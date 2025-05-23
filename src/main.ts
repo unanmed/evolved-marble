@@ -1,24 +1,57 @@
-import './style.css'
-import typescriptLogo from './typescript.svg'
-import viteLogo from '/vite.svg'
-import { setupCounter } from './counter.ts'
+import './styles.css';
+import { BattleScene } from './scene/battle/scene';
+import { OffscreenCanvas2D } from './scene/canvas2d';
+import { SceneController } from './scene/controller';
+import { InputType } from './scene/common';
 
-document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-  <div>
-    <a href="https://vite.dev" target="_blank">
-      <img src="${viteLogo}" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://www.typescriptlang.org/" target="_blank">
-      <img src="${typescriptLogo}" class="logo vanilla" alt="TypeScript logo" />
-    </a>
-    <h1>Vite + TypeScript</h1>
-    <div class="card">
-      <button id="counter" type="button"></button>
-    </div>
-    <p class="read-the-docs">
-      Click on the Vite and TypeScript logos to learn more
-    </p>
-  </div>
-`
+class Main {
+    readonly canvas: OffscreenCanvas2D;
+    readonly scene: SceneController;
 
-setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
+    constructor() {
+        const canvas = document.getElementById('scene') as HTMLCanvasElement;
+        this.canvas = new OffscreenCanvas2D(true, canvas);
+        this.scene = new SceneController(this.canvas);
+
+        window.addEventListener('resize', () => this.resetCanvas());
+    }
+
+    initialize() {
+        this.resetCanvas();
+        this.initializeScene();
+    }
+
+    resetCanvas() {
+        this.canvas.setHD(true);
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        const ratio = width / height;
+        if (ratio > 4 / 3) {
+            const w = Math.floor((height * 4) / 3);
+            this.canvas.size(w, height);
+            this.canvas.canvas.style.width = `${w}px`;
+            this.canvas.canvas.style.height = `${height}px`;
+        } else {
+            const h = Math.floor((width * 3) / 4);
+            this.canvas.size(width, (width * 3) / 4);
+            this.canvas.canvas.style.width = `${width}px`;
+            this.canvas.canvas.style.height = `${h}px`;
+        }
+    }
+
+    async initializeScene() {
+        this.scene.add(new BattleScene());
+        await this.scene.ready();
+        this.scene.changeTo('battle');
+    }
+}
+
+const main = new Main();
+main.initialize();
+
+window.addEventListener('keydown', ev => {
+    main.scene.input(InputType.KeyDown, ev);
+});
+window.addEventListener('keyup', ev => {
+    main.scene.input(InputType.KeyUp, ev);
+});
