@@ -26,7 +26,7 @@ const enum BodyType {
     Sword
 }
 
-interface BallBodyData {
+export interface BallBodyData {
     isMarble: boolean;
     color: string;
     hp: number;
@@ -50,12 +50,18 @@ interface BattleMove {
     angular: number;
 }
 
-export class BattleScene extends Scene {
+interface BattleSceneEvent {
+    over: [win: string];
+    attack: [attacker: string, defender: string, damage: number];
+    contact: [a: string, b: string];
+}
+
+export class BattleScene extends Scene<BattleSceneEvent> {
     private backImage: HTMLImageElement = new Image();
     private world: World = new World();
 
-    private balls: Body[] = [];
-    private actions: BattleMove[] = [];
+    balls: Body[] = [];
+    actions: BattleMove[] = [];
     private damageRender: Set<DamageRender> = new Set();
 
     private left: boolean = false;
@@ -64,6 +70,7 @@ export class BattleScene extends Scene {
     private right: boolean = false;
     private rotateCW: boolean = false;
     private rotateACW: boolean = false;
+    private end: boolean = false;
 
     constructor() {
         super('battle');
@@ -223,6 +230,7 @@ export class BattleScene extends Scene {
             const y = radius * Math.sin(theta - Math.PI / 2);
             vertices.push(new Vec2(x, y));
         }
+        vertices.push(new Vec2(0, 0));
 
         return vertices;
     }
@@ -259,7 +267,13 @@ export class BattleScene extends Scene {
         // 剑
         const sword = world.createBody({
             type: 'dynamic',
-            position: new Vec2(bodyX + 1, bodyY)
+            position: new Vec2(bodyX + 1, bodyY),
+            userData: {
+                color,
+                hp: 0,
+                isMarble: false,
+                attackTime: 0
+            }
         });
         sword.createFixture(new Box(0.5, 0.2), {
             density: 0.5,
@@ -284,7 +298,7 @@ export class BattleScene extends Scene {
             position: new Vec2(bodyX, bodyY)
         });
         helmet.createFixture(
-            new Polygon(this.createHelmetShape(0.7, (Math.PI * 2) / 3, 24)),
+            new Polygon(this.createHelmetShape(0.7, (Math.PI * 2) / 3, 8)),
             {
                 density: 0.2,
                 friction: 0.4,
@@ -375,6 +389,7 @@ export class BattleScene extends Scene {
         )?.getUserData() as BallBodyData;
         if (!bodyData) return;
         if (performance.now() - bodyData.attackTime < IVALID_FRAME) return;
+        const attackerData = attacker.getUserData() as BallBodyData;
         const isHelmet = defenderData.type === BodyType.Helmet;
         const v1 = attacker.getLinearVelocity();
         const v2 = defender.getLinearVelocity();
@@ -397,6 +412,14 @@ export class BattleScene extends Scene {
             startTime: performance.now(),
             value: damage
         });
+        this.emit('attack', attackerData.color, defenderData.color, damage);
+
+        if (bodyData.hp <= 0) {
+            bodyData.hp = 0;
+            if (!attackerData) return;
+            this.emit('over', attackerData.color);
+            this.end = true;
+        }
     }
 
     private contact(contact: Contact) {
@@ -409,6 +432,7 @@ export class BattleScene extends Scene {
         const userDataB = fixtureB.getUserData() as BattleFixtureData;
         if (!userDataA || !userDataB) return;
         if (userDataA.color === userDataB.color) return;
+        this.emit('contact', userDataA.color, userDataB.color);
         if (userDataA.type === BodyType.Sword) {
             this.attack(bodyA, bodyB, userDataB);
         } else if (userDataB.type === BodyType.Sword) {
@@ -417,6 +441,7 @@ export class BattleScene extends Scene {
     }
 
     resetWorld() {
+        this.end = false;
         this.balls = [];
         this.actions = [];
         this.world = new World(new Vec2(0, 0));
@@ -435,6 +460,7 @@ export class BattleScene extends Scene {
     }
 
     onTick(_timestamp: number, dt: number, _lastTick: number): void {
+        if (this.end) return;
         this.balls.forEach((v, i) => {
             const { linear, angular } = this.actions[i];
             if (linear.length() > 0) {

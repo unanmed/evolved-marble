@@ -2,11 +2,13 @@ import EventEmitter from 'eventemitter3';
 import type { OffscreenCanvas2D } from './canvas2d';
 import type { InputType } from './common';
 
-interface SceneEvent {
+export interface SceneEvent {
     shown: [];
 }
 
-export abstract class Scene extends EventEmitter<SceneEvent> {
+export abstract class Scene<E extends object = SceneEvent> extends EventEmitter<
+    E | SceneEvent
+> {
     constructor(public readonly id: string) {
         super();
     }

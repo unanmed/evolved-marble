@@ -3,15 +3,19 @@ import { BattleScene } from './scene/battle/scene';
 import { OffscreenCanvas2D } from './scene/canvas2d';
 import { SceneController } from './scene/controller';
 import { InputType } from './scene/common';
+import { TrainManager } from './train/manager';
+import { BattleTrain } from './train/battle/train';
 
 class Main {
     readonly canvas: OffscreenCanvas2D;
     readonly scene: SceneController;
+    readonly train: TrainManager;
 
     constructor() {
         const canvas = document.getElementById('scene') as HTMLCanvasElement;
         this.canvas = new OffscreenCanvas2D(true, canvas);
         this.scene = new SceneController(this.canvas);
+        this.train = new TrainManager(this.scene);
 
         window.addEventListener('resize', () => this.resetCanvas());
     }
@@ -19,6 +23,7 @@ class Main {
     initialize() {
         this.resetCanvas();
         this.initializeScene();
+        this.initializetrain();
     }
 
     resetCanvas() {
@@ -43,6 +48,11 @@ class Main {
         this.scene.add(new BattleScene());
         await this.scene.ready();
         this.scene.changeTo('battle');
+    }
+
+    initializetrain() {
+        this.train.add(new BattleTrain(this.train));
+        this.train.changeTo('battle');
     }
 }
 

@@ -30,7 +30,11 @@ export class SceneController extends EventEmitter<SceneControllerEvent> {
         tick(0);
     }
 
-    add(scene: Scene) {
+    get(id: string) {
+        return this.list.get(id);
+    }
+
+    add(scene: Scene<any>) {
         this.list.set(scene.id, scene);
     }
 
