@@ -61,13 +61,19 @@ def train(args):
             
     print("Start to train.")
     
+    start_ep = 0
+    
     if args.resume:
         data = torch.load(args.from_state, map_location=device)
         model.load_state_dict(data["policy"])
         optimizer.load_state_dict(data["optim"])
+        
+        if data.get("episode") is not None:
+            start_ep = data["episode"]
 
     for ep in range(n_episodes):
         optimizer.zero_grad()
+        env.episode = start_ep + ep + 1
         obs_dict, _ = env.reset()
         termination = {agent: False for agent in obs_dict}
 
@@ -123,7 +129,8 @@ def train(args):
         if (ep + 1) % 5 == 0:
             torch.save({
                 "policy": model.state_dict(),
-                "optim": optimizer.state_dict()
+                "optim": optimizer.state_dict(),
+                "episode": start_ep + ep + 1
             }, f"checkpoint/{ep + 1}.pt")
 
 if __name__ == "__main__":

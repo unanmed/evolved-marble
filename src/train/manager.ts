@@ -5,6 +5,10 @@ export interface ITrainDataBase {
     type: string;
 }
 
+interface ResetData extends ITrainDataBase {
+    episode: number;
+}
+
 export interface ITrainParallelResets<T, I> {
     observation: Record<string, T>;
     info: Record<string, I>;
@@ -98,11 +102,14 @@ export class TrainManager extends EventEmitter<TrainManagerEvent> {
     }
 
     onData(ev: MessageEvent) {
-        const data = JSON.parse(ev.data) as ITrainDataBase;
+        const data = JSON.parse(ev.data) as ResetData;
         if (data.type === 'reset') {
-            const reset = this._process?.reset();
-            if (reset) {
-                this.send(reset);
+            if (this._process) {
+                const reset = this._process.reset();
+                this._process.iteration = data.episode;
+                if (reset) {
+                    this.send(reset);
+                }
             }
             return;
         }

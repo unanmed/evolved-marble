@@ -13,6 +13,7 @@ class EvolvedMarbleEnv(ParallelEnv):
         self.ws = WebSocketServer()
         self.agents = ["red", "blue"]
         self.possible_agents = self.agents.copy()
+        self.episode = 0
 
         self._observation_space = Box(low=-1.0, high=1.0, shape=(16,), dtype=np.float32)
         self._action_space = Box(low=-1.0, high=1.0, shape=(3,), dtype=np.float32)
@@ -25,7 +26,7 @@ class EvolvedMarbleEnv(ParallelEnv):
         return self._action_space
 
     def reset(self, seed=None, options=None):
-        reset_payload = {"type": "reset"}
+        reset_payload = {"type": "reset", "episode": self.episode}
         result = asyncio.get_event_loop().run_until_complete(
             self._send_and_receive(reset_payload)
         )

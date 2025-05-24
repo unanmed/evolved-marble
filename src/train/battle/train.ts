@@ -55,6 +55,8 @@ export class BattleTrain extends TrainProcess<
 
     private damageInfo: DamageInfo[] = [];
     private colors: string[] = [];
+    private teleport: number[] = [];
+    private totalTeleport: number[] = [];
     private winInfo: WinInfo = { won: false, color: 'red' };
     private wins: Record<string, number> = {};
 
@@ -87,6 +89,11 @@ export class BattleTrain extends TrainProcess<
             const bIdx = this.colors.indexOf(b);
             this.damageInfo[aIdx].lastContact = now;
             this.damageInfo[bIdx].lastContact = now;
+        });
+        this.scene.on('teleport', (color: string) => {
+            const idx = this.colors.indexOf(color);
+            this.teleport[idx]++;
+            this.totalTeleport[idx]++;
         });
 
         this.reset();
@@ -266,6 +273,8 @@ export class BattleTrain extends TrainProcess<
         this.scene.resetWorld();
         this.colors = [];
         this.damageInfo = [];
+        this.teleport = [];
+        this.totalTeleport = [];
         this.winInfo = { won: false, color: 'red' };
         this.scene.balls.forEach(v => {
             const data = v.getUserData() as BallBodyData;
@@ -276,6 +285,8 @@ export class BattleTrain extends TrainProcess<
                 damage: [],
                 lastContact: now
             });
+            this.teleport.push(0);
+            this.totalTeleport.push(0);
         });
 
         const obs: Record<string, number[]> = {};
@@ -333,19 +344,23 @@ export class BattleTrain extends TrainProcess<
         const done = now - this.lastReset > 60000 || this.winInfo.won;
 
         const reward: number[] = Array(this.colors.length).fill(0);
+        const teleported = this.teleport.some(v => v > 0);
         this.colors.forEach((color, i) => {
-            if (this.iteration < 20) {
+            if (this.iteration < 20 && !teleported) {
                 // 场地长宽为 20*15
                 reward[i] += -(nowLength - lastLength) * 0.1;
             }
             const info = this.damageInfo[i];
             // 生命值最大为 100
             reward[i] += info.damage.reduce(
-                (prev, curr) => prev + curr ** 2 * 0.03,
+                (prev, curr) => prev + curr * 0.3,
                 0
             );
             reward[i] -= info.recv.reduce((prev, curr) => prev + curr * 0.1, 0);
+            // 去边界施加惩罚
+            reward[i] -= this.teleport[i] * this.totalTeleport[i];
 
+            this.teleport[i] = 0;
             info.damage = [];
             info.recv = [];
             if (now - info.lastContact > 10000) {

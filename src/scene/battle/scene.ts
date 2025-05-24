@@ -54,6 +54,7 @@ interface BattleSceneEvent {
     over: [win: string];
     attack: [attacker: string, defender: string, damage: number];
     contact: [a: string, b: string];
+    teleport: [color: string];
 }
 
 export class BattleScene extends Scene<BattleSceneEvent> {
@@ -61,6 +62,8 @@ export class BattleScene extends Scene<BattleSceneEvent> {
     private world: World = new World();
 
     balls: Body[] = [];
+    swords: Body[] = [];
+    helmets: Body[] = [];
     actions: BattleMove[] = [];
     private damageRender: Set<DamageRender> = new Set();
 
@@ -321,10 +324,10 @@ export class BattleScene extends Scene<BattleSceneEvent> {
         body.setLinearDamping(LINEAR_DAMPING);
         body.setAngularDamping(ANGULAR_DAMPING);
 
-        return body;
+        return [body, sword, helmet];
     }
 
-    private createBoundaries(
+    private _createBoundaries(
         left: number,
         right: number,
         top: number,
@@ -444,10 +447,21 @@ export class BattleScene extends Scene<BattleSceneEvent> {
         this.end = false;
         this.balls = [];
         this.actions = [];
+        this.swords = [];
+        this.helmets = [];
         this.world = new World(new Vec2(0, 0));
-        this.createBoundaries(0, 20, 0, 15);
-        this.balls.push(this.createMarble('red', [0.5, 9, 0.5, 14]));
-        this.balls.push(this.createMarble('blue', [10.5, 9, 0.5, 14]));
+        // this.createBoundaries(0, 20, 0, 15);
+        const [redBall, redSword, redHelmet] = this.createMarble(
+            'red',
+            [0.5, 9, 0.5, 14]
+        );
+        const [blueBall, blueSword, blueHelmet] = this.createMarble(
+            'blue',
+            [10.5, 9, 0.5, 14]
+        );
+        this.balls.push(redBall, blueBall);
+        this.swords.push(redSword, blueSword);
+        this.helmets.push(redHelmet, blueHelmet);
         this.actions.push({ linear: new Vec2(), angular: 0 });
         this.actions.push({ linear: new Vec2(), angular: 0 });
         this.world.on('begin-contact', contact => {
@@ -483,7 +497,30 @@ export class BattleScene extends Scene<BattleSceneEvent> {
             if (Math.abs(angVel) > MAX_ANGULAR_SPEED) {
                 v.setAngularVelocity(Math.sign(angVel) * MAX_ANGULAR_SPEED);
             }
+
+            const pos = v.getPosition().clone();
+            const offset = new Vec2(); // wraparound 修正偏移
+            if (pos.x < 0) offset.x = 20;
+            if (pos.x > 20) offset.x = -20;
+            if (pos.y < 0) offset.y = 15;
+            if (pos.y > 15) offset.y = -15;
+            if (offset.length() > 0) {
+                // 主体瞬移
+                const ball = v;
+                const sword = this.swords[i];
+                const helmet = this.helmets[i];
+                const data = ball.getUserData() as BallBodyData;
+                if (!data) return;
+                const color = data.color;
+
+                ball.setPosition(ball.getPosition().clone().add(offset));
+                sword.setPosition(sword.getPosition().clone().add(offset));
+                helmet.setPosition(helmet.getPosition().clone().add(offset));
+
+                this.emit('teleport', color);
+            }
         });
+
         this.world.step(dt / 1000);
     }
 
