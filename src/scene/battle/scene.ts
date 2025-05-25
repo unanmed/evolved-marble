@@ -626,4 +626,8 @@ export class BattleScene extends Scene<BattleSceneEvent> {
             }
         }
     }
+
+    endBattle() {
+        this.end = true;
+    }
 }

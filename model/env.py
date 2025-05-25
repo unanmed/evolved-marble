@@ -1,5 +1,6 @@
 import asyncio
 import json
+from time import sleep
 from typing import Any, Optional, Tuple
 import numpy as np
 from pettingzoo import ParallelEnv
@@ -13,11 +14,19 @@ class EvolvedMarbleEnv(ParallelEnv):
         self.ws = WebSocketServer()
         self.agents = ["red", "blue"]
         self.possible_agents = self.agents.copy()
-        self.episode = 0
+        self.episode = -2
 
         self._observation_space = Box(low=-1.0, high=1.0, shape=(16,), dtype=np.float32)
         self._action_space = Box(low=-1.0, high=1.0, shape=(3,), dtype=np.float32)
         self.ws.start()
+        
+        print("Waiting for connection.")
+        while True:
+            if self.ws.is_connected():
+                break
+            else:
+                sleep(1)
+        print("Client connected.")
 
     def observation_space(self, agent):
         return self._observation_space
@@ -26,11 +35,16 @@ class EvolvedMarbleEnv(ParallelEnv):
         return self._action_space
 
     def reset(self, seed=None, options=None):
+        self.episode += 1
+        self.agents = self.possible_agents.copy()
         reset_payload = {"type": "reset", "episode": self.episode}
         result = asyncio.get_event_loop().run_until_complete(
             self._send_and_receive(reset_payload)
         )
-        return result["observation"], result.get("info", {})
+        obs = dict()
+        for key, value in result["observation"].items():
+            obs[key] = np.array(value, dtype=np.float32)
+        return obs, result.get("info", dict())
 
     async def step_async(self, actions: dict[str, np.ndarray]) -> Tuple[
         dict[str, np.ndarray],
@@ -46,8 +60,18 @@ class EvolvedMarbleEnv(ParallelEnv):
                 "angular": float(action[2]),
             }
         result = await self._send_and_receive(payload)
+        obs = dict()
+        for key, value in result["observation"].items():
+            obs[key] = np.array(value, dtype=np.float32)
+            
+        self.agents = [
+            agent for agent in self.agents
+            if not result["termination"].get(agent, False) and 
+                not result["truncation"].get(agent, False)
+        ]
+        
         return (
-            result["observation"],
+            obs,
             result["reward"],
             result["termination"],
             result["truncation"],

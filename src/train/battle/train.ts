@@ -342,6 +342,9 @@ export class BattleTrain extends TrainProcess<
 
         const now = performance.now();
         const done = now - this.lastReset > 60000 || this.winInfo.won;
+        if (done) {
+            this.scene.endBattle();
+        }
 
         const reward: number[] = Array(this.colors.length).fill(0);
         const teleported = this.teleport.some(v => v > 0);
@@ -353,7 +356,7 @@ export class BattleTrain extends TrainProcess<
             const info = this.damageInfo[i];
             // 生命值最大为 100
             reward[i] += info.damage.reduce(
-                (prev, curr) => prev + curr * 0.3,
+                (prev, curr) => prev + curr * 0.5,
                 0
             );
             reward[i] -= info.recv.reduce((prev, curr) => prev + curr * 0.1, 0);
@@ -414,7 +417,7 @@ export class BattleTrain extends TrainProcess<
             ];
             rewardObj[v] = reward[i];
             termination[v] = done;
-            truncation[v] = v === this.winInfo.color;
+            truncation[v] = this.winInfo.won && v === this.winInfo.color;
             infos[v] = { reason };
         });
 
