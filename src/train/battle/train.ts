@@ -61,6 +61,7 @@ export class BattleTrain extends TrainProcess<
     private wins: Record<string, number> = {};
 
     private lastReset: number = 0;
+    private timeout: number = 120000;
 
     initialize(): void {
         this.scene = this.manager.scene.get('battle') as BattleScene;
@@ -211,7 +212,7 @@ export class BattleTrain extends TrainProcess<
 
         const update = () => {
             const now = performance.now();
-            const remain = 60000 - now + this.lastReset;
+            const remain = this.timeout - now + this.lastReset;
             remainTime.innerText = `剩余时间：${Math.floor(
                 remain / 1000
             ).toString()}`;
@@ -341,7 +342,7 @@ export class BattleTrain extends TrainProcess<
         const nowLength = posA.clone().sub(posB.clone()).length();
 
         const now = performance.now();
-        const done = now - this.lastReset > 60000 || this.winInfo.won;
+        const done = now - this.lastReset > this.timeout || this.winInfo.won;
         if (done) {
             this.scene.endBattle();
         }
@@ -371,14 +372,14 @@ export class BattleTrain extends TrainProcess<
                 const ratio = Math.max(1 - this.iteration / 50, 0);
                 reward[i] -= ratio;
             }
-            if (now - this.lastReset > 60000) {
+            if (now - this.lastReset > this.timeout) {
                 // 超时惩罚
                 reward[i] -= 20;
             }
             if (this.winInfo.won) {
                 // 获胜奖惩
                 if (this.winInfo.color === color) {
-                    reward[i] += 20;
+                    reward[i] += 20 + (now - this.timeout) / 1000;
                 } else {
                     reward[i] -= 10;
                 }
@@ -413,7 +414,7 @@ export class BattleTrain extends TrainProcess<
                 angle / Math.PI / 2,
                 angularVel / 10,
                 // 剩余时间
-                (now - this.lastReset) / 60000
+                (now - this.lastReset) / this.timeout
             ];
             rewardObj[v] = reward[i];
             termination[v] = done;

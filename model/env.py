@@ -9,12 +9,12 @@ from .ws_client import WebSocketServer
 
 
 class EvolvedMarbleEnv(ParallelEnv):
-    def __init__(self):
+    def __init__(self, config):
         super().__init__()
         self.ws = WebSocketServer()
         self.agents = ["red", "blue"]
         self.possible_agents = self.agents.copy()
-        self.episode = -2
+        self.episode = config["episode"] - 2
 
         self._observation_space = Box(low=-1.0, high=1.0, shape=(16,), dtype=np.float32)
         self._action_space = Box(low=-1.0, high=1.0, shape=(3,), dtype=np.float32)
