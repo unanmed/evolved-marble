@@ -79,7 +79,7 @@ if __name__ == "__main__":
     ray.init()
     
     parser = argparse.ArgumentParser()
-    parser.add_argument('--resume', type=bool, default=True)
+    parser.add_argument('--resume', type=bool, default=False)
     parser.add_argument('--from_state', type=int, default=0)
     args = parser.parse_args()
 

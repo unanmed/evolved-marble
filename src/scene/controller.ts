@@ -1,26 +1,29 @@
 import EventEmitter from 'eventemitter3';
-import type { Scene } from './scene';
-import type { OffscreenCanvas2D } from './canvas2d';
-import type { InputType } from './common';
+import { Scene } from './scene';
+import { IUIInstance, UIController } from '@motajs/client';
+import { InputType, IScene, SceneMode } from '../common';
 
 interface SceneControllerEvent {
     change: [scene: Scene];
 }
 
 export class SceneController extends EventEmitter<SceneControllerEvent> {
-    readonly list: Map<string, Scene> = new Map();
+    readonly list: Map<string, IScene<any, any>> = new Map();
 
     private lastTick: number = 0;
 
-    private _nowScene: Scene | null = null;
-    public get nowScene(): Scene | null {
-        return this._nowScene;
-    }
-    public set nowScene(v: Scene | null) {
-        this.changeTo(v);
+    /** 当前打开的 UI 实例 */
+    private _instance?: IUIInstance;
+    get instance() {
+        return this._instance;
     }
 
-    constructor(public readonly canvas: OffscreenCanvas2D) {
+    private _nowScene: IScene<any, any> | null = null;
+    public get nowScene(): IScene<any, any> | null {
+        return this._nowScene;
+    }
+
+    constructor(public readonly ui: UIController) {
         super();
 
         const tick = (timestamp: number) => {
@@ -30,14 +33,25 @@ export class SceneController extends EventEmitter<SceneControllerEvent> {
         tick(0);
     }
 
+    /**
+     * 根据 id 获取场景实例
+     */
     get(id: string) {
         return this.list.get(id);
     }
 
-    add(scene: Scene<any>) {
+    /**
+     * 添加场景实例
+     */
+    add(scene: Scene<any, any, any>) {
         this.list.set(scene.id, scene);
     }
 
+    /**
+     * 切换当前显示的场景
+     * @param scene 要切换至的场景
+     * @param props 传入场景的参数
+     */
     changeTo(scene: Scene | string | null) {
         if (typeof scene === 'string') {
             const target = this.list.get(scene) ?? null;
@@ -47,23 +61,34 @@ export class SceneController extends EventEmitter<SceneControllerEvent> {
         }
         if (!this._nowScene) return;
         this._nowScene.onShown();
+        this.ui.closeAll();
+        this._nowScene.setMode(SceneMode.Scene);
+        this._instance = this.ui.open(this._nowScene.getGameUI(), {
+            scene: this._nowScene
+        });
     }
-
+    /**
+     * 每帧执行一次的函数
+     */
     tick(timestamp: number) {
         if (!this._nowScene) return;
         const lastTick = this.lastTick;
         this.lastTick = timestamp;
         if (lastTick === 0) return;
         const dt = timestamp - lastTick;
-        this.canvas.clear();
         this._nowScene.onTick(timestamp, dt, lastTick);
-        this._nowScene.render(this.canvas);
     }
 
+    /**
+     * 加载所有场景的必要信息，全部加载完毕后兑现
+     */
     ready(): Promise<void[]> {
         return Promise.all(this.list.values().map(v => v.load()));
     }
 
+    /**
+     * 输入按键操作
+     */
     input(type: InputType, ev: KeyboardEvent) {
         if (!this._nowScene) return;
         this._nowScene.onInput(type, ev);

@@ -1,5 +1,7 @@
-import EventEmitter from 'eventemitter3';
-import type { SceneController } from '../scene/controller';
+import { EventEmitter } from 'eventemitter3';
+import { SceneController } from '../scene/controller';
+import { IDisplayInfoBase, IScene, ITrainer } from '@/common';
+import { Ticker } from 'mutate-animate';
 
 export interface ITrainDataBase {
     type: string;
@@ -15,9 +17,14 @@ export interface ITrainParallelResets<T, I> {
 }
 
 export abstract class TrainProcess<
-    T extends ITrainDataBase = ITrainDataBase,
-    R extends ITrainParallelResets<any, any> = ITrainParallelResets<any, any>
-> extends EventEmitter {
+        S,
+        T extends IDisplayInfoBase,
+        D extends ITrainDataBase,
+        R extends ITrainParallelResets<any, any>
+    >
+    extends EventEmitter
+    implements ITrainer<S, T>
+{
     abstract readonly id: string;
     /** 两次操作的间隔，单位毫秒 */
     abstract readonly interval: number;
@@ -26,20 +33,36 @@ export abstract class TrainProcess<
 
     protected pending: boolean = false;
 
-    iteration: number = 0;
+    episode: number = 0;
 
     constructor(public readonly manager: TrainManager) {
         super();
     }
 
+    /**
+     * 初始化此训练器
+     */
     abstract initialize(): void;
 
+    /**
+     * 重置场景，并返回重置状态
+     */
     abstract onReset(): R;
 
-    abstract onData(data: T): void;
+    /**
+     * 接收到训练端发送的信息后执行
+     * @param data 接收到的信息
+     */
+    abstract onData(data: D): void;
+
+    /**
+     * 每帧执行一次的函数
+     * @param timestamp 时间戳
+     */
+    abstract onTick(timestamp: number): void;
 
     reset() {
-        this.iteration++;
+        this.episode++;
         this.resetTime();
         return this.onReset();
     }
@@ -65,22 +88,36 @@ export abstract class TrainProcess<
         });
     }
 
+    /**
+     * 向训练端发送信息
+     */
     send(data: any) {
         this.manager.send(data);
     }
+
+    abstract save(): string | Blob | ArrayBuffer;
+
+    abstract load(data: string | Blob | ArrayBuffer): void;
+
+    abstract getDisplayInfo(): T;
+
+    abstract onBind(scene: IScene<S, T>): void;
 }
+
+export type AnyTrainProcess = TrainProcess<any, any, any, any>;
 
 interface TrainManagerEvent {}
 
 export class TrainManager extends EventEmitter<TrainManagerEvent> {
     readonly socket: WebSocket;
-    readonly list: Map<string, TrainProcess> = new Map();
+    readonly list: Map<string, AnyTrainProcess> = new Map();
+    readonly ticker = new Ticker();
 
-    private _process: TrainProcess | null = null;
-    public get trainScene(): TrainProcess | null {
+    private _process: AnyTrainProcess | null = null;
+    public get trainScene(): AnyTrainProcess | null {
         return this._process;
     }
-    public set trainScene(v: TrainProcess | string | null) {
+    public set trainScene(v: AnyTrainProcess | string | null) {
         this.changeTo(v);
     }
 
@@ -89,16 +126,21 @@ export class TrainManager extends EventEmitter<TrainManagerEvent> {
         this.socket = new WebSocket('ws://localhost:7725');
         this.socket.addEventListener('open', () => {
             console.log(`Train socket connect successfully.`);
-            if (this._process) this._process.iteration = 0;
+            if (this._process) this._process.episode = 0;
         });
         this.socket.addEventListener('message', ev => {
             this.onData(ev);
         });
+        this.ticker.add(time => this.tick(time));
     }
 
-    add(process: TrainProcess) {
+    add(process: AnyTrainProcess) {
         this.list.set(process.id, process);
         process.initialize();
+    }
+
+    get(id: string) {
+        return this.list.get(id);
     }
 
     onData(ev: MessageEvent) {
@@ -106,7 +148,7 @@ export class TrainManager extends EventEmitter<TrainManagerEvent> {
         if (data.type === 'reset') {
             if (this._process) {
                 const reset = this._process.reset();
-                this._process.iteration = data.episode;
+                this._process.episode = data.episode;
                 if (reset) {
                     this.send(reset);
                 }
@@ -116,7 +158,7 @@ export class TrainManager extends EventEmitter<TrainManagerEvent> {
         this._process?.onData(data);
     }
 
-    changeTo(process: TrainProcess | string | null) {
+    changeTo(process: AnyTrainProcess | string | null) {
         if (process === null) this._process = null;
         else if (typeof process === 'string') {
             const p = this.list.get(process);
@@ -130,5 +172,9 @@ export class TrainManager extends EventEmitter<TrainManagerEvent> {
 
     send(data: any) {
         this.socket.send(JSON.stringify(data));
+    }
+
+    tick(time: number) {
+        this._process?.onTick(time);
     }
 }

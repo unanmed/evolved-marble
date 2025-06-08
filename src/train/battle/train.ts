@@ -1,10 +1,12 @@
 import { Vec2 } from 'planck-js';
-import type { BallBodyData, BattleScene } from '../../scene/battle/scene';
+import { BattleScene } from '@/scene/battle/scene';
+import { TrainProcess, ITrainDataBase, ITrainParallelResets } from '../manager';
 import {
-    TrainProcess,
-    type ITrainDataBase,
-    type ITrainParallelResets
-} from '../manager';
+    BallBodyData,
+    IBattleDisplayInfo,
+    IBattleSceneState
+} from '@/scene/battle/types';
+import { IScene } from '@/common';
 
 interface BattleTrainData extends ITrainDataBase {
     actions: Record<
@@ -44,7 +46,15 @@ interface BattleSendData {
     info: Record<string, BattleBallInfo>;
 }
 
+interface BattleSaveData {
+    episode: number;
+    colors: string[];
+    wins: number[];
+}
+
 export class BattleTrain extends TrainProcess<
+    IBattleSceneState,
+    IBattleDisplayInfo,
     BattleTrainData,
     ITrainParallelResets<number[], BattleBallInfo>
 > {
@@ -62,6 +72,39 @@ export class BattleTrain extends TrainProcess<
 
     private lastReset: number = 0;
     private timeout: number = 120000;
+
+    private readonly display: IBattleDisplayInfo = {
+        episode: 0,
+        remainTime: 0,
+        red: {
+            color: 'red',
+            win: 0,
+            hp: 0,
+            x: 0,
+            y: 0,
+            vx: 0,
+            vy: 0,
+            angle: 0,
+            angularVel: 0,
+            actionHor: 0,
+            actionVer: 0,
+            actionRotate: 0
+        },
+        blue: {
+            color: 'blue',
+            win: 0,
+            hp: 0,
+            x: 0,
+            y: 0,
+            vx: 0,
+            vy: 0,
+            angle: 0,
+            angularVel: 0,
+            actionHor: 0,
+            actionVer: 0,
+            actionRotate: 0
+        }
+    };
 
     initialize(): void {
         this.scene = this.manager.scene.get('battle') as BattleScene;
@@ -83,6 +126,11 @@ export class BattleTrain extends TrainProcess<
             this.winInfo.color = win;
             this.wins[win] ??= 0;
             this.wins[win]++;
+            if (win === 'red') {
+                this.display.red.win = this.wins[win];
+            } else if (win === 'blue') {
+                this.display.blue.win = this.wins[win];
+            }
         });
         this.scene.on('contact', (a: string, b: string) => {
             const now = performance.now();
@@ -98,174 +146,6 @@ export class BattleTrain extends TrainProcess<
         });
 
         this.reset();
-
-        // 展示数据
-        const left = document.createElement('div');
-        const right = document.createElement('div');
-        left.style.position = 'fixed';
-        left.style.left = '0';
-        left.style.top = '0';
-        left.style.width = '200px';
-        left.style.height = '100%';
-        left.style.display = 'flex';
-        left.style.flexDirection = 'column';
-        left.style.justifyContent = 'center';
-        left.style.alignItems = 'end';
-        left.style.color = 'white';
-        left.style.font = '24px Arial';
-        right.style.position = 'fixed';
-        right.style.right = '0';
-        right.style.top = '0';
-        right.style.width = '200px';
-        right.style.height = '100%';
-        right.style.display = 'flex';
-        right.style.flexDirection = 'column';
-        right.style.justifyContent = 'center';
-        right.style.alignItems = 'start';
-        right.style.color = 'white';
-        right.style.font = '24px Arial';
-
-        document.body.appendChild(left);
-        document.body.appendChild(right);
-
-        const remainTime = document.createElement('span');
-        const episode = document.createElement('span');
-        const info1 = document.createElement('span');
-        const info2 = document.createElement('span');
-        const info3 = document.createElement('span');
-        const info4 = document.createElement('span');
-        const win1 = document.createElement('span');
-        const win2 = document.createElement('span');
-        const winInfo1 = document.createElement('span');
-        const winInfo2 = document.createElement('span');
-
-        remainTime.style.marginBottom = '32px';
-        episode.style.marginBottom = '32px';
-        info3.style.marginTop = '32px';
-        info4.style.marginTop = '32px';
-        // win1.style.marginTop = '32px';
-        // win2.style.marginTop = '32px';
-        winInfo1.style.marginBottom = '32px';
-        winInfo2.style.marginBottom = '32px';
-
-        info1.innerText = '红方信息';
-        info2.innerText = '蓝方信息';
-        info3.innerText = '红方操作';
-        info4.innerText = '蓝方操作';
-        win1.innerText = '红方胜率';
-        win2.innerText = '蓝方胜率';
-
-        const infoName: Record<string, string> = {
-            hp: '生命值',
-            x: 'x坐标',
-            y: 'y坐标',
-            vx: 'x速度',
-            vy: 'y速度',
-            angle: '旋转角',
-            angularVel: '角速度'
-        };
-        const actionName: Record<string, string> = {
-            horizontal: '水平',
-            vertical: '竖直',
-            rotate: '旋转'
-        };
-
-        const infos: Record<string, Record<string, HTMLSpanElement>> = {};
-        const actions: Record<string, Record<string, HTMLSpanElement>> = {};
-
-        left.appendChild(remainTime);
-        left.appendChild(win1);
-        left.appendChild(winInfo1);
-        left.appendChild(info1);
-        right.appendChild(episode);
-        right.appendChild(win2);
-        right.appendChild(winInfo2);
-        right.appendChild(info2);
-
-        for (const color of this.colors) {
-            infos[color] = {};
-            actions[color] = {};
-            for (const key of Object.keys(infoName)) {
-                infos[color][key] = document.createElement('span');
-            }
-            for (const key of Object.keys(actionName)) {
-                actions[color][key] = document.createElement('span');
-            }
-        }
-
-        for (const ele of Object.values(infos.red)) {
-            left.appendChild(ele);
-        }
-        for (const ele of Object.values(infos.blue)) {
-            right.appendChild(ele);
-        }
-
-        left.appendChild(info3);
-        right.appendChild(info4);
-
-        for (const ele of Object.values(actions.red)) {
-            left.appendChild(ele);
-        }
-        for (const ele of Object.values(actions.blue)) {
-            right.appendChild(ele);
-        }
-
-        const update = () => {
-            const now = performance.now();
-            const remain = this.timeout - now + this.lastReset;
-            remainTime.innerText = `剩余时间：${Math.floor(
-                remain / 1000
-            ).toString()}`;
-
-            episode.innerText = `当前轮数：${this.iteration}`;
-            const redWin = this.wins.red ?? 0;
-            const blueWin = this.wins.blue ?? 0;
-            const total = redWin + blueWin;
-            const redWinRatio = (redWin / total) * 100 || 0;
-            const blueWinRatio = (blueWin / total) * 100 || 0;
-            winInfo1.innerText = `${redWin}(${redWinRatio.toFixed(2)}%)`;
-            winInfo2.innerText = `${blueWin}(${blueWinRatio.toFixed(2)}%)`;
-
-            this.colors.forEach((v, i) => {
-                const ball = this.scene.getBall(v);
-                if (!ball) return;
-                const data = ball.getUserData() as BallBodyData;
-                if (!data) return;
-                const pos = ball.getPosition();
-                const vel = ball.getLinearVelocity();
-                const angle = ball.getAngle() % (Math.PI * 2);
-                const angularVel = ball.getAngularVelocity();
-
-                const values: Record<string, number> = {
-                    hp: data.hp,
-                    x: pos.x,
-                    y: pos.y,
-                    vx: vel.x,
-                    vy: vel.y,
-                    angle: angle,
-                    angularVel: angularVel
-                };
-                const actionValue: Record<string, number> = {
-                    horizontal: this.scene.actions[i].linear.x,
-                    vertical: this.scene.actions[i].linear.y,
-                    rotate: this.scene.actions[i].angular
-                };
-
-                for (const [key, value] of Object.entries(values)) {
-                    infos[v][key].innerText = `${
-                        infoName[key]
-                    }：${value.toFixed(2)}`;
-                }
-                for (const [key, value] of Object.entries(actionValue)) {
-                    actions[v][key].innerText = `${
-                        actionName[key]
-                    }：${value.toFixed(2)}`;
-                }
-            });
-
-            requestAnimationFrame(update);
-        };
-        update();
     }
 
     onReset(): ITrainParallelResets<number[], BattleBallInfo> {
@@ -347,39 +227,43 @@ export class BattleTrain extends TrainProcess<
             this.scene.endBattle();
         }
 
+        const time = now - this.lastReset;
         const reward: number[] = Array(this.colors.length).fill(0);
         const teleported = this.teleport.some(v => v > 0);
         this.colors.forEach((color, i) => {
-            if (this.iteration < 20 && !teleported) {
+            if (this.episode < 20 && !teleported) {
                 // 场地长宽为 20*15
                 reward[i] += -(nowLength - lastLength) * 0.1;
             }
             const info = this.damageInfo[i];
             // 生命值最大为 100
             reward[i] += info.damage.reduce(
-                (prev, curr) => prev + curr * 0.5,
+                (prev, curr) => prev + curr * 0.2,
                 0
             );
-            reward[i] -= info.recv.reduce((prev, curr) => prev + curr * 0.1, 0);
+            reward[i] -= info.recv.reduce(
+                (prev, curr) => prev + curr * 0.03,
+                0
+            );
             // 去边界施加惩罚
             reward[i] -= this.teleport[i] * this.totalTeleport[i];
 
             this.teleport[i] = 0;
             info.damage = [];
             info.recv = [];
-            if (now - info.lastContact > 10000) {
+            if (now - info.lastContact > 10000 && this.episode <= 50) {
                 // 每多一秒没有接触就增加惩罚量，并逐渐降低权重
-                const ratio = Math.max(1 - this.iteration / 50, 0);
+                const ratio = Math.max(1 - this.episode / 50, 0);
                 reward[i] -= ratio;
             }
-            if (now - this.lastReset > this.timeout) {
+            if (time > this.timeout) {
                 // 超时惩罚
                 reward[i] -= 20;
             }
             if (this.winInfo.won) {
                 // 获胜奖惩
                 if (this.winInfo.color === color) {
-                    reward[i] += 20 + (now - this.timeout) / 1000;
+                    reward[i] += 40 + (this.timeout - time) / 1000;
                 } else {
                     reward[i] -= 10;
                 }
@@ -436,5 +320,59 @@ export class BattleTrain extends TrainProcess<
         };
 
         this.send(toSend);
+    }
+
+    onTick(): void {
+        const now = performance.now();
+        this.display.remainTime = this.timeout - now + this.lastReset;
+        this.display.episode = this.episode;
+        this.colors.forEach((v, i) => {
+            const ball = this.scene.getBall(v);
+            if (!ball) return;
+            const data = ball.getUserData() as BallBodyData;
+            if (!data) return;
+            const pos = ball.getPosition();
+            const vel = ball.getLinearVelocity();
+            const angle = ball.getAngle() % (Math.PI * 2);
+            const angularVel = ball.getAngularVelocity();
+
+            const obj = v === 'red' ? this.display.red : this.display.blue;
+            obj.hp = data.hp;
+            obj.x = pos.x;
+            obj.y = pos.y;
+            obj.vx = vel.x;
+            obj.vy = vel.y;
+            obj.angle = angle;
+            obj.angularVel = angularVel;
+            obj.actionHor = this.scene.actions[i].linear.x;
+            obj.actionVer = this.scene.actions[i].linear.y;
+            obj.actionRotate = this.scene.actions[i].angular;
+        });
+    }
+
+    save(): string | Blob | ArrayBuffer {
+        const info = this.getDisplayInfo();
+        const data: BattleSaveData = {
+            episode: info.episode,
+            colors: [info.red.color, info.blue.color],
+            wins: [info.red.win, info.blue.win]
+        };
+        return JSON.stringify(data);
+    }
+
+    load(data: string | Blob | ArrayBuffer): void {
+        if (typeof data !== 'string') return;
+        const info = JSON.parse(data) as BattleSaveData;
+        this.episode = info.episode;
+        this.display.red.win = info.wins[0];
+        this.display.blue.win = info.wins[1];
+    }
+
+    getDisplayInfo(): IBattleDisplayInfo {
+        return this.display;
+    }
+
+    onBind(scene: IScene<IBattleSceneState, IBattleDisplayInfo>): void {
+        this.scene = scene as BattleScene;
     }
 }

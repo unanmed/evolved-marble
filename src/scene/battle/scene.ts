@@ -8,9 +8,19 @@ import {
     WeldJoint,
     World
 } from 'planck-js';
-import type { OffscreenCanvas2D } from '../canvas2d';
-import { Scene } from '../scene';
-import { InputType } from '../common';
+import { Scene, SceneEvent } from '../scene';
+import { MotaOffscreenCanvas2D } from '@motajs/client';
+import { BattleSceneUI } from './component';
+import {
+    BallBodyData,
+    BattleFixtureData,
+    BattleMove,
+    BodyType,
+    DamageRender,
+    IBattleDisplayInfo,
+    IBattleSceneState
+} from './types';
+import { InputType, SceneGameUI } from '@/common';
 
 const MAX_SPEED = 10.0;
 const MAX_ANGULAR_SPEED = 10.0;
@@ -20,52 +30,26 @@ const LINEAR_DAMPING = 2.0;
 const ANGULAR_DAMPING = 5.0;
 const IVALID_FRAME = 500;
 
-const enum BodyType {
-    Marble,
-    Helmet,
-    Sword
-}
-
-export interface BallBodyData {
-    isMarble: boolean;
-    color: string;
-    hp: number;
-    attackTime: number;
-}
-
-interface BattleFixtureData {
-    type: BodyType;
-    color: string;
-}
-
-interface DamageRender {
-    x: number;
-    y: number;
-    startTime: number;
-    value: number;
-}
-
-interface BattleMove {
-    linear: Vec2;
-    angular: number;
-}
-
-interface BattleSceneEvent {
+interface BattleSceneEvent extends SceneEvent {
     over: [win: string];
     attack: [attacker: string, defender: string, damage: number];
     contact: [a: string, b: string];
     teleport: [color: string];
 }
 
-export class BattleScene extends Scene<BattleSceneEvent> {
-    private backImage: HTMLImageElement = new Image();
-    private world: World = new World();
+export class BattleScene extends Scene<
+    IBattleSceneState,
+    IBattleDisplayInfo,
+    BattleSceneEvent
+> {
+    readonly backImage: HTMLImageElement = new Image();
+    world: World = new World();
 
     balls: Body[] = [];
     swords: Body[] = [];
     helmets: Body[] = [];
     actions: BattleMove[] = [];
-    private damageRender: Set<DamageRender> = new Set();
+    readonly damageRender: Set<DamageRender> = new Set();
 
     private left: boolean = false;
     private up: boolean = false;
@@ -86,7 +70,7 @@ export class BattleScene extends Scene<BattleSceneEvent> {
         });
     }
 
-    render(canvas: OffscreenCanvas2D): void {
+    render(canvas: MotaOffscreenCanvas2D): void {
         const ctx = canvas.ctx;
         ctx.drawImage(this.backImage, 0, 0, canvas.width, canvas.height);
         const scale = canvas.width / 20;
@@ -629,5 +613,13 @@ export class BattleScene extends Scene<BattleSceneEvent> {
 
     endBattle() {
         this.end = true;
+    }
+
+    getGameUI(): SceneGameUI<IBattleSceneState, IBattleDisplayInfo> {
+        return BattleSceneUI;
+    }
+
+    getState(): IBattleSceneState {
+        throw new Error('Method not implemented.');
     }
 }
