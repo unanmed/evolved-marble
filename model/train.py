@@ -3,11 +3,12 @@ import json
 import ray
 import os
 import argparse
-from ray.rllib.algorithms.ppo import PPOConfig, PPO
+from ray.rllib.algorithms.ppo import PPOConfig
 from ray.rllib.env import ParallelPettingZooEnv
 from ray.tune.registry import register_env
-from .env import EvolvedMarbleEnv  # 替换为你的环境模块路径
-from ray.rllib.algorithms.callbacks import DefaultCallbacks
+from .env import EvolvedMarbleEnv
+from .ws_client import ws
+from time import sleep
 
 def env_creator(config: Dict[str, Any]):
     """环境创建函数（RLlib要求）"""
@@ -17,21 +18,12 @@ def env_creator(config: Dict[str, Any]):
 def train(args):
     # 注册自定义环境
     register_env("EvolvedMarble", env_creator)
-    
-    start_episode = 0
-    if args.resume:
-        with open(f"{os.path.abspath('.')}/checkpoint/{args.from_state}/custom.json") as f:
-            data = json.load(f)
-            start_episode = data["episode"]
 
-    # 配置多智能体PPO
+    # 配置多智能体 PPO，使用 lstm RNN 模型
     config = (
         PPOConfig()
         .environment(
             env="EvolvedMarble",
-            env_config={
-                "episode": start_episode
-            }
         )
         .multi_agent(
             # 所有智能体共享同一策略
@@ -42,7 +34,12 @@ def train(args):
             gamma=0.99,
             lr=1e-4,
             train_batch_size=600,
-            model={"fcnet_hiddens": [256, 256]},
+            model={
+                "use_lstm": True,
+                "lstm_cell_size": 64,
+                "max_seq_len": 32,
+                "vf_share_layers": True,
+            },
         )
         .checkpointing(
             checkpoint_trainable_policies_only=True
@@ -53,11 +50,28 @@ def train(args):
             rollout_fragment_length='auto'
         )
     )
+    
+    ws.start()
+    print("Waiting for connection.")
+    while True:
+        if ws.is_connected():
+            break
+        else:
+            sleep(1)
+    print("Client connected.")
 
     # 启动训练
     algo = config.build_algo()
+    reset_data = ws.send_and_receive({"type": "resetEpisode"})
+    if reset_data["status"] != "success":
+        raise RuntimeError("Client reset episode error!")
     if args.resume:
         algo.load_checkpoint(f"{os.path.abspath('.')}/checkpoint/{args.from_state}")
+        with open(f"{os.path.abspath('.')}/checkpoint/{args.from_state}/custom.json") as f:
+            data = json.load(f)
+            load_data = ws.send_and_receive({"type": "load", data: data})
+            if load_data["status"] != "success":
+                raise RuntimeError("Client load status error!")
 
         print("Train from loaded state.")
         
@@ -72,8 +86,9 @@ def train(args):
         # 每100轮保存一次模型
         if (i + 1) % 5 == 0:
             algo.save_checkpoint(f"{os.path.abspath('.')}/checkpoint/{i + 1}")
+            save_data = ws.send_and_receive({"type": "save"})["data"]
             with open(f"{os.path.abspath('.')}/checkpoint/{i + 1}/custom.json", 'w') as f:
-                json.dump({"episode": start_episode + i + 1}, f)
+                json.dump(save_data, f)
 
 if __name__ == "__main__":
     ray.init()

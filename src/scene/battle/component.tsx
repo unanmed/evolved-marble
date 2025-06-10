@@ -81,7 +81,7 @@ export const BattleSceneCom = defineComponent<
         const display = props.scene.getDisplayInfo();
         if (!display) return;
         d.episode = display.episode;
-        d.remainTime = display.remainTime;
+        d.remainTime = Math.max(display.remainTime, 0);
         d.red = { ...display.red };
         d.blue = { ...display.blue };
     });
@@ -105,7 +105,7 @@ export const BattleSceneCom = defineComponent<
                 ctx.translate(pos.x * scale, pos.y * scale);
                 ctx.beginPath();
                 ctx.rect(-0.5 * scale, -0.9 * scale, 1 * scale, 0.1 * scale);
-                ctx.lineWidth = 4;
+                ctx.lineWidth = 6;
                 ctx.strokeStyle = '#fff';
                 ctx.stroke();
                 ctx.fillStyle = '#ccc';
@@ -239,7 +239,7 @@ export const BattleSceneCom = defineComponent<
 
     /** Win Ratio */
     const wr = (count: number) => {
-        const ratio = Math.min(count / d.episode, 1);
+        const ratio = Math.min(count / (d.red.win + d.blue.win), 1);
         if (isNaN(ratio)) return '0(0%)';
         else return `${count}(${(ratio * 100).toFixed(2)}%)`;
     };
@@ -302,7 +302,7 @@ export const BattleSceneCom = defineComponent<
                 hidden={hideInfo.value}
                 zIndex={5}
             >
-                <text text={`当前轮数：${d.episode}`} loc={l(0)} />
+                <text text={`当前轮数：${Math.max(d.episode, 0)}`} loc={l(0)} />
                 <text text="蓝方胜率" loc={l(1, 1)} />
                 <text text={wr(d.blue.win)} loc={l(2, 1)} />
                 <text text="蓝方信息" loc={l(3, 2)} />

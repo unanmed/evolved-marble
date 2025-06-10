@@ -1,6 +1,7 @@
 import asyncio
 import websockets
 import threading
+import json
 from time import sleep
 from queue import Queue
 
@@ -50,11 +51,11 @@ class WebSocketServer:
 
     def recv(self):
         """主线程调用此方法接收消息"""
-        if not self.message_queue.empty():
-            return self.message_queue.get()
-        else:
-            sleep(0.01)
-            return self.recv()
+        while True:
+            if not self.message_queue.empty():
+                return self.message_queue.get()
+            else:
+                sleep(0.01)
 
     def stop(self):
         if self.loop:
@@ -63,4 +64,14 @@ class WebSocketServer:
             
     def is_connected(self):
         return len(self.connections) > 0
+    
+    def send_and_receive(self, payload) -> dict:
+        try:
+            self.send(json.dumps(payload))
+            msg = self.recv()
+            return json.loads(msg)
+        except (ConnectionError, json.JSONDecodeError) as e:
+            print(f"WebSocket error: {e}")
+            raise
             
+ws = WebSocketServer()

@@ -9,6 +9,11 @@ export interface ITrainDataBase {
 
 interface ResetData extends ITrainDataBase {
     episode: number;
+    data: any;
+}
+
+export interface IWebSocketSend {
+    type: string;
 }
 
 export interface ITrainParallelResets<T, I> {
@@ -126,7 +131,6 @@ export class TrainManager extends EventEmitter<TrainManagerEvent> {
         this.socket = new WebSocket('ws://localhost:7725');
         this.socket.addEventListener('open', () => {
             console.log(`Train socket connect successfully.`);
-            if (this._process) this._process.episode = 0;
         });
         this.socket.addEventListener('message', ev => {
             this.onData(ev);
@@ -145,17 +149,40 @@ export class TrainManager extends EventEmitter<TrainManagerEvent> {
 
     onData(ev: MessageEvent) {
         const data = JSON.parse(ev.data) as ResetData;
-        if (data.type === 'reset') {
-            if (this._process) {
-                const reset = this._process.reset();
-                this._process.episode = data.episode;
-                if (reset) {
-                    this.send(reset);
+        switch (data.type) {
+            case 'reset': {
+                if (this._process) {
+                    const reset = this._process.reset();
+                    if (reset) {
+                        this.send({ type: 'reset', data: reset });
+                    } else {
+                        this.send({ type: 'reset', data: null });
+                    }
                 }
+                break;
             }
-            return;
+            case 'resetEpisode': {
+                if (this._process) {
+                    this._process.episode = 0;
+                    this.send({ type: 'resetEpisode', status: 'success' });
+                }
+                break;
+            }
+            case 'save': {
+                const saved = this._process?.save();
+                this.send({ type: 'save', data: saved });
+                break;
+            }
+            case 'load': {
+                this._process?.load(data.data);
+                this.send({ type: 'load', status: 'success' });
+                break;
+            }
+            default: {
+                this._process?.onData(data);
+                break;
+            }
         }
-        this._process?.onData(data);
     }
 
     changeTo(process: AnyTrainProcess | string | null) {
@@ -170,7 +197,7 @@ export class TrainManager extends EventEmitter<TrainManagerEvent> {
         }
     }
 
-    send(data: any) {
+    send<T extends IWebSocketSend>(data: T) {
         this.socket.send(JSON.stringify(data));
     }
 

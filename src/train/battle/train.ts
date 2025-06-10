@@ -319,7 +319,7 @@ export class BattleTrain extends TrainProcess<
             info: infos
         };
 
-        this.send(toSend);
+        this.send({ type: 'step', data: toSend });
     }
 
     onTick(): void {
