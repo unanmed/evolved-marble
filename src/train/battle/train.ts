@@ -365,6 +365,7 @@ export class BattleTrain extends TrainProcess<
         this.episode = data.episode;
         this.display.red.win = data.wins[0];
         this.display.blue.win = data.wins[1];
+        this.wins = { red: data.wins[0], blue: data.wins[1] };
     }
 
     getDisplayInfo(): IBattleDisplayInfo {
