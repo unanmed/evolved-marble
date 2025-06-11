@@ -8,7 +8,7 @@ import {
 } from '@/scene/battle/types';
 import { IScene } from '@/common';
 
-interface BattleTrainData extends ITrainDataBase {
+interface IBattleTrainData extends ITrainDataBase {
     actions: Record<
         string,
         {
@@ -46,7 +46,7 @@ interface BattleSendData {
     info: Record<string, BattleBallInfo>;
 }
 
-interface BattleSaveData {
+interface IBattleSaveData {
     episode: number;
     colors: string[];
     wins: number[];
@@ -54,8 +54,9 @@ interface BattleSaveData {
 
 export class BattleTrain extends TrainProcess<
     IBattleSceneState,
+    IBattleSaveData,
     IBattleDisplayInfo,
-    BattleTrainData,
+    IBattleTrainData,
     ITrainParallelResets<number[], BattleBallInfo>
 > {
     readonly id: string = 'battle';
@@ -207,7 +208,7 @@ export class BattleTrain extends TrainProcess<
         };
     }
 
-    async onData(data: BattleTrainData): Promise<void> {
+    async onData(data: IBattleTrainData): Promise<void> {
         if (this.pending || data.type !== 'action') return;
         this.colors.forEach(v => {
             const [x, y] = data.actions[v].linear;
@@ -350,22 +351,20 @@ export class BattleTrain extends TrainProcess<
         });
     }
 
-    save(): string | Blob | ArrayBuffer {
+    save(): IBattleSaveData {
         const info = this.getDisplayInfo();
-        const data: BattleSaveData = {
+        const data: IBattleSaveData = {
             episode: info.episode,
             colors: [info.red.color, info.blue.color],
             wins: [info.red.win, info.blue.win]
         };
-        return JSON.stringify(data);
+        return data;
     }
 
-    load(data: string | Blob | ArrayBuffer): void {
-        if (typeof data !== 'string') return;
-        const info = JSON.parse(data) as BattleSaveData;
-        this.episode = info.episode;
-        this.display.red.win = info.wins[0];
-        this.display.blue.win = info.wins[1];
+    load(data: IBattleSaveData): void {
+        this.episode = data.episode;
+        this.display.red.win = data.wins[0];
+        this.display.blue.win = data.wins[1];
     }
 
     getDisplayInfo(): IBattleDisplayInfo {

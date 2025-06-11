@@ -69,7 +69,7 @@ def train(args):
         algo.load_checkpoint(f"{os.path.abspath('.')}/checkpoint/{args.from_state}")
         with open(f"{os.path.abspath('.')}/checkpoint/{args.from_state}/custom.json") as f:
             data = json.load(f)
-            load_data = ws.send_and_receive({"type": "load", data: data})
+            load_data = ws.send_and_receive({"type": "load", "data": data})
             if load_data["status"] != "success":
                 raise RuntimeError("Client load status error!")
 

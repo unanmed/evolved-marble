@@ -23,12 +23,13 @@ export interface ITrainParallelResets<T, I> {
 
 export abstract class TrainProcess<
         S,
+        SL,
         T extends IDisplayInfoBase,
         D extends ITrainDataBase,
         R extends ITrainParallelResets<any, any>
     >
     extends EventEmitter
-    implements ITrainer<S, T>
+    implements ITrainer<S, SL, T>
 {
     abstract readonly id: string;
     /** 两次操作的间隔，单位毫秒 */
@@ -100,16 +101,16 @@ export abstract class TrainProcess<
         this.manager.send(data);
     }
 
-    abstract save(): string | Blob | ArrayBuffer;
+    abstract save(): SL;
 
-    abstract load(data: string | Blob | ArrayBuffer): void;
+    abstract load(data: SL): void;
 
     abstract getDisplayInfo(): T;
 
     abstract onBind(scene: IScene<S, T>): void;
 }
 
-export type AnyTrainProcess = TrainProcess<any, any, any, any>;
+export type AnyTrainProcess = TrainProcess<any, any, any, any, any>;
 
 interface TrainManagerEvent {}
 

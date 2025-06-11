@@ -28,7 +28,7 @@ export interface IScene<S, T extends IDisplayInfoBase> {
     /** 当前的渲染模式 */
     readonly mode: SceneMode;
     /** 绑定的训练器 */
-    readonly trainer: ITrainer<S, T> | null;
+    readonly trainer: ITrainer<S, any, T> | null;
 
     /**
      * 获取训练时的必要显示信息
@@ -39,7 +39,7 @@ export interface IScene<S, T extends IDisplayInfoBase> {
      * 绑定训练器至这个场景
      * @param trainer 要绑定的训练器
      */
-    bindTrainer(trainer: ITrainer<S, T> | null): void;
+    bindTrainer(trainer: ITrainer<S, any, T> | null): void;
 
     /**
      * 设置显示模式
@@ -100,7 +100,7 @@ export interface IDisplayInfoBase {
     episode: number;
 }
 
-export interface ITrainer<S, T extends IDisplayInfoBase> {
+export interface ITrainer<S, SL, T extends IDisplayInfoBase> {
     /**
      * 获取训练器的当前信息
      */
@@ -109,13 +109,13 @@ export interface ITrainer<S, T extends IDisplayInfoBase> {
     /**
      * 保存必要的训练状态
      */
-    save(): string | Blob | ArrayBuffer;
+    save(): SL;
 
     /**
      * 加载必要的训练状态
      * @param data 状态信息
      */
-    load(data: string | Blob | ArrayBuffer): void;
+    load(data: SL): void;
 
     /**
      * 当此训练器绑定至场景上时执行的方法
