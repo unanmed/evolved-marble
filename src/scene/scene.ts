@@ -33,7 +33,7 @@ export abstract class Scene<
     mode: SceneMode = SceneMode.None;
 
     /** 这个场景的训练器 */
-    trainer: ITrainer<S, T> | null = null;
+    trainer: ITrainer<S, T, any> | null = null;
 
     constructor(public readonly id: string) {
         super();
@@ -43,7 +43,7 @@ export abstract class Scene<
         return this.trainer?.getDisplayInfo() ?? null;
     }
 
-    bindTrainer(trainer: ITrainer<S, T> | null): void {
+    bindTrainer(trainer: ITrainer<S, T, any> | null): void {
         this.trainer = trainer;
     }
 
