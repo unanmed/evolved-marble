@@ -1,8 +1,8 @@
 import './styles.css';
-import { BattleScene } from './scene/battle/scene';
+import { Sword1v1Scene } from './scene/sword1v1/scene';
 import { SceneController } from './scene/controller';
 import { TrainManager } from './train/manager';
-import { BattleTrain } from './train/battle/train';
+import { Sword1v1Train } from './train/sword1v1/train';
 import { initializeRenderer, renderer, scene } from './renderer';
 import { defineComponent } from 'vue';
 import { createApp } from '@motajs/client';
@@ -32,22 +32,21 @@ class Main {
     }
 
     async initializeScene() {
-        this.scene.add(new BattleScene());
+        this.scene.add(new Sword1v1Scene());
         await this.scene.ready();
-        this.scene.changeTo('battle');
+        this.scene.changeTo('sword1v1');
     }
 
     initializetrain() {
-        this.train.add(new BattleTrain(this.train));
-        this.train.changeTo('battle');
+        this.train.add(new Sword1v1Train(this.train));
+        this.train.changeTo('sword1v1');
     }
 
     bind() {
-        ['battle'].forEach(v => {
-            const scene = this.scene.get(v);
-            const train = this.train.get(v);
-            if (!scene || !train) return;
-            scene.bindTrainer(train);
+        this.scene.list.forEach(v => {
+            const train = this.train.get(v.id);
+            if (!train) return;
+            v.bindTrainer(train);
         });
     }
 }

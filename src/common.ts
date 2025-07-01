@@ -1,4 +1,4 @@
-import { GameUI } from '@motajs/client';
+import { GameUI, IUIInstance } from '@motajs/client';
 import { DefineComponent, DefineSetupFnComponent } from 'vue';
 
 export const enum SceneMode {
@@ -25,6 +25,10 @@ export type SceneGameUI<S, T extends IDisplayInfoBase> = GameUI<
 >;
 
 export interface IScene<S, T extends IDisplayInfoBase> {
+    /** 这个场景的标识符 */
+    readonly id: string;
+    /** 这个场景的名称 */
+    readonly name: string;
     /** 当前的渲染模式 */
     readonly mode: SceneMode;
     /** 绑定的训练器 */
@@ -122,4 +126,38 @@ export interface ITrainer<S, SL, T extends IDisplayInfoBase> {
      * @param scene 绑定至的场景
      */
     onBind(scene: IScene<S, T>): void;
+}
+
+export interface ISceneController {
+    /** 当前打开的 UI 实例 */
+    readonly instance?: IUIInstance;
+    /** 当前的场景 */
+    readonly nowScene: IScene<any, any> | null;
+
+    /**
+     * 切换当前显示的场景
+     * @param scene 要切换至的场景
+     * @param props 传入场景的参数
+     */
+    changeTo(scene: IScene<any, any> | string | null): void;
+
+    /**
+     * 添加场景实例
+     */
+    add(scene: IScene<any, any>): void;
+
+    /**
+     * 根据 id 获取场景实例
+     */
+    get(id: string): IScene<any, any> | null;
+
+    /**
+     * 加载所有场景的必要信息，全部加载完毕后兑现
+     */
+    ready(): Promise<void[]>;
+
+    /**
+     * 每帧执行一次的函数
+     */
+    tick(timestamp: number): void;
 }

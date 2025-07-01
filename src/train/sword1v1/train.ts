@@ -1,14 +1,14 @@
 import { Vec2 } from 'planck-js';
-import { BattleScene } from '@/scene/battle/scene';
+import { Sword1v1Scene } from '@/scene/sword1v1/scene';
 import { TrainProcess, ITrainDataBase, ITrainParallelResets } from '../manager';
 import {
     BallBodyData,
-    IBattleDisplayInfo,
-    IBattleSceneState
-} from '@/scene/battle/types';
+    ISword1v1DisplayInfo,
+    ISword1v1SceneState
+} from '@/scene/sword1v1/types';
 import { IScene } from '@/common';
 
-interface IBattleTrainData extends ITrainDataBase {
+interface ISword1v1TrainData extends ITrainDataBase {
     actions: Record<
         string,
         {
@@ -46,23 +46,23 @@ interface BattleSendData {
     info: Record<string, BattleBallInfo>;
 }
 
-interface IBattleSaveData {
+interface ISword1v1SaveData {
     episode: number;
     colors: string[];
     wins: number[];
 }
 
-export class BattleTrain extends TrainProcess<
-    IBattleSceneState,
-    IBattleSaveData,
-    IBattleDisplayInfo,
-    IBattleTrainData,
+export class Sword1v1Train extends TrainProcess<
+    ISword1v1SceneState,
+    ISword1v1SaveData,
+    ISword1v1DisplayInfo,
+    ISword1v1TrainData,
     ITrainParallelResets<number[], BattleBallInfo>
 > {
     readonly id: string = 'battle';
     readonly interval: number = 100;
 
-    private scene!: BattleScene;
+    private scene!: Sword1v1Scene;
 
     private damageInfo: DamageInfo[] = [];
     private colors: string[] = [];
@@ -74,7 +74,7 @@ export class BattleTrain extends TrainProcess<
     private lastReset: number = 0;
     private timeout: number = 120000;
 
-    private readonly display: IBattleDisplayInfo = {
+    private readonly display: ISword1v1DisplayInfo = {
         episode: 0,
         remainTime: 0,
         red: {
@@ -108,7 +108,7 @@ export class BattleTrain extends TrainProcess<
     };
 
     initialize(): void {
-        this.scene = this.manager.scene.get('battle') as BattleScene;
+        this.scene = this.manager.scene.get('battle') as Sword1v1Scene;
         this.scene.on(
             'attack',
             (attacker: string, defender: string, damage: number) => {
@@ -208,7 +208,7 @@ export class BattleTrain extends TrainProcess<
         };
     }
 
-    async onData(data: IBattleTrainData): Promise<void> {
+    async onData(data: ISword1v1TrainData): Promise<void> {
         if (this.pending || data.type !== 'action') return;
         this.colors.forEach(v => {
             const [x, y] = data.actions[v].linear;
@@ -351,9 +351,9 @@ export class BattleTrain extends TrainProcess<
         });
     }
 
-    save(): IBattleSaveData {
+    save(): ISword1v1SaveData {
         const info = this.getDisplayInfo();
-        const data: IBattleSaveData = {
+        const data: ISword1v1SaveData = {
             episode: info.episode,
             colors: [info.red.color, info.blue.color],
             wins: [info.red.win, info.blue.win]
@@ -361,18 +361,18 @@ export class BattleTrain extends TrainProcess<
         return data;
     }
 
-    load(data: IBattleSaveData): void {
+    load(data: ISword1v1SaveData): void {
         this.episode = data.episode;
         this.display.red.win = data.wins[0];
         this.display.blue.win = data.wins[1];
         this.wins = { red: data.wins[0], blue: data.wins[1] };
     }
 
-    getDisplayInfo(): IBattleDisplayInfo {
+    getDisplayInfo(): ISword1v1DisplayInfo {
         return this.display;
     }
 
-    onBind(scene: IScene<IBattleSceneState, IBattleDisplayInfo>): void {
-        this.scene = scene as BattleScene;
+    onBind(scene: IScene<ISword1v1SceneState, ISword1v1DisplayInfo>): void {
+        this.scene = scene as Sword1v1Scene;
     }
 }

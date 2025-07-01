@@ -1,13 +1,16 @@
 import EventEmitter from 'eventemitter3';
 import { Scene } from './scene';
 import { IUIInstance, UIController } from '@motajs/client';
-import { InputType, IScene, SceneMode } from '../common';
+import { InputType, IScene, ISceneController, SceneMode } from '../common';
 
 interface SceneControllerEvent {
     change: [scene: Scene];
 }
 
-export class SceneController extends EventEmitter<SceneControllerEvent> {
+export class SceneController
+    extends EventEmitter<SceneControllerEvent>
+    implements ISceneController
+{
     readonly list: Map<string, IScene<any, any>> = new Map();
 
     private lastTick: number = 0;
@@ -37,7 +40,7 @@ export class SceneController extends EventEmitter<SceneControllerEvent> {
      * 根据 id 获取场景实例
      */
     get(id: string) {
-        return this.list.get(id);
+        return this.list.get(id) ?? null;
     }
 
     /**
@@ -52,7 +55,7 @@ export class SceneController extends EventEmitter<SceneControllerEvent> {
      * @param scene 要切换至的场景
      * @param props 传入场景的参数
      */
-    changeTo(scene: Scene | string | null) {
+    changeTo(scene: Scene<any, any, any> | string | null) {
         if (typeof scene === 'string') {
             const target = this.list.get(scene) ?? null;
             this._nowScene = target;
@@ -67,6 +70,7 @@ export class SceneController extends EventEmitter<SceneControllerEvent> {
             scene: this._nowScene
         });
     }
+
     /**
      * 每帧执行一次的函数
      */

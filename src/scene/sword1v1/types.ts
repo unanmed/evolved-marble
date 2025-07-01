@@ -1,7 +1,7 @@
 import { Vec2 } from 'planck-js';
 import { IDisplayInfoBase } from '../../common';
 
-interface BallBattleDisplayInfo {
+interface Sword1v1DisplayBallInfo {
     color: string;
     win: number;
     hp: number;
@@ -16,10 +16,10 @@ interface BallBattleDisplayInfo {
     actionRotate: number;
 }
 
-export interface IBattleDisplayInfo extends IDisplayInfoBase {
+export interface ISword1v1DisplayInfo extends IDisplayInfoBase {
     remainTime: number;
-    red: BallBattleDisplayInfo;
-    blue: BallBattleDisplayInfo;
+    red: Sword1v1DisplayBallInfo;
+    blue: Sword1v1DisplayBallInfo;
 }
 
 interface BallInfo {
@@ -35,7 +35,7 @@ interface BallInfo {
     hp: number;
 }
 
-export interface IBattleSceneState {
+export interface ISword1v1SceneState {
     balls: BallInfo;
 }
 

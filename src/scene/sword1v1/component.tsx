@@ -14,25 +14,25 @@ import {
     BattleFixtureData,
     BodyType,
     DamageRender,
-    IBattleDisplayInfo,
-    IBattleSceneState
+    ISword1v1DisplayInfo,
+    ISword1v1SceneState
 } from './types';
-import { BattleScene } from './scene';
+import { Sword1v1Scene } from './scene';
 
-const battleSceneProps = {
+const sword1v1SceneProps = {
     props: ['scene']
 } satisfies SetupComponentOptions<
-    SceneUIProps<IBattleSceneState, IBattleDisplayInfo>
+    SceneUIProps<ISword1v1SceneState, ISword1v1DisplayInfo>
 >;
 
-export const BattleSceneCom = defineComponent<
-    SceneUIProps<IBattleSceneState, IBattleDisplayInfo>
+export const Sword1v1SceneCom = defineComponent<
+    SceneUIProps<ISword1v1SceneState, ISword1v1DisplayInfo>
 >(props => {
     const ele = ref<Sprite>();
     const hideScene = ref(false);
     const hideInfo = ref(false);
 
-    const d = shallowReactive<IBattleDisplayInfo>({
+    const d = shallowReactive<ISword1v1DisplayInfo>({
         episode: 0,
         remainTime: 0,
         red: {
@@ -86,7 +86,7 @@ export const BattleSceneCom = defineComponent<
         d.blue = { ...display.blue };
     });
 
-    const drawScene = (canvas: MotaOffscreenCanvas2D, scene: BattleScene) => {
+    const drawScene = (canvas: MotaOffscreenCanvas2D, scene: Sword1v1Scene) => {
         const ctx = canvas.ctx;
         ctx.drawImage(scene.backImage, 0, 0, canvas.width, canvas.height);
         const scale = canvas.width / 20;
@@ -229,7 +229,7 @@ export const BattleSceneCom = defineComponent<
     };
 
     const render = (canvas: MotaOffscreenCanvas2D) => {
-        const scene = props.scene as BattleScene;
+        const scene = props.scene as Sword1v1Scene;
         const mode = scene.getMode();
 
         if (mode === SceneMode.Scene) {
@@ -320,6 +320,6 @@ export const BattleSceneCom = defineComponent<
             </container>
         </container>
     );
-}, battleSceneProps);
+}, sword1v1SceneProps);
 
-export const BattleSceneUI = new GameUI('battle-scene', BattleSceneCom);
+export const Sword1v1SceneUI = new GameUI('sowrd1v1-scene', Sword1v1SceneCom);

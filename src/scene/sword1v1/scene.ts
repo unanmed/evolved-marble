@@ -10,15 +10,15 @@ import {
 } from 'planck-js';
 import { Scene, SceneEvent } from '../scene';
 import { MotaOffscreenCanvas2D } from '@motajs/client';
-import { BattleSceneUI } from './component';
+import { Sword1v1SceneUI } from './component';
 import {
     BallBodyData,
     BattleFixtureData,
     BattleMove,
     BodyType,
     DamageRender,
-    IBattleDisplayInfo,
-    IBattleSceneState
+    ISword1v1DisplayInfo,
+    ISword1v1SceneState
 } from './types';
 import { InputType, SceneGameUI } from '@/common';
 
@@ -37,11 +37,14 @@ interface BattleSceneEvent extends SceneEvent {
     teleport: [color: string];
 }
 
-export class BattleScene extends Scene<
-    IBattleSceneState,
-    IBattleDisplayInfo,
+export class Sword1v1Scene extends Scene<
+    ISword1v1SceneState,
+    ISword1v1DisplayInfo,
     BattleSceneEvent
 > {
+    readonly id: string = 'sword1v1';
+    readonly name: string = '剑士 1v1';
+
     readonly backImage: HTMLImageElement = new Image();
     world: World = new World();
 
@@ -58,10 +61,6 @@ export class BattleScene extends Scene<
     private rotateCW: boolean = false;
     private rotateACW: boolean = false;
     private end: boolean = false;
-
-    constructor() {
-        super('battle');
-    }
 
     async load() {
         this.backImage.src = `${import.meta.env.BASE_URL}battle.webp`;
@@ -615,11 +614,11 @@ export class BattleScene extends Scene<
         this.end = true;
     }
 
-    getGameUI(): SceneGameUI<IBattleSceneState, IBattleDisplayInfo> {
-        return BattleSceneUI;
+    getGameUI(): SceneGameUI<ISword1v1SceneState, ISword1v1DisplayInfo> {
+        return Sword1v1SceneUI;
     }
 
-    getState(): IBattleSceneState {
+    getState(): ISword1v1SceneState {
         throw new Error('Method not implemented.');
     }
 }

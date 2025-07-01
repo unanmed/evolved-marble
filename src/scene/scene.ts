@@ -29,13 +29,14 @@ export abstract class Scene<
     extends EventEmitter<E | SceneEvent>
     implements IScene<S, T>
 {
+    abstract readonly id: string;
+    abstract readonly name: string;
     /** 场景的显示模式 */
     mode: SceneMode = SceneMode.None;
-
     /** 这个场景的训练器 */
     trainer: ITrainer<S, T, any> | null = null;
 
-    constructor(public readonly id: string) {
+    constructor() {
         super();
     }
 
