@@ -7,6 +7,7 @@ import { initializeRenderer, renderer, scene } from './renderer';
 import { defineComponent } from 'vue';
 import { createApp } from '@motajs/client';
 import { InputType } from './common';
+import { SCENE } from './setup';
 
 const RootComponent = defineComponent(() => {
     return () => (
@@ -34,12 +35,12 @@ class Main {
     async initializeScene() {
         this.scene.add(new Sword1v1Scene());
         await this.scene.ready();
-        this.scene.changeTo('sword1v1');
+        this.scene.changeTo(SCENE);
     }
 
     initializetrain() {
         this.train.add(new Sword1v1Train(this.train));
-        this.train.changeTo('sword1v1');
+        this.train.changeTo(SCENE);
     }
 
     bind() {

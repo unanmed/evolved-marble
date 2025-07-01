@@ -131,6 +131,7 @@ export class TrainManager extends EventEmitter<TrainManagerEvent> {
         super();
         this.socket = new WebSocket('ws://localhost:7725');
         this.socket.addEventListener('open', () => {
+            // eslint-disable-next-line no-console
             console.log(`Train socket connect successfully.`);
         });
         this.socket.addEventListener('message', ev => {
