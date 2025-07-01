@@ -21,7 +21,7 @@ pnpm dev
 首先在根目录运行：
 
 ```bash
-python -m train.py
+python -m model.train
 ```
 
 然后打开游戏页面。
