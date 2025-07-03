@@ -9,6 +9,7 @@ Evolved Marble 是一个基于强化学习的球球战争项目（可参考 Lost
 -   `ffmpeg n7.1 >= 2025`
 -   `python == 3.9.22`
 -   `requirements.txt` 中的 pip 依赖
+-   `Chrome >= 71`，不支持 `Firefox`, `Safari` 浏览器
 
 ## 运行
 
