@@ -3,7 +3,7 @@ from typing import Tuple
 import numpy as np
 from pettingzoo import ParallelEnv
 from gymnasium.spaces import Box
-from .ws_client import ws
+from .ws import ws
 
 class EvolvedMarbleEnv(ParallelEnv):
     def __init__(self, config):

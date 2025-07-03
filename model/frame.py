@@ -6,8 +6,6 @@ import os
 from flask import Flask, request
 
 app = Flask(__name__)
-UPLOAD_FOLDER = 'frames'
-
 
 ffmpeg_process = subprocess.Popen([
     "ffmpeg",

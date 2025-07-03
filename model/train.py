@@ -8,7 +8,7 @@ from ray.rllib.algorithms.ppo import PPOConfig
 from ray.rllib.env import ParallelPettingZooEnv
 from ray.tune.registry import register_env
 from .env import EvolvedMarbleEnv
-from .ws_client import ws
+from .ws import ws
 from .frame import start
 
 def env_creator(config: Dict[str, Any]):
