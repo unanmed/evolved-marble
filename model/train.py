@@ -3,12 +3,13 @@ import json
 import ray
 import os
 import argparse
+from time import sleep
 from ray.rllib.algorithms.ppo import PPOConfig
 from ray.rllib.env import ParallelPettingZooEnv
 from ray.tune.registry import register_env
 from .env import EvolvedMarbleEnv
 from .ws_client import ws
-from time import sleep
+from .frame import start
 
 def env_creator(config: Dict[str, Any]):
     """环境创建函数（RLlib要求）"""
@@ -59,6 +60,8 @@ def train(args):
         else:
             sleep(1)
     print("Client connected.")
+    
+    print("\n--------------------\n")
 
     # 启动训练
     algo = config.build_algo()
@@ -75,7 +78,7 @@ def train(args):
 
         print("Train from loaded state.")
         
-    print("--------------------")
+    print("\n--------------------\n")
     for i in range(1000):
         result = algo.train()
         print(
@@ -97,6 +100,8 @@ if __name__ == "__main__":
     parser.add_argument('--resume', type=bool, default=False)
     parser.add_argument('--from_state', type=int, default=0)
     args = parser.parse_args()
+    
+    start()
 
     # 开始训练
     train(args)

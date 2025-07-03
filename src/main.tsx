@@ -3,11 +3,12 @@ import { Sword1v1Scene } from './scene/sword1v1/scene';
 import { SceneController } from './scene/controller';
 import { TrainManager } from './train/manager';
 import { Sword1v1Train } from './train/sword1v1/train';
-import { initializeRenderer, renderer, scene } from './renderer';
+import { initializeRenderer, recorder, renderer, scene } from './renderer';
 import { defineComponent } from 'vue';
 import { createApp } from '@motajs/client';
-import { InputType } from './common';
-import { SCENE } from './setup';
+import { InputType, ITrainWorkflow } from './common';
+import { excitation, SCENE } from './setup';
+import { TrainWorkflow } from './workflow';
 
 const RootComponent = defineComponent(() => {
     return () => (
@@ -18,18 +19,24 @@ const RootComponent = defineComponent(() => {
 class Main {
     readonly scene: SceneController;
     readonly train: TrainManager;
+    readonly workflow: ITrainWorkflow;
 
     constructor() {
         this.scene = new SceneController(scene);
         this.train = new TrainManager(this.scene);
+        this.workflow = new TrainWorkflow(this.train, excitation, recorder);
     }
 
-    initialize() {
+    async initialize() {
         initializeRenderer();
-        this.initializeScene();
+        const scene = this.initializeScene();
         this.initializetrain();
         this.bind();
         createApp(RootComponent).mount(renderer);
+        excitation.excite(this.scene);
+        excitation.excite(this.train);
+        await scene;
+        this.workflow.start();
     }
 
     async initializeScene() {

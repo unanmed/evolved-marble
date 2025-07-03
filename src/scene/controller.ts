@@ -1,7 +1,13 @@
 import EventEmitter from 'eventemitter3';
 import { Scene } from './scene';
 import { IUIInstance, UIController } from '@motajs/client';
-import { InputType, IScene, ISceneController, SceneMode } from '../common';
+import {
+    InputType,
+    IScene,
+    ISceneController,
+    ITickExcitable,
+    SceneMode
+} from '../common';
 
 interface SceneControllerEvent {
     change: [scene: Scene];
@@ -9,7 +15,7 @@ interface SceneControllerEvent {
 
 export class SceneController
     extends EventEmitter<SceneControllerEvent>
-    implements ISceneController
+    implements ISceneController, ITickExcitable
 {
     readonly list: Map<string, IScene<any, any>> = new Map();
 
@@ -28,12 +34,6 @@ export class SceneController
 
     constructor(public readonly ui: UIController) {
         super();
-
-        const tick = (timestamp: number) => {
-            this.tick(timestamp);
-            requestAnimationFrame(tick);
-        };
-        tick(0);
     }
 
     /**
@@ -80,7 +80,7 @@ export class SceneController
         this.lastTick = timestamp;
         if (lastTick === 0) return;
         const dt = timestamp - lastTick;
-        this._nowScene.onTick(timestamp, dt, lastTick);
+        this._nowScene.tick(timestamp, dt, lastTick);
     }
 
     /**

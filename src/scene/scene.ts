@@ -31,6 +31,9 @@ export abstract class Scene<
 {
     abstract readonly id: string;
     abstract readonly name: string;
+
+    timestamp: number = 0;
+
     /** 场景的显示模式 */
     mode: SceneMode = SceneMode.None;
     /** 这个场景的训练器 */
@@ -55,6 +58,11 @@ export abstract class Scene<
 
     getMode() {
         return this.mode;
+    }
+
+    tick(timestamp: number, dt: number, lastTick: number): void {
+        this.timestamp = timestamp;
+        this.onTick(timestamp, dt, lastTick);
     }
 
     abstract getGameUI(): SceneGameUI<S, T>;

@@ -185,7 +185,7 @@ export class Sword1v1Scene extends Scene<
         // 伤害弹出
         ctx.save();
         const toDelete = new Set<DamageRender>();
-        const now = performance.now();
+        const now = this.timestamp;
         for (const damage of this.damageRender) {
             const progress = (now - damage.startTime) / 2000;
             if (progress >= 1) {
@@ -374,7 +374,7 @@ export class Sword1v1Scene extends Scene<
             defenderData.color
         )?.getUserData() as BallBodyData;
         if (!bodyData) return;
-        if (performance.now() - bodyData.attackTime < IVALID_FRAME) return;
+        if (this.timestamp - bodyData.attackTime < IVALID_FRAME) return;
         const attackerData = attacker.getUserData() as BallBodyData;
         const isHelmet = defenderData.type === BodyType.Helmet;
         const v1 = attacker.getLinearVelocity();
@@ -390,12 +390,12 @@ export class Sword1v1Scene extends Scene<
         );
 
         bodyData.hp -= damage;
-        bodyData.attackTime = performance.now();
+        bodyData.attackTime = this.timestamp;
         const pos = defender.getPosition();
         this.damageRender.add({
             x: pos.x,
             y: pos.y,
-            startTime: performance.now(),
+            startTime: this.timestamp,
             value: damage
         });
         this.emit('attack', attackerData.color, defenderData.color, damage);

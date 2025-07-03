@@ -14,6 +14,15 @@ export interface SceneUIProps<S, T extends IDisplayInfoBase> {
     scene: IScene<S, T>;
 }
 
+export interface IDisplayInfoBase {
+    /** 当前训练到了第几轮 */
+    episode: number;
+}
+
+export interface IHTTPResponseBase {
+    code: number;
+}
+
 export const enum InputType {
     KeyDown,
     KeyUp
@@ -33,6 +42,8 @@ export interface IScene<S, T extends IDisplayInfoBase> {
     readonly mode: SceneMode;
     /** 绑定的训练器 */
     readonly trainer: ITrainer<S, any, T> | null;
+    /** 当前时刻 */
+    readonly timestamp: number;
 
     /**
      * 获取训练时的必要显示信息
@@ -76,9 +87,15 @@ export interface IScene<S, T extends IDisplayInfoBase> {
     onShown(): void;
 
     /**
-     * 每个滴答执行一次:
-     * - 在显示游戏画面时，每帧执行一次，时刻是真实时刻
-     * - 在不显示游戏画面，即显示信息或不显示时，会尽可能快地执行，时刻是非真实时刻，两次滴答固定间隔 16.67ms
+     * 执行下一个逻辑帧
+     * @param timestamp 当前时刻
+     * @param dt 与上一帧的时刻差值
+     * @param lastTick 上一帧的时刻
+     */
+    tick(timestamp: number, dt: number, lastTick: number): void;
+
+    /**
+     * 每个逻辑帧执行一次
      * @param timestamp 当前时刻
      * @param dt 与上一帧的时刻差值
      * @param lastTick 上一帧的时刻
@@ -99,12 +116,10 @@ export interface IScene<S, T extends IDisplayInfoBase> {
     onModeChange(mode: SceneMode): void;
 }
 
-export interface IDisplayInfoBase {
-    /** 当前训练到了第几轮 */
-    episode: number;
-}
-
 export interface ITrainer<S, SL, T extends IDisplayInfoBase> {
+    /** 当前时刻 */
+    readonly timestamp: number;
+
     /**
      * 获取训练器的当前信息
      */
@@ -160,4 +175,38 @@ export interface ISceneController {
      * 每帧执行一次的函数
      */
     tick(timestamp: number): void;
+}
+
+export interface ITickExcitable {
+    /**
+     * 帧激励函数
+     * @param time 当前帧时刻
+     */
+    tick(time: number): void;
+}
+
+export interface ITickExcitation {
+    /**
+     * 激励一个可激励对象
+     * @param target 激励目标
+     */
+    excite(target: ITickExcitable): void;
+
+    /**
+     * 取消激励目标
+     * @param target 取消激励的模板
+     */
+    unexcite(target: ITickExcitable): void;
+}
+
+export interface ITrainWorkflow {
+    /**
+     * 开始训练工作流程
+     */
+    start(): Promise<void>;
+
+    /**
+     * 结束训练工作流程
+     */
+    end(): void;
 }

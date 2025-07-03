@@ -59,7 +59,7 @@ export class Sword1v1Train extends TrainProcess<
     ISword1v1TrainData,
     ITrainParallelResets<number[], BattleBallInfo>
 > {
-    readonly id: string = 'battle';
+    readonly id: string = 'sword1v1';
     readonly interval: number = 100;
 
     private scene!: Sword1v1Scene;
@@ -108,14 +108,14 @@ export class Sword1v1Train extends TrainProcess<
     };
 
     initialize(): void {
-        this.scene = this.manager.scene.get('battle') as Sword1v1Scene;
+        this.scene = this.manager.scene.get('sword1v1') as Sword1v1Scene;
         this.scene.on(
             'attack',
             (attacker: string, defender: string, damage: number) => {
                 const attIdx = this.colors.indexOf(attacker);
                 const defIdx = this.colors.indexOf(defender);
                 if (attIdx === -1 || defIdx === -1) return;
-                const now = performance.now();
+                const now = this.timestamp;
                 this.damageInfo[attIdx].damage.push(damage);
                 this.damageInfo[attIdx].lastContact = now;
                 this.damageInfo[defIdx].recv.push(damage);
@@ -134,7 +134,7 @@ export class Sword1v1Train extends TrainProcess<
             }
         });
         this.scene.on('contact', (a: string, b: string) => {
-            const now = performance.now();
+            const now = this.timestamp;
             const aIdx = this.colors.indexOf(a);
             const bIdx = this.colors.indexOf(b);
             this.damageInfo[aIdx].lastContact = now;
@@ -150,7 +150,7 @@ export class Sword1v1Train extends TrainProcess<
     }
 
     onReset(): ITrainParallelResets<number[], BattleBallInfo> {
-        const now = performance.now();
+        const now = this.timestamp;
         this.lastReset = now;
         this.scene.resetWorld();
         this.colors = [];
@@ -208,8 +208,8 @@ export class Sword1v1Train extends TrainProcess<
         };
     }
 
-    async onData(data: ISword1v1TrainData): Promise<void> {
-        if (this.pending || data.type !== 'action') return;
+    actionTick(data: ISword1v1TrainData) {
+        if (data.type !== 'action') return;
         this.colors.forEach(v => {
             const [x, y] = data.actions[v].linear;
             this.scene.actionMove(v, new Vec2(x, y));
@@ -219,10 +219,9 @@ export class Sword1v1Train extends TrainProcess<
         const posA = ballA.getPosition();
         const posB = ballB.getPosition();
         const lastLength = posA.clone().sub(posB.clone()).length();
-        await this.waitPending();
         const nowLength = posA.clone().sub(posB.clone()).length();
 
-        const now = performance.now();
+        const now = this.timestamp;
         const done = now - this.lastReset > this.timeout || this.winInfo.won;
         if (done) {
             this.scene.endBattle();
@@ -323,9 +322,12 @@ export class Sword1v1Train extends TrainProcess<
         this.send({ type: 'step', data: toSend });
     }
 
-    onTick(): void {
-        const now = performance.now();
-        this.display.remainTime = this.timeout - now + this.lastReset;
+    async onTick(time: number, action: boolean) {
+        if (action) {
+            const action = (await this.getData()) as ISword1v1TrainData;
+            this.actionTick(action);
+        }
+        this.display.remainTime = this.timeout - time + this.lastReset;
         this.display.episode = this.episode;
         this.colors.forEach((v, i) => {
             const ball = this.scene.getBall(v);
@@ -349,6 +351,7 @@ export class Sword1v1Train extends TrainProcess<
             obj.actionVer = this.scene.actions[i].linear.y;
             obj.actionRotate = this.scene.actions[i].angular;
         });
+        this.tickEnd();
     }
 
     save(): ISword1v1SaveData {

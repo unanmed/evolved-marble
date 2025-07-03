@@ -1,7 +1,7 @@
 import { EventEmitter } from 'eventemitter3';
 import { SceneController } from '../scene/controller';
-import { IDisplayInfoBase, IScene, ITrainer } from '@/common';
-import { Ticker } from 'mutate-animate';
+import { IDisplayInfoBase, IScene, ITickExcitable, ITrainer } from '@/common';
+import { MODEL_INTERVAL } from '@/setup';
 
 export interface ITrainDataBase {
     type: string;
@@ -35,11 +35,11 @@ export abstract class TrainProcess<
     /** 两次操作的间隔，单位毫秒 */
     abstract readonly interval: number;
 
-    private lastTime: number = performance.now();
+    protected readonly dataQueue: D[] = [];
 
-    protected pending: boolean = false;
-
+    timestamp: number = 0;
     episode: number = 0;
+    tickCount: number = 0;
 
     constructor(public readonly manager: TrainManager) {
         super();
@@ -56,49 +56,70 @@ export abstract class TrainProcess<
     abstract onReset(): R;
 
     /**
-     * 接收到训练端发送的信息后执行
+     * 接收到训练端发送的信息
      * @param data 接收到的信息
      */
-    abstract onData(data: D): void;
+    onData(data: D): void {
+        this.dataQueue.push(data);
+    }
+
+    /**
+     * 获取训练段消息队列的信息
+     */
+    async getData(): Promise<D> {
+        if (this.dataQueue.length > 0) return this.dataQueue.shift()!;
+        return new Promise(res => {
+            const wait = () => {
+                if (this.dataQueue.length > 0) {
+                    res(this.dataQueue.shift()!);
+                    return;
+                }
+                requestAnimationFrame(wait);
+            };
+            requestAnimationFrame(wait);
+        });
+    }
 
     /**
      * 每帧执行一次的函数
      * @param timestamp 时间戳
+     * @param tick 当前是第几个逻辑帧
+     * @param action 当前帧是否应该让模型执行操作
      */
-    abstract onTick(timestamp: number): void;
+    abstract onTick(timestamp: number, action: boolean, tick: number): void;
+
+    /**
+     * 执行下一帧
+     * @param timestamp 时间戳
+     */
+    tick(timestamp: number) {
+        this.timestamp = timestamp;
+        this.tickCount++;
+        this.onTick(
+            timestamp,
+            this.tickCount % MODEL_INTERVAL === 0,
+            this.tickCount
+        );
+    }
 
     reset() {
         this.episode++;
-        this.resetTime();
+        this.tickCount = 0;
         return this.onReset();
-    }
-
-    protected resetTime() {
-        this.lastTime = performance.now();
-    }
-
-    protected waitPending(): Promise<void> {
-        this.pending = true;
-        return new Promise(res => {
-            const wait = () => {
-                const now = performance.now();
-                if (now - this.lastTime < this.interval) {
-                    requestAnimationFrame(wait);
-                    return;
-                }
-                this.lastTime = now;
-                this.pending = false;
-                res();
-            };
-            wait();
-        });
     }
 
     /**
      * 向训练端发送信息
      */
-    send(data: any) {
+    send<T extends IWebSocketSend>(data: T) {
         this.manager.send(data);
+    }
+
+    /**
+     * 当前帧处理完毕
+     */
+    tickEnd() {
+        this.manager.tickEnd();
     }
 
     abstract save(): SL;
@@ -112,12 +133,17 @@ export abstract class TrainProcess<
 
 export type AnyTrainProcess = TrainProcess<any, any, any, any, any>;
 
-interface TrainManagerEvent {}
+interface TrainManagerEvent {
+    tickEnd: [];
+    data: [data: ITrainDataBase];
+}
 
-export class TrainManager extends EventEmitter<TrainManagerEvent> {
+export class TrainManager
+    extends EventEmitter<TrainManagerEvent>
+    implements ITickExcitable
+{
     readonly socket: WebSocket;
     readonly list: Map<string, AnyTrainProcess> = new Map();
-    readonly ticker = new Ticker();
 
     private _process: AnyTrainProcess | null = null;
     public get trainScene(): AnyTrainProcess | null {
@@ -137,7 +163,6 @@ export class TrainManager extends EventEmitter<TrainManagerEvent> {
         this.socket.addEventListener('message', ev => {
             this.onData(ev);
         });
-        this.ticker.add(time => this.tick(time));
     }
 
     add(process: AnyTrainProcess) {
@@ -204,6 +229,17 @@ export class TrainManager extends EventEmitter<TrainManagerEvent> {
     }
 
     tick(time: number) {
-        this._process?.onTick(time);
+        if (!this._process) {
+            this.tickEnd();
+            return;
+        }
+        this._process.tick(time);
+    }
+
+    /**
+     * 当前帧处理完毕
+     */
+    tickEnd() {
+        this.emit('tickEnd');
     }
 }

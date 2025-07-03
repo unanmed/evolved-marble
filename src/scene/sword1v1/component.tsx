@@ -206,7 +206,7 @@ export const Sword1v1SceneCom = defineComponent<
         // 伤害弹出
         ctx.save();
         const toDelete = new Set<DamageRender>();
-        const now = performance.now();
+        const now = props.scene.timestamp;
         for (const damage of scene.damageRender) {
             const progress = (now - damage.startTime) / 2000;
             if (progress >= 1) {

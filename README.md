@@ -2,9 +2,15 @@
 
 Evolved Marble 是一个基于强化学习的球球战争项目（可参考 Lost Marbles 等创作者的视频）。
 
-## 运行
+## 需要的工具
 
-首先确保你已经安装了 `node.js >= 18` 和 `pnpm >= 8`，先执行如下代码安装所需依赖：
+-   `node.js >= 18`
+-   `pnpm >= 8`
+-   `ffmpeg n7.1 >= 2025`
+-   `python == 3.9.22`
+-   `requirements.txt` 中的 pip 依赖
+
+## 运行
 
 ```bash
 pnpm i

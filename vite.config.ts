@@ -23,7 +23,12 @@ export default defineConfig({
     ],
     base: './',
     server: {
-        port: 8074
+        port: 8074,
+        proxy: {
+            '/upload-frame': 'http://localhost:8075',
+            '/frame-end': 'http://localhost:8075',
+            '/ping': 'http://localhost:8075'
+        }
     },
     resolve: {
         alias: {
