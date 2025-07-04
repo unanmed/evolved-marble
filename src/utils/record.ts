@@ -1,12 +1,12 @@
+import { FRAME_INTERVAL } from '@/setup';
 import EventEmitter from 'eventemitter3';
 
 export interface IRecorderDestination {
     /**
-     * 接收帧图片
-     * @param frame 当前帧图片
-     * @returns 是否接收并处理成功
+     * 接收录制的数据
+     * @param chunk 当前这一段的数据
      */
-    receive(frame: Blob): Promise<boolean>;
+    receive(chunk: ArrayBuffer): void;
 
     /**
      * 结束录制
@@ -15,44 +15,61 @@ export interface IRecorderDestination {
 }
 
 interface RecorderEvent {
-    frame: [blob: Blob | null];
+    chunk: [blob: ArrayBuffer];
     finish: [];
 }
 
 export class Recorder extends EventEmitter<RecorderEvent> {
     private destination?: IRecorderDestination;
 
+    private frames: number = 0;
+
+    private encoder: VideoEncoder;
+
     constructor(public readonly target: HTMLCanvasElement) {
         super();
+        this.encoder = new VideoEncoder({
+            output: chunk => {
+                const buffer = new ArrayBuffer(chunk.byteLength);
+                chunk.copyTo(buffer);
+                this.destination?.receive(buffer);
+            },
+            error: error => {
+                // eslint-disable-next-line no-console
+                console.error(error);
+            }
+        });
+
+        this.encoder.configure({
+            codec: 'avc1.640032',
+            width: target.width,
+            height: target.height,
+            bitrate: 8_000_000, // 4 Mbps
+            framerate: 60
+        });
     }
 
     /**
      * 捕获一帧图像
      */
     async capture() {
-        const data = await new Promise<Blob | null>(res => {
-            this.target.toBlob(blob => {
-                res(blob);
-            }, 'image/jpeg');
+        const frame = new VideoFrame(this.target, {
+            timestamp: this.frames * FRAME_INTERVAL
         });
-        if (this.destination && data) {
-            const success = await this.destination.receive(data);
-            if (!success) {
-                // eslint-disable-next-line no-console
-                console.warn(`Frame transfer failed!`);
-            }
+        this.encoder.encode(frame);
+        frame.close();
+        this.frames++;
+        if (this.frames % 1800 === 0) {
+            await this.encoder.flush();
         }
-        this.emit('frame', data);
-        return data;
     }
 
     /**
      * 结束录制
      */
-    finish() {
-        if (this.destination) {
-            this.destination.finish();
-        }
+    async finish() {
+        await this.encoder.flush();
+        this.destination?.finish();
         this.emit('finish');
     }
 

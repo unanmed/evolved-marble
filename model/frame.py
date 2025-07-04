@@ -6,43 +6,29 @@ import os
 from flask import Flask, request
 
 app = Flask(__name__)
+RECORDED_FILE = os.path.join(os.getcwd(), 'video/recorded.webm')
+OUTPUT_FILE = os.path.join(os.getcwd(), 'video/output.webm')
+chunk_index = 0
 
-ffmpeg_process = subprocess.Popen([
-    "ffmpeg",
-    "-y",
-    "-f", "image2pipe",
-    "-framerate", "60",
-    "-vcodec", "mjpeg",
-    "-i", "-",
-    "-c:v", "libx264",
-    "-preset", "ultrafast",
-    "-b:v", "8000k",
-    "-pix_fmt", "yuv420p",
-    os.path.join(os.getcwd(), 'video/output.mp4')
-], stdin=subprocess.PIPE)
-
-@app.route('/upload-frame', methods=['POST'])
-def upload_frame():
+@app.route('/upload-chunk', methods=['POST'])
+def upload_chunk():
+    global chunk_index
     data = request.data
-    if not ffmpeg_process:
-        return {"code": 2}, 500
+    if not data:
+        return {"code": 1}, 400
 
-    try:
-        ffmpeg_process.stdin.write(data)
-    except Exception as e:
-        return {"code": 1}, 500
+    with open(RECORDED_FILE, "ab") as f:
+        f.write(data)
 
+    chunk_index += 1
     return {"code": 0}, 200
 
 @app.route('/end-frame', methods=['POST'])
 def end_frame():
-    global ffmpeg_process
-    ffmpeg_process.stdin.close()
-    ffmpeg_process.wait()
-    ffmpeg_process = None
-    return {"code": 0}, 200
+    cmd = f"ffmpeg -i {RECORDED_FILE} -c copy {OUTPUT_FILE}"
+    os.system(cmd)
 
-@app.route('/ping', methods=['GET'])
+@app.route('/ping-chunk', methods=['GET'])
 def ping():
     return 'pong', 200
 
@@ -52,11 +38,14 @@ def on_exit():
 def run_flask():
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)
-    app.run(port=8075, use_reloader=False)
+    app.run(port=8076)
 
 def start():
+    os.makedirs(os.path.join(os.getcwd(), 'video'), exist_ok=True)
     # 注册退出时清理函数
     atexit.register(on_exit)
+    
+    open(RECORDED_FILE, "wb").close()  # 清空文件
 
     # 启动 Flask（后台）
     flask_thread = threading.Thread(target=run_flask, daemon=True)

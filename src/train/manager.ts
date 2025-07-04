@@ -2,6 +2,7 @@ import { EventEmitter } from 'eventemitter3';
 import { SceneController } from '../scene/controller';
 import { IDisplayInfoBase, IScene, ITickExcitable, ITrainer } from '@/common';
 import { MODEL_INTERVAL } from '@/setup';
+import { recorder } from '@/renderer';
 
 export interface ITrainDataBase {
     type: string;
@@ -155,13 +156,16 @@ export class TrainManager
 
     constructor(public readonly scene: SceneController) {
         super();
-        this.socket = new WebSocket('ws://localhost:7725');
+        this.socket = new WebSocket('ws://localhost:8075');
         this.socket.addEventListener('open', () => {
             // eslint-disable-next-line no-console
             console.log(`Train socket connect successfully.`);
         });
         this.socket.addEventListener('message', ev => {
             this.onData(ev);
+        });
+        this.socket.addEventListener('close', () => {
+            recorder.finish();
         });
     }
 

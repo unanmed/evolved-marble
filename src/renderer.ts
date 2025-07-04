@@ -1,6 +1,6 @@
 import { MotaRenderer, UIController } from '@motajs/client';
 import { Recorder } from './utils/record';
-import { RecordUploader } from './utils/upload';
+import { RecordWriter } from './utils/writer';
 
 export const renderer = new MotaRenderer({
     canvas: '#main',
@@ -17,6 +17,7 @@ function resizeRenderer() {
     // const heightRatio = height / 1080;
     // renderer.setScale(Math.min(widthRatio, heightRatio));
 }
+resizeRenderer();
 
 export function initializeRenderer() {
     window.addEventListener('resize', resizeRenderer);
@@ -29,5 +30,5 @@ scene.lastOnly(true);
 
 // 初始化录制
 export const recorder = new Recorder(renderer.getCanvas());
-export const uploader = new RecordUploader();
-recorder.to(uploader);
+export const writer = new RecordWriter();
+recorder.to(writer);

@@ -25,9 +25,9 @@ export default defineConfig({
     server: {
         port: 8074,
         proxy: {
-            '/upload-frame': 'http://localhost:8075',
-            '/frame-end': 'http://localhost:8075',
-            '/ping': 'http://localhost:8075'
+            '/upload-chunk': 'http://localhost:8076',
+            '/end-chunk': 'http://localhost:8076',
+            '/ping-chunk': 'http://localhost:8076'
         }
     },
     resolve: {

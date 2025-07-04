@@ -14,5 +14,8 @@ export const MODEL_INTERVAL = 6;
 export const FRAME = 60;
 export const FRAME_INTERVAL = 1000 / FRAME;
 
+/** 录制时，将多长的视频作为一个分块 */
+export const CHUNK_FRAME = 30 * 60;
+
 /** 激励源 */
 export const excitation = new SpecifiedFrameExcitation(FRAME_INTERVAL);

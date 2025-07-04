@@ -3,16 +3,42 @@ import { Sword1v1Scene } from './scene/sword1v1/scene';
 import { SceneController } from './scene/controller';
 import { TrainManager } from './train/manager';
 import { Sword1v1Train } from './train/sword1v1/train';
-import { initializeRenderer, recorder, renderer, scene } from './renderer';
-import { defineComponent } from 'vue';
-import { createApp } from '@motajs/client';
+import {
+    initializeRenderer,
+    recorder,
+    renderer,
+    scene,
+    writer
+} from './renderer';
+import { defineComponent, ref } from 'vue';
+import { createApp, Font } from '@motajs/client';
 import { InputType, ITrainWorkflow } from './common';
 import { excitation, SCENE } from './setup';
 import { TrainWorkflow } from './workflow';
 
 const RootComponent = defineComponent(() => {
+    const font = new Font('Verdana', 32);
+    const recording = ref(false);
+
+    const startRecord = () => {
+        if (recording.value) return;
+        writer.start();
+        main.workflow.start();
+        recording.value = false;
+    };
+
     return () => (
-        <container loc={[0, 0, 1920, 1080]}>{scene.render()}</container>
+        <container loc={[0, 0, 1920, 1080]}>
+            <text
+                zIndex={10}
+                text={recording.value ? '录制中' : '开始录制'}
+                cursor="pointer"
+                loc={[0, 0]}
+                font={font}
+                onClick={startRecord}
+            />
+            <container loc={[0, 0, 1920, 1080]}>{scene.render()}</container>
+        </container>
     );
 });
 
@@ -36,7 +62,6 @@ class Main {
         excitation.excite(this.scene);
         excitation.excite(this.train);
         await scene;
-        this.workflow.start();
     }
 
     async initializeScene() {

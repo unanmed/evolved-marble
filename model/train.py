@@ -101,7 +101,7 @@ if __name__ == "__main__":
     parser.add_argument('--from_state', type=int, default=0)
     args = parser.parse_args()
     
-    start()
+    # start()
 
     # 开始训练
     train(args)
