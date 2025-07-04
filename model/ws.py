@@ -6,7 +6,7 @@ from time import sleep
 from queue import Queue
 
 class WebSocketServer:
-    def __init__(self, host='0.0.0.0', port=7725):
+    def __init__(self, host='0.0.0.0', port=8075):
         self.host = host
         self.port = port
         self.message_queue = Queue()

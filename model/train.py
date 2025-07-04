@@ -83,7 +83,7 @@ def train(args):
         result = algo.train()
         print(
             f"iter: {i + 1} | Red Reward: {result['env_runners']['agent_episode_returns_mean']['red']:.4} | "
-            f"Blue Reward: {result['env_runners']['agent_episode_returns_mean']['blue']:.4}"
+            f"Blue Reward: {result['env_runners']['agent_episode_returns_mean']['blue']:.4}  "
         )
 
         # 每100轮保存一次模型

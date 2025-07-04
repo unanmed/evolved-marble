@@ -1,11 +1,9 @@
 import subprocess
 import atexit
 import threading
-import logging
 import os
-from flask import Flask, request
-
-app = Flask(__name__)
+import websockets
+import asyncio
 
 ffmpeg_process = subprocess.Popen([
     "ffmpeg",
@@ -21,20 +19,6 @@ ffmpeg_process = subprocess.Popen([
     os.path.join(os.getcwd(), 'video/output.mp4')
 ], stdin=subprocess.PIPE)
 
-@app.route('/upload-frame', methods=['POST'])
-def upload_frame():
-    data = request.data
-    if not ffmpeg_process:
-        return {"code": 2}, 500
-
-    try:
-        ffmpeg_process.stdin.write(data)
-    except Exception as e:
-        return {"code": 1}, 500
-
-    return {"code": 0}, 200
-
-@app.route('/end-frame', methods=['POST'])
 def end_frame():
     global ffmpeg_process
     ffmpeg_process.stdin.close()
@@ -42,24 +26,37 @@ def end_frame():
     ffmpeg_process = None
     return {"code": 0}, 200
 
-@app.route('/ping', methods=['GET'])
-def ping():
-    return 'pong', 200
+async def frame_handler(websocket):
+    try:
+        async for message in websocket:
+            try:
+                if message == "finish":
+                    end_frame()
+                elif ffmpeg_process is not None:
+                    ffmpeg_process.stdin.write(message)
+            except Exception as e:
+                print(f"[FFmpeg] 写入失败: {e}")
+    except websockets.exceptions.ConnectionClosed:
+        print("[WebSocket] 客户端断开连接")
 
 def on_exit():
     end_frame()
     
-def run_flask():
-    log = logging.getLogger('werkzeug')
-    log.setLevel(logging.ERROR)
-    app.run(port=8075, use_reloader=False)
+def start_ws_server():
+    async def server():
+        print("[WebSocket] 正在启动 ws://localhost:8076")
+        async with websockets.serve(frame_handler, "localhost", 8076):
+            await asyncio.Future()  # 永不返回
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(server())
+    loop.run_forever()
 
 def start():
-    # 注册退出时清理函数
     atexit.register(on_exit)
-
-    # 启动 Flask（后台）
-    flask_thread = threading.Thread(target=run_flask, daemon=True)
-    flask_thread.start()
+    os.makedirs(os.path.join(os.getcwd(), 'video'), exist_ok=True)
     
-    print('Flask server started.')
+    thread = threading.Thread(target=start_ws_server, daemon=True)
+    thread.start()
+    print("[WebSocket] 服务已在独立线程启动")

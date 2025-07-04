@@ -155,7 +155,7 @@ export class TrainManager
 
     constructor(public readonly scene: SceneController) {
         super();
-        this.socket = new WebSocket('ws://localhost:7725');
+        this.socket = new WebSocket('ws://localhost:8075');
         this.socket.addEventListener('open', () => {
             // eslint-disable-next-line no-console
             console.log(`Train socket connect successfully.`);

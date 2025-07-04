@@ -7,6 +7,7 @@ export const renderer = new MotaRenderer({
     width: 1920,
     height: 1080
 });
+resizeRenderer();
 
 function resizeRenderer() {
     // 固定 1080P

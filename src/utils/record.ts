@@ -4,9 +4,8 @@ export interface IRecorderDestination {
     /**
      * 接收帧图片
      * @param frame 当前帧图片
-     * @returns 是否接收并处理成功
      */
-    receive(frame: Blob): Promise<boolean>;
+    receive(frame: Blob): void;
 
     /**
      * 结束录制
@@ -36,11 +35,7 @@ export class Recorder extends EventEmitter<RecorderEvent> {
             }, 'image/jpeg');
         });
         if (this.destination && data) {
-            const success = await this.destination.receive(data);
-            if (!success) {
-                // eslint-disable-next-line no-console
-                console.warn(`Frame transfer failed!`);
-            }
+            this.destination.receive(data);
         }
         this.emit('frame', data);
         return data;
