@@ -1,4 +1,5 @@
-import { GameUI, IUIInstance } from '@motajs/client';
+import { GameUI, IUIInstance, MotaOffscreenCanvas2D } from '@motajs/client';
+import { Body, Contact, Fixture, World } from 'planck-js';
 import { DefineComponent, DefineSetupFnComponent } from 'vue';
 
 export const enum SceneMode {
@@ -187,6 +188,11 @@ export interface ITickExcitable {
 
 export interface ITickExcitation {
     /**
+     * 当前时刻
+     */
+    now(): number;
+
+    /**
      * 激励一个可激励对象
      * @param target 激励目标
      */
@@ -209,4 +215,125 @@ export interface ITrainWorkflow {
      * 结束训练工作流程
      */
     end(): void;
+}
+
+export interface WorldBodyData<T> {
+    /** IWorldBody 对象 */
+    readonly body: IWorldBody<T>;
+    /** 物体实例 */
+    readonly ins: IWorldBodyInstance;
+}
+
+export interface BodyContact<T> {
+    /** 当前物体接触时的构件 */
+    selfFixture: Fixture;
+    /** 接触到的物体的构件 */
+    oppoFixture: Fixture;
+    /** 当前物体接触时的物体实例 */
+    selfBodyIns: Body;
+    /** 接触到的物体的物体实例 */
+    oppoBodyIns: Body;
+    /** 当前物体对象 */
+    selfBody: WorldBodyData<T>;
+    /** 接触的物体对象 */
+    oppoBody: WorldBodyData<any>;
+    /** 在 {@link contact} 属性中，当前物体是否是 A（getFixtureA） */
+    isA: boolean;
+    /** 接触对象 */
+    contact: Contact;
+}
+
+export interface IWorldBodyInstance {
+    /** 这个物体实例包含的所有的 planck-js 物体 */
+    readonly bodyList: Set<Body>;
+    /** 这个物体实例所处的世界 */
+    readonly world: World;
+    /** 这个物体实例所处的地图 */
+    readonly map: IMap;
+}
+
+export interface IWorldBody<T = void> {
+    /**
+     * 创建物体实例
+     * @param world 物体实例创建至的世界
+     * @param data 创建物体所需要的数据
+     * @param map 物体实例所在的地图
+     */
+    create(world: World, data: T, map: IMap): IWorldBodyInstance;
+
+    /**
+     * 摧毁这个物体，当物体从世界上移除后执行
+     * @param ins 要摧毁的物体实例
+     * @returns 是否摧毁成功
+     */
+    destroy(ins: IWorldBodyInstance): boolean;
+
+    /**
+     * 当前物体与另一个物体开始接触，两个物体接触时二者会同时执行此方法，顺序不固定
+     * @param body 接触的物体
+     */
+    contact(contact: BodyContact<T>, timestamp: number): void;
+
+    /**
+     * 渲染属于此物体的物体实例
+     * @param canvas 渲染至的画布
+     */
+    render(canvas: MotaOffscreenCanvas2D, ins: IWorldBodyInstance): void;
+
+    /**
+     * 更新这个物体的某个物体实例，一般可以发生在角色升级时等情况
+     * @param ins 物体实例
+     */
+    updateBody(ins: IWorldBodyInstance): void;
+}
+
+export interface IMap {
+    /**
+     * 重置这个地图
+     */
+    reset(): void;
+
+    /**
+     * 获取这个地图的世界，世界是地图的物理模拟沙盒，每个地图都有自己的世界
+     */
+    getWorld(): World;
+
+    /**
+     * 添加一个物体
+     * @param body 物体实例
+     * @param data 创建物体时所需的数据
+     * @returns 这个物体在本世界的 id
+     */
+    addBody<T>(body: IWorldBody<T>, data: T): number;
+
+    /**
+     * 移除物体
+     * @param id 物体在本世界的 id
+     * @returns 物体是否移除成功，当物体存在且移除成功时返回 `true`，其他情况返回 `false`
+     */
+    removeBody(id: number): boolean;
+
+    /**
+     * 渲染这个地图
+     * @param canvas 渲染至的画布
+     */
+    render(canvas: MotaOffscreenCanvas2D): void;
+
+    /**
+     * 执行一步模拟
+     * @param time 模拟时长
+     * @param velocityIterations 速度迭代次数
+     * @param positionIterations 位置迭代次数
+     */
+    step(
+        time: number,
+        velocityIterations?: number,
+        positionIterations?: number
+    ): void;
+
+    /**
+     * 当一个物体更新过之后执行
+     * @param ins 更新过的物体实例
+     */
+    updatedBody(ins: IWorldBodyInstance): void;
 }

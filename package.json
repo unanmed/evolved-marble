@@ -10,12 +10,14 @@
     },
     "devDependencies": {
         "@eslint/js": "^9.27.0",
+        "@types/lodash-es": "^4.17.12",
         "@types/node": "^22.15.30",
         "@vitejs/plugin-vue-jsx": "^4.2.0",
         "eslint": "^9.27.0",
         "eslint-config-prettier": "^10.1.5",
         "eslint-plugin-prettier": "^5.4.1",
         "globals": "^16.2.0",
+        "prettier": "^3.6.2",
         "typescript": "~5.8.3",
         "typescript-eslint": "^8.33.0",
         "vite": "^6.3.5"
@@ -23,6 +25,7 @@
     "dependencies": {
         "@motajs/client": "^0.1.2",
         "eventemitter3": "^5.0.1",
+        "lodash-es": "^4.17.21",
         "mutate-animate": "^1.4.2",
         "planck-js": "^1.3.0",
         "vue": "^3.5.14"

@@ -13,6 +13,8 @@ export abstract class TickExcitationBase
     /** 所有的可激励对象 */
     protected readonly targets: Set<ITickExcitable> = new Set();
 
+    abstract now(): number;
+
     excite(target: ITickExcitable): void {
         this.targets.add(target);
     }
@@ -24,13 +26,19 @@ export abstract class TickExcitationBase
 
 export class AnimationFrameExcitation extends TickExcitationBase {
     private readonly ticker: Ticker = new Ticker();
+    private nowTime: number = 0;
 
     constructor() {
         super();
         this.ticker.add(time => {
+            this.nowTime = time;
             this.targets.forEach(v => v.tick(time));
             this.emit('tick', time);
         });
+    }
+
+    now(): number {
+        return this.nowTime;
     }
 }
 
@@ -48,5 +56,9 @@ export class SpecifiedFrameExcitation extends TickExcitationBase {
         this.targets.forEach(v => v.tick(this.nowTime));
         this.emit('tick', this.nowTime);
         this.nowTime += this.interval;
+    }
+
+    now(): number {
+        return this.nowTime;
     }
 }
