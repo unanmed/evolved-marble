@@ -128,6 +128,15 @@ export class BattleSim {
                     this.emitCommand(cmd, tick);
                     break;
                 }
+                default: {
+                    // 编译期穷尽性守卫（WR-02）：若新增 Command 变体而未在此处理，
+                    // `cmd` 在 default 分支会被收窄为 `never`，赋值即报类型错误——
+                    // 从而杜绝"静默 no-op"这一旧原型反模式。运行期到此分支即抛错（不静默）。
+                    const unhandled: never = cmd;
+                    throw new Error(
+                        `unhandled command kind: ${JSON.stringify(unhandled)}`
+                    );
+                }
             }
         }
     }
