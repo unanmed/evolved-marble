@@ -22,6 +22,9 @@ export interface IRngStream {
 /**
  * xmur3 字符串散列，用于把 (种子, 流名) 混合为去相关的初始状态。
  * 绝不用朴素的 `seed + index`（会产生相关流）。
+ *
+ * @param str 待散列的字符串（本模块固定使用 `${流名}#${种子}`）。
+ * @returns 一个无参闭包；每次调用返回下一个 32 位无符号散列值。
  */
 function xmur3(str: string): () => number {
     let h = 1779033703 ^ str.length;
@@ -37,13 +40,24 @@ function xmur3(str: string): () => number {
     };
 }
 
-/** 由 (主种子, 流名) 派生出 4 个去相关的 uint32 种子。 */
+/**
+ * 由 (主种子, 流名) 派生出 4 个去相关的 uint32 种子。
+ *
+ * @param seed 主种子（整场模拟共享）。
+ * @param name 流名（在同一主种子下区分不同用途的随机来源）。
+ * @returns 4 个去相关的 uint32 组成的初始状态。
+ */
 export function mixSeed(seed: number, name: string): RngState {
     const h = xmur3(`${name}#${seed}`);
     return [h(), h(), h(), h()];
 }
 
-/** 用初始状态构造一个 sfc32 随机流。 */
+/**
+ * 用初始状态构造一个 sfc32 随机流。
+ *
+ * @param init sfc32 的 128 位初始状态（4 个 uint32）。
+ * @returns 一个新构造的、以该状态起步的随机流。
+ */
 export function makeSfc32(init: RngState): IRngStream {
     let a = init[0] >>> 0;
     let b = init[1] >>> 0;

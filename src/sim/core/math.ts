@@ -18,7 +18,14 @@
  * 日后若需收紧到跨机一致（D-03），应在此集中审计全部数学调用。
  */
 
-/** 将 `value` 夹紧到 `[min, max]` 区间（纯函数、确定性）。 */
+/**
+ * 将 `value` 夹紧到 `[min, max]` 区间（纯函数、确定性）。
+ *
+ * @param value 待夹紧的数值。
+ * @param min 区间下界（含）。
+ * @param max 区间上界（含）。
+ * @returns 夹紧后的数值：原值（在其间）或最接近的边界值。
+ */
 export function clamp(value: number, min: number, max: number): number {
     if (value < min) return min;
     if (value > max) return max;
