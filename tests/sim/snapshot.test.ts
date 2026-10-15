@@ -184,6 +184,26 @@ describe('entity-id cursor survives a snapshot round-trip (CR-01, D-05)', () => 
     });
 });
 
+describe('quantize int32 range guard (WR-03)', () => {
+    it('throws deterministically when a component exceeds the quantized int32 range', () => {
+        const sim = new BattleSim(DEFAULT_SEED);
+        sim.spawn();
+        // QUANT_GRID=256 时，|value| 超过 floor(INT32_MAX/256)+1 ≈ 8.39e6 将溢出 setInt32。
+        const beyond = Math.floor(2147483647 / QUANT_GRID) + 1;
+        sim.state.store.get(1).xform.x = beyond;
+        expect(() => sim.snapshot()).toThrow(
+            /snapshot: value out of quantized int32 range/
+        );
+    });
+
+    it('leaves in-range components byte-identical (guard does not alter valid bytes)', () => {
+        const sim = steppedSim(DEFAULT_SEED, 3, 25);
+        const bytes = sim.snapshot();
+        const restored = deserializeState(bytes);
+        expect(Array.from(serializeState(restored))).toEqual(Array.from(bytes));
+    });
+});
+
 describe('snapshot as a deterministic restart point', () => {
     it('two restores of the same snapshot re-step identically', () => {
         const bytes = new Uint8Array(

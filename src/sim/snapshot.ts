@@ -39,9 +39,27 @@ const HEADER_SIZE = 8;
 const STREAM_STATE_BYTES = 16;
 /** 每个实体的固定字节数：7 × int32（id + hp + level + x + y + vx + vy）。 */
 const ENTITY_BYTES = 28;
+/** 有符号 int32 上界（`DataView.setInt32` 溢出会静默按模 2³² 回绕）。 */
+const INT32_MAX = 2147483647;
 
+/**
+ * 量化：把浮点值吸附到 `1/QUANT_GRID` 栅格并转为整数。
+ *
+ * 写入路径用 `DataView.setInt32`，其对越界值**静默**按 ToInt32（模 2³²）回绕——会让
+ * `fingerprint(restore(serialize(s)))` 与 `fingerprint(serialize(s))` 分歧且无任何信号
+ * （WR-03）。故此处对越界值**确定性抛错**，而不是任其回绕；Phase-1 量级远低于上界，
+ * 但 Phase-2 物理速度/位移可能突破 `±(INT32_MAX / QUANT_GRID)`。栅格、取整与字节序保持不变。
+ *
+ * @param v 待量化的原始浮点值。
+ * @returns 栅格化后的整数（保证落在有符号 int32 范围内）。
+ * @throws 当 `Math.round(v * QUANT_GRID)` 越出有符号 int32 范围时抛出（消息含原值）。
+ */
 function quantize(v: number): number {
-    return Math.round(v * QUANT_GRID);
+    const q = Math.round(v * QUANT_GRID);
+    if (q > INT32_MAX || q < -INT32_MAX - 1) {
+        throw new Error(`snapshot: value out of quantized int32 range: ${v}`);
+    }
+    return q;
 }
 
 function dequantize(q: number): number {
