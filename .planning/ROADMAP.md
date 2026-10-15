@@ -13,7 +13,7 @@ Milestone 1 delivers the **tactical combat layer**: a browser-hosted, determinis
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation & Deterministic Sim Core** - Headless, fixed-timestep, seeded PRNG core with a determinism gate — no renderer, no bridge
+- [x] **Phase 1: Foundation & Deterministic Sim Core** - Headless, fixed-timestep, seeded PRNG core with a determinism gate — no renderer, no bridge (completed 2026-10-15)
 - [ ] **Phase 2: Physics & Composite Units** - Rapier2D compound units (body + weapon + armor colliders) with typed, part-tagged contact events
 - [ ] **Phase 3: Combat Mechanics, Data & Progression** - Data-driven classes/weapons/armor, collision-velocity damage, armor reduction, XP & leveling
 - [ ] **Phase 4: Unit AI & Autonomous Battle** - Spec observation/action model, behavior-tree AI at 0.1s, autonomous 10v10 to a decisive winner, watchability audit
@@ -192,7 +192,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Deterministic Sim Core | 12/12 | In Progress|  |
+| 1. Foundation & Deterministic Sim Core | 12/12 | Complete    | 2026-10-15 |
 | 2. Physics & Composite Units | 0/3 | Not started | - |
 | 3. Combat Mechanics, Data & Progression | 0/3 | Not started | - |
 | 4. Unit AI & Autonomous Battle | 0/3 | Not started | - |
