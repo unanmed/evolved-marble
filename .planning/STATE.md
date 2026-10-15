@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: Foundation & Deterministic Sim Core
-status: executing
-stopped_at: Completed 01-11-PLAN.md (D-12 JSDoc on tests/sim helpers + gate widened to ['src','tests/sim'])
-last_updated: "2026-10-15T14:48:36.795Z"
+status: verifying
+stopped_at: "Completed 01-12-PLAN.md (D-12 whole tree: gate widened to ['src','tests'])"
+last_updated: "2026-10-15T14:58:39.904Z"
 last_activity: 2026-10-15
 last_activity_desc: Phase 1 execution started
-state_head: cb1468a3041c820a0007aa9c9f469c59f1213e40
+state_head: f6249b6423f212cdd94a13dda5480ec14cfac2bc
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
   percent: 0
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-15)
 
 Phase: 1 (Foundation & Deterministic Sim Core) — EXECUTING
 Plan: 12 of 12
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-15 — Phase 1 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -69,6 +69,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 1 P09 | 5 | 3 tasks | 3 files |
 | Phase 1 P10 | 4 | 2 tasks | 2 files |
 | Phase 01 P11 | 4 | 3 tasks | 5 files |
+| Phase 1 P12 | 5 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -112,6 +113,8 @@ Recent decisions affecting current work:
 - [Phase 1]: D-12 convention gate SCAN_ROOTS widened from ['src/sim'] to ['src']; the whole src tree is now enforced (gate green, 5 tests; determinism gate unchanged, behavior-preserving).
 - [Phase 1]: D-12 pass on tests/sim/** edited commands.test.ts + the four sim-test helper files (headless/rng/snapshot) and left clock.test.ts/entity-store.test.ts untouched — their test-local interfaces were already documented by 01-06 and entity-store has no module-level declarations (plan: 'add only what is missing').
 - [Phase 1]: D-12 convention gate SCAN_ROOTS widened from ['src'] to ['src', 'tests/sim']; the sim test suite is now enforced (gate green, 5 tests; determinism gate unchanged, behavior-preserving).
+- [Phase 1]: [Phase 1]: D-12 pass on the remaining tests/** files added docs only to gate.test.ts (module constants SEED/OTHER_SEED/TICKS) and run-sim.ts's local recorder helper; IRunTraceOptions/runTrace/FIXED_ENTITY_COUNT and loop.test.ts's ICounter/Counter were already documented by 01-06 (plan: 'add only what is missing').
+- [Phase 1]: [Phase 1]: D-12 convention gate SCAN_ROOTS widened from ['src', 'tests/sim'] to ['src', 'tests']; the whole Phase-1 tree (src/** + tests/**), including the gate file itself, is now enforced (gate green, 5 tests; determinism gate unchanged, behavior-preserving).
 
 ### Pending Todos
 
@@ -133,6 +136,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-15T14:48:36.742Z
-Stopped at: Completed 01-11-PLAN.md (D-12 JSDoc on tests/sim helpers + gate widened to ['src','tests/sim'])
+Last session: 2026-10-15T14:58:38.602Z
+Stopped at: Completed 01-12-PLAN.md (D-12 whole tree: gate widened to ['src','tests'])
 Resume file: None
