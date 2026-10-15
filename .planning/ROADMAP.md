@@ -30,12 +30,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Running the same seed twice yields an identical state fingerprint, and a different seed yields a different one — no `Math.random` reaches sim state.
   3. A headless mode runs a full simulation with no rendering/display and produces the same result as any rendered run.
   4. An automated determinism gate (state fingerprint / snapshot hash) runs in CI and fails the build on any divergence.
-**Plans**: 3 plans
+**Plans**: 4 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Toolchain bootstrap (TS7/Vite8/Vitest, DOM-free tsconfig) + end-to-end seeded fixed-step → fingerprint tracer
-- [ ] 01-02-PLAN.md — Seeded RNG stream facade + typed Command contract + sanctioned math/content + sim/** boundary enforcement
-- [ ] 01-03-PLAN.md — Canonical snapshot/fingerprint + double-run determinism gate + pre-commit wiring
+- [ ] 01-01-PLAN.md — Toolchain bootstrap (TS7/Vite8/Vitest, DOM-free tsconfig) + predecessor-tree removal + sim config
+- [ ] 01-02-PLAN.md — End-to-end seeded fixed-step → fingerprint tracer (headless sim core slice)
+- [ ] 01-03-PLAN.md — Seeded RNG stream facade + typed Command contract + sanctioned math/content + sim/** boundary enforcement
+- [ ] 01-04-PLAN.md — Canonical snapshot/fingerprint + double-run determinism gate + pre-commit wiring
 
 ### Phase 2: Physics & Composite Units
 **Goal**: Units are compound Rapier2D rigid bodies whose body/weapon/armor parts are physically distinct and tagged, and whose physical contacts are surfaced as typed, part-tagged simulation events — deterministically.
