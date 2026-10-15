@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SEED } from '../../src/config/sim';
 import { BattleSim } from '../../src/sim/battle-sim';
-import { CommandQueue } from '../../src/sim/commands';
-import { EventLog } from '../../src/sim/core/events';
+import { CommandKind, CommandQueue } from '../../src/sim/commands';
+import {
+    EventLog,
+    SimEventKind,
+    type IRejectedEvent
+} from '../../src/sim/core/events';
 
 /**
  * 内向命令契约 + 每 tick 事件日志（SIM-02/SIM-03，威胁 T-01-05）。
@@ -15,12 +19,15 @@ describe('CommandQueue', () => {
     it('drains buffered commands in insertion order and clears the buffer', () => {
         const q = new CommandQueue();
         q.submit([
-            { kind: 'force', unit: 1, fx: 1, fy: 0, atTick: 1 },
-            { kind: 'torque', unit: 1, amount: 0.5, atTick: 1 }
+            { kind: CommandKind.Force, unit: 1, fx: 1, fy: 0, atTick: 1 },
+            { kind: CommandKind.Torque, unit: 1, amount: 0.5, atTick: 1 }
         ]);
         expect(q.pending).toBe(2);
         const out = q.drain();
-        expect(out.map(c => c.kind)).toEqual(['force', 'torque']);
+        expect(out.map(c => c.kind)).toEqual([
+            CommandKind.Force,
+            CommandKind.Torque
+        ]);
         expect(q.pending).toBe(0);
         expect(q.drain()).toEqual([]);
     });
@@ -45,7 +52,11 @@ describe('CommandQueue', () => {
 describe('EventLog', () => {
     it('emits copies (not live handles) and clears on drain', () => {
         const log = new EventLog();
-        const ev = { kind: 'rejected' as const, tick: 1, reason: 'x' };
+        const ev: IRejectedEvent = {
+            kind: SimEventKind.Rejected,
+            tick: 1,
+            reason: 'x'
+        };
         log.emit(ev);
         const drained = log.drain();
         expect(drained).toEqual([ev]);
@@ -63,7 +74,13 @@ describe('BattleSim commands', () => {
         const forced = new BattleSim(DEFAULT_SEED);
         forced.spawn();
         forced.submit([
-            { kind: 'force', unit: id, fx: 0.3, fy: -0.2, atTick: 1 }
+            {
+                kind: CommandKind.Force,
+                unit: id,
+                fx: 0.3,
+                fy: -0.2,
+                atTick: 1
+            }
         ]);
 
         base.step();
@@ -80,7 +97,9 @@ describe('BattleSim commands', () => {
         const id = 1;
         const sim = new BattleSim(DEFAULT_SEED);
         sim.spawn();
-        sim.submit([{ kind: 'force', unit: id, fx: 1, fy: 0, atTick: 1 }]);
+        sim.submit([
+            { kind: CommandKind.Force, unit: id, fx: 1, fy: 0, atTick: 1 }
+        ]);
         sim.step();
         sim.step();
 
@@ -101,7 +120,9 @@ describe('BattleSim commands', () => {
         sim.spawn();
         sim.step();
         const afterFirst = sim.state.store.get(id).xform.vx;
-        sim.submit([{ kind: 'force', unit: id, fx: 5, fy: 0, atTick: 2 }]);
+        sim.submit([
+            { kind: CommandKind.Force, unit: id, fx: 5, fy: 0, atTick: 2 }
+        ]);
         // 已推进 tick 的状态不受影响
         expect(sim.state.store.get(id).xform.vx).toBe(afterFirst);
     });
@@ -114,21 +135,23 @@ describe('BattleSim commands', () => {
         sim.step();
         expect(sim.state.commands.rejectedTotal).toBe(1);
         const events = sim.state.events.drain();
-        expect(events.some(e => e.kind === 'rejected')).toBe(true);
+        expect(events.some(e => e.kind === SimEventKind.Rejected)).toBe(true);
         // 绝无静默 no-op：未知命令不会产生 command 事件
-        expect(events.some(e => e.kind === 'command')).toBe(false);
+        expect(events.some(e => e.kind === SimEventKind.Command)).toBe(false);
     });
 
     it('drops a command for a non-existent entity without throwing', () => {
         const sim = new BattleSim(DEFAULT_SEED);
         sim.spawn(); // id 1
         expect(() => {
-            sim.submit([{ kind: 'force', unit: 999, fx: 1, fy: 0, atTick: 1 }]);
+            sim.submit([
+                { kind: CommandKind.Force, unit: 999, fx: 1, fy: 0, atTick: 1 }
+            ]);
             sim.step();
         }).not.toThrow();
-        expect(sim.state.events.drain().some(e => e.kind === 'rejected')).toBe(
-            true
-        );
+        expect(
+            sim.state.events.drain().some(e => e.kind === SimEventKind.Rejected)
+        ).toBe(true);
         // 形状合法，故不计入 CommandQueue 拒绝计数
         expect(sim.state.commands.rejectedTotal).toBe(0);
     });
@@ -142,14 +165,14 @@ describe('BattleSim commands', () => {
             for (let t = 0; t < 10; t++) {
                 sim.submit([
                     {
-                        kind: 'force',
+                        kind: CommandKind.Force,
                         unit: a,
                         fx: 0.1,
                         fy: 0.05,
                         atTick: t + 1
                     },
                     {
-                        kind: 'force',
+                        kind: CommandKind.Force,
                         unit: b,
                         fx: -0.02,
                         fy: 0.3,
