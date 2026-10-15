@@ -1,7 +1,7 @@
 import { FIXED_DT } from '../config/sim';
-import { CommandQueue, type Command } from './commands';
+import { CommandKind, CommandQueue, type Command } from './commands';
 import { TickClock } from './core/clock';
-import { EventLog } from './core/events';
+import { EventLog, SimEventKind } from './core/events';
 import { RandomStreams } from './core/rng';
 import { deserializeState, fingerprint, serializeState } from './snapshot';
 import { movementSystem } from './systems/movement';
@@ -83,7 +83,7 @@ export class BattleSim {
         const tick = this._state.clock.tick;
         for (const r of rejections) {
             this._state.events.emit({
-                kind: 'rejected',
+                kind: SimEventKind.Rejected,
                 tick,
                 reason: r.reason
             });
@@ -101,7 +101,7 @@ export class BattleSim {
     private applyCommands(cmds: readonly Command[], tick: number): void {
         for (const cmd of cmds) {
             switch (cmd.kind) {
-                case 'force': {
+                case CommandKind.Force: {
                     if (!this.hasUnit(cmd.unit)) {
                         this.rejectUnit(cmd.unit, tick);
                         break;
@@ -112,9 +112,9 @@ export class BattleSim {
                     this.emitCommand(cmd, tick);
                     break;
                 }
-                case 'torque':
-                case 'weaponAbility':
-                case 'unitAbility': {
+                case CommandKind.Torque:
+                case CommandKind.WeaponAbility:
+                case CommandKind.UnitAbility: {
                     // Phase 1 无角速度/武器/能力实现：记录事件（非静默），Phase 2+ 落地。
                     if (!this.hasUnit(cmd.unit)) {
                         this.rejectUnit(cmd.unit, tick);
@@ -123,7 +123,7 @@ export class BattleSim {
                     this.emitCommand(cmd, tick);
                     break;
                 }
-                case 'spawn': {
+                case CommandKind.Spawn: {
                     // 保留（王国层）：Phase 1 只记录不落地。
                     this.emitCommand(cmd, tick);
                     break;
@@ -143,7 +143,7 @@ export class BattleSim {
 
     private emitCommand(cmd: Command, tick: number): void {
         this._state.events.emit({
-            kind: 'command',
+            kind: SimEventKind.Command,
             tick,
             command: cmd.kind,
             unit: cmd.unit
@@ -152,7 +152,7 @@ export class BattleSim {
 
     private rejectUnit(unit: EntityId, tick: number): void {
         this._state.events.emit({
-            kind: 'rejected',
+            kind: SimEventKind.Rejected,
             tick,
             reason: `unknown entity: ${unit}`
         });
