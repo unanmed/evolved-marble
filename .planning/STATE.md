@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: Foundation & Deterministic Sim Core
 status: executing
-stopped_at: Completed 01-07-PLAN.md (D-12 JSDoc on sim/core + content/formulas + convention gate)
-last_updated: "2026-10-15T14:15:30.390Z"
+stopped_at: Completed 01-09-PLAN.md (D-12 JSDoc on rest of sim/ + gate widened to ['src/sim'])
+last_updated: "2026-10-15T14:28:30.116Z"
 last_activity: 2026-10-15
 last_activity_desc: Phase 1 execution started
-state_head: 5f1bb3a2f629c29e9c35c51a0165ae5bedfe5163
+state_head: cf8c5d76088885299a28acc6e9488627a3361192
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 12
-  completed_plans: 8
+  completed_plans: 9
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-15)
 ## Current Position
 
 Phase: 1 (Foundation & Deterministic Sim Core) — EXECUTING
-Plan: 9 of 12
+Plan: 10 of 12
 Status: Ready to execute
 Last activity: 2026-10-15 — Phase 1 execution started
 
@@ -66,6 +66,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 1 P6 | 18 | 2 tasks | 17 files |
 | Phase 1 P08 | 3 | 2 tasks | 2 files |
 | Phase 1 P07 | 7 | 2 tasks | 3 files |
+| Phase 1 P09 | 5 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -103,6 +104,8 @@ Recent decisions affecting current work:
 - [Phase 1]: [Phase 1]: The dangling vitest coverage block was deleted (not installed): it referenced undeclared @vitest/coverage-v8 and backed no test:coverage script; coverage can be re-introduced deliberately with provider dependency + script together (WR-05, D-08).
 - [Phase 1]: [Phase 1]: D-12 JSDoc pass edited only math.ts + rng.ts (clamp/xmur3/mixSeed/makeSfc32); clock.ts/events.ts/content/formulas.ts already carried declaration-level Chinese JSDoc, so the pass is comment-only and behavior-preserving (fingerprint ed670b76a9019 unchanged).
 - [Phase 1]: [Phase 1]: D-12 convention gate (tests/style/conventions.test.ts) is structural (JSDoc block existence + /** opener + tag presence) over exported top-level declarations only; SCAN_ROOTS = ['src/sim/core','src/sim/content'] widen plan-by-plan (01-09..01-12), so the gate is never green over undocumented files.
+- [Phase 1]: [Phase 1]: D-12 pass on the remaining src/sim files edited only snapshot.ts and systems/movement.ts; battle-sim.ts/commands.ts/world/entity-store.ts/world/world.ts already carried declaration-level Chinese JSDoc, so they were left untouched (plan: 'add only what is missing').
+- [Phase 1]: [Phase 1]: D-12 convention gate SCAN_ROOTS widened from ['src/sim/core','src/sim/content'] to ['src/sim']; the whole sim tree is now enforced (gate green, 5 tests; determinism fingerprint unchanged).
 
 ### Pending Todos
 
@@ -124,6 +127,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-15T14:15:30.337Z
-Stopped at: Completed 01-07-PLAN.md (D-12 JSDoc on sim/core + content/formulas + convention gate)
+Last session: 2026-10-15T14:28:30.058Z
+Stopped at: Completed 01-09-PLAN.md (D-12 JSDoc on rest of sim/ + gate widened to ['src/sim'])
 Resume file: None
