@@ -62,6 +62,12 @@ function quantize(v: number): number {
     return q;
 }
 
+/**
+ * 反量化：把栅格化整数还原为浮点值（`quantize()` 的逆操作）。
+ *
+ * @param q 栅格化后的整数（来自规范字节中的 `int32` 字段）。
+ * @returns 还原后的浮点值（`q / QUANT_GRID`）。
+ */
 function dequantize(q: number): number {
     return q / QUANT_GRID;
 }
@@ -70,6 +76,9 @@ function dequantize(q: number): number {
  * 规范字节编码。字段顺序固定；实体按 `EntityStore.ids()` 的**有序数组**遍历；
  * 随机流按名字**字典序**排序以保证规范（与构造顺序无关）；浮点量化到 `QUANT_GRID` 栅格。
  * 字节序固定为小端。同一逻辑状态在任何调用点都编码为**完全相同**的字节。
+ *
+ * @param s 待序列化的聚合状态根。
+ * @returns 规范、有序、量化的状态字节（小端）。
  */
 export function serializeState(s: ISimState): Uint8Array {
     const rngEntries = Object.entries(s.rng.save()).sort(([a], [b]) =>
@@ -140,6 +149,10 @@ export function serializeState(s: ISimState): Uint8Array {
  *
  * `dt` 不属于序列化状态（它是构造期配置），默认取 `FIXED_DT`；`BattleSim.restore`
  * 会传入其自身的 `dt`。
+ *
+ * @param bytes `serializeState()` 产出的规范字节。
+ * @param dt 逻辑时钟的固定步长（不属于序列化状态；省略时取 `FIXED_DT`）。
+ * @returns 重建的聚合状态根（等价于序列化时刻的状态）。
  */
 export function deserializeState(
     bytes: Uint8Array,
@@ -232,6 +245,9 @@ export function deserializeState(
  * 注意：这是**诊断**用途的状态指纹，**绝不可**作为安全令牌/认证器（研究安全域 V6，
  * 威胁 T-01-03 disposition=accept）。任何安全决策都不应消费它。哈希与序列化保持
  * 可分离：状态规模变大时可在此处换成原生/向量化哈希，模拟逻辑不受影响（D-03）。
+ *
+ * @param bytes 规范状态字节（`serializeState()` 产出）。
+ * @returns 53 位指纹的 16 进制字符串（非加密诊断值）。
  */
 export function fingerprint(bytes: Uint8Array): string {
     let h1 = 0xdeadbeef ^ bytes.length;
