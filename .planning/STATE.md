@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: Foundation & Deterministic Sim Core
 status: executing
-stopped_at: Completed 01-09-PLAN.md (D-12 JSDoc on rest of sim/ + gate widened to ['src/sim'])
-last_updated: "2026-10-15T14:28:30.116Z"
+stopped_at: Completed 01-10-PLAN.md (D-12 JSDoc on src/host + src/config; gate widened to ['src'])
+last_updated: "2026-10-15T14:37:13.062Z"
 last_activity: 2026-10-15
 last_activity_desc: Phase 1 execution started
-state_head: cf8c5d76088885299a28acc6e9488627a3361192
+state_head: 274cd4dcca3c20376a5efd49289539840cc4419a
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 12
-  completed_plans: 9
+  completed_plans: 10
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-15)
 ## Current Position
 
 Phase: 1 (Foundation & Deterministic Sim Core) — EXECUTING
-Plan: 10 of 12
+Plan: 11 of 12
 Status: Ready to execute
 Last activity: 2026-10-15 — Phase 1 execution started
 
@@ -67,6 +67,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 1 P08 | 3 | 2 tasks | 2 files |
 | Phase 1 P07 | 7 | 2 tasks | 3 files |
 | Phase 1 P09 | 5 | 3 tasks | 3 files |
+| Phase 1 P10 | 4 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,8 @@ Recent decisions affecting current work:
 - [Phase 1]: [Phase 1]: D-12 convention gate (tests/style/conventions.test.ts) is structural (JSDoc block existence + /** opener + tag presence) over exported top-level declarations only; SCAN_ROOTS = ['src/sim/core','src/sim/content'] widen plan-by-plan (01-09..01-12), so the gate is never green over undocumented files.
 - [Phase 1]: [Phase 1]: D-12 pass on the remaining src/sim files edited only snapshot.ts and systems/movement.ts; battle-sim.ts/commands.ts/world/entity-store.ts/world/world.ts already carried declaration-level Chinese JSDoc, so they were left untouched (plan: 'add only what is missing').
 - [Phase 1]: [Phase 1]: D-12 convention gate SCAN_ROOTS widened from ['src/sim/core','src/sim/content'] to ['src/sim']; the whole sim tree is now enforced (gate green, 5 tests; determinism fingerprint unchanged).
+- [Phase 1]: D-12 pass on src/host + src/config edited only src/host/pump.ts: loop.ts already documented IStepTarget/IRunLoopConfig/runLoop and config/sim.ts already had per-constant docs, so they were left untouched (plan: 'add only what is missing').
+- [Phase 1]: D-12 convention gate SCAN_ROOTS widened from ['src/sim'] to ['src']; the whole src tree is now enforced (gate green, 5 tests; determinism gate unchanged, behavior-preserving).
 
 ### Pending Todos
 
@@ -127,6 +130,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-15T14:28:30.058Z
-Stopped at: Completed 01-09-PLAN.md (D-12 JSDoc on rest of sim/ + gate widened to ['src/sim'])
+Last session: 2026-10-15T14:37:12.552Z
+Stopped at: Completed 01-10-PLAN.md (D-12 JSDoc on src/host + src/config; gate widened to ['src'])
 Resume file: None
