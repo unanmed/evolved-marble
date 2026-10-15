@@ -5,7 +5,7 @@ import eslintPluginPrettierRecommended from 'eslint-plugin-prettier/recommended'
 
 export default tseslint.config(
     {
-        ignores: ['node_modules', 'dist', 'public']
+        ignores: ['node_modules', 'dist', 'public', 'coverage']
     },
     eslint.configs.recommended,
     ...tseslint.configs.recommended,
@@ -16,6 +16,9 @@ export default tseslint.config(
         }
     },
     {
+        /* 浏览器全局仅作用于宿主/渲染侧；src/sim 与 src/config 属无头边界（边界规则在 Plan 01-03） */
+        files: ['**/*.{js,mjs,cjs,ts,tsx}'],
+        ignores: ['src/sim/**', 'src/config/**'],
         languageOptions: {
             globals: {
                 ...globals.browser

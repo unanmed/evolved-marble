@@ -28,3 +28,12 @@ checkpoint
 .conda
 test.json
 video
+
+# Test coverage
+coverage
+
+# GSD research cache
+.planning/research/.cache/
+
+# D-10/D-11: 大产物（录像、检查点）一律输出到仓库外目录并轮转；
+# 任何此类产物都不得提交入库（避免重演旧仓库 140MB checkpoint 入库）。

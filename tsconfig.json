@@ -6,22 +6,22 @@
         "lib": ["ESNext", "DOM", "DOM.Iterable"],
         "skipLibCheck": true,
 
-        "jsx": "preserve",
-        "jsxImportSource": "vue",
-
         /* Bundler mode */
         "moduleResolution": "bundler",
         "allowImportingTsExtensions": true,
         "moduleDetection": "force",
         "noEmit": true,
 
+        /* TS 7 no longer infers rootDir (Pitfall 7) */
+        "rootDir": "src",
+
         /* Linting */
         "strict": true,
 
-        "baseUrl": ".",
+        /* TS 7 removed baseUrl (TS5102): paths must be relative to this config */
         "paths": {
-            "@/*": ["src/*"]
+            "@/*": ["./src/*"]
         }
     },
-    "include": ["src"]
+    "include": ["src", "tests"]
 }
