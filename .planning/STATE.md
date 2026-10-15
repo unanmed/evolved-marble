@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: Foundation & Deterministic Sim Core
 status: executing
-stopped_at: Completed 01-06-PLAN.md (D-13/D-14/D-15/D-16 style retrofit; behavior byte-identical)
-last_updated: "2026-10-15T13:51:21.939Z"
+stopped_at: Completed 01-08-PLAN.md (WR-04 ESLint boundary covers src/config + WR-05 dangling coverage removed)
+last_updated: "2026-10-15T13:59:58.146Z"
 last_activity: 2026-10-15
 last_activity_desc: Phase 1 execution started
-state_head: 6c92d3b07a3377593ef1640098eecef79c201bb9
+state_head: 19dbb537187e4fbaf50827f131e7874d03a5dc29
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 12
-  completed_plans: 6
+  completed_plans: 7
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-15)
 ## Current Position
 
 Phase: 1 (Foundation & Deterministic Sim Core) — EXECUTING
-Plan: 3 of 12
+Plan: 4 of 12
 Status: Ready to execute
 Last activity: 2026-10-15 — Phase 1 execution started
 
@@ -64,6 +64,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 1 P4 | 7 | 3 tasks | 11 files |
 | Phase 1 P5 | 12 | 3 tasks | 4 files |
 | Phase 1 P6 | 18 | 2 tasks | 17 files |
+| Phase 1 P08 | 3 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -97,6 +98,8 @@ Recent decisions affecting current work:
 - [Phase 1]: IUnitComponents was split into named IUnitAttrs/IUnitXform (D-16); the mocked performance global and the snapshot mutator case became named interfaces (IPerformanceStub/IPerformanceGlobal, IMutatorCase).
 - [Phase 1]: D-13 landed as one globally-atomic task (interface-first classes, no class-as-type) because TypeScript cannot compile a half-renamed type graph; the pre-commit hook (lint + determinism gate) stays green after each task.
 - [Phase 1]: The retrofit is byte-for-byte behavior-preserving: the fixed-seed fingerprint trace (12 ticks, seed 12345, final ed670b76a9019) is identical before and after.
+- [Phase 1]: [Phase 1]: The ESLint headless boundary block files selector now covers ['src/sim/**/*.ts','src/config/**/*.ts'], matching tsconfig.sim.json's DOM-free include, so Date/Math.random in a config module are lint errors too (WR-04, D-03/SIM-03).
+- [Phase 1]: [Phase 1]: The dangling vitest coverage block was deleted (not installed): it referenced undeclared @vitest/coverage-v8 and backed no test:coverage script; coverage can be re-introduced deliberately with provider dependency + script together (WR-05, D-08).
 
 ### Pending Todos
 
@@ -118,6 +121,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-15T13:51:21.886Z
-Stopped at: Completed 01-06-PLAN.md (D-13/D-14/D-15/D-16 style retrofit; behavior byte-identical)
+Last session: 2026-10-15T13:59:30.262Z
+Stopped at: Completed 01-08-PLAN.md (WR-04 ESLint boundary covers src/config + WR-05 dangling coverage removed)
 Resume file: None
