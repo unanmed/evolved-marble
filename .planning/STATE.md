@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: Foundation & Deterministic Sim Core
 status: executing
-stopped_at: Completed 01-02-PLAN.md (headless sim tracer)
-last_updated: "2026-10-15T10:58:03.991Z"
+stopped_at: Completed 01-03-PLAN.md (Command contract, seeded streams, headless boundary)
+last_updated: "2026-10-15T11:14:28.806Z"
 last_activity: 2026-10-15
 last_activity_desc: Phase 1 execution started
-state_head: 169881b410df7c75865e0bef2e7691a143115924
+state_head: 5286fccdd86bfe0a4eae677d578d9bd3793baa75
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-15)
 ## Current Position
 
 Phase: 1 (Foundation & Deterministic Sim Core) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-10-15 — Phase 1 execution started
 
@@ -60,6 +60,7 @@ Progress: [░░░░░░░░░░] 0%
 |------|----------|-------|-------|
 | Phase 1 P01 | 11 | 2 tasks | 30 files |
 | Phase 1 P02 | 6 | 1 tasks | 11 files |
+| Phase 1 P03 | 11 | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -77,6 +78,9 @@ Recent decisions affecting current work:
 - [Phase 1]: [Phase 1]: movementSystem nudge scale set to 0.05 (not 0.001) — 0.001 is below the 1/256 fingerprint quantization grid and would make the gate vacuous.
 - [Phase 1]: [Phase 1]: Fingerprint is a non-cryptographic diagnostic (cyrb53 over canonical quantized bytes), never a security token.
 - [Phase 1]: [Phase 1]: Base tsconfig rootDir widened from src to . so tests/ is under rootDir under TS7; tsconfig.sim.json still narrows to src.
+- [Phase 1]: [Phase 1]: Command intake is a total function — submit() accepts readonly unknown[] and validates at runtime, dropping+counting unknown kind/missing fields (T-01-05); commands drain exactly once at the TOP of step().
+- [Phase 1]: [Phase 1]: MOVEMENT_NUDGE_SCALE moved to content/formulas.ts (D-06 single source); torque/weaponAbility/unitAbility/spawn and damage/kill/levelup/contact are reserved, wired-but-inert contract surfaces (emit events, never silent no-ops).
+- [Phase 1]: [Phase 1]: sim/** headless boundary is enforced twice — ESLint sim/** block (no-restricted-imports/globals/properties/syntax) plus the DOM-free tsconfig.sim.json; Math global NOT banned (D-02 allows sin/cos), only Math.random.
 
 ### Pending Todos
 
@@ -98,6 +102,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-15T10:57:53.655Z
-Stopped at: Completed 01-02-PLAN.md (headless sim tracer)
+Last session: 2026-10-15T11:14:28.779Z
+Stopped at: Completed 01-03-PLAN.md (Command contract, seeded streams, headless boundary)
 Resume file: None

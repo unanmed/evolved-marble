@@ -11,7 +11,7 @@ Requirements for the first milestone (watchable autonomous 10+ v 10+ physics bat
 ### SIM — 确定性模拟核心
 
 - [x] **SIM-01**: 模拟按固定步长推进，与渲染解耦（tick = 游戏 1 分钟；1× 下 60 步/秒）
-- [ ] **SIM-02**: 所有模拟随机性来自带种子的 PRNG（禁用 `Math.random`），可由种子复现
+- [x] **SIM-02**: 所有模拟随机性来自带种子的 PRNG（禁用 `Math.random`），可由种子复现
 - [x] **SIM-03**: 存在无渲染的无头运行模式
 - [ ] **SIM-04**: 有确定性门禁（状态指纹/快照），证明同种子结果一致
 
@@ -111,7 +111,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | SIM-01 | Phase 1 | Complete |
-| SIM-02 | Phase 1 | Pending |
+| SIM-02 | Phase 1 | Complete |
 | SIM-03 | Phase 1 | Complete |
 | SIM-04 | Phase 1 | Pending |
 | PHYS-01 | Phase 2 | Pending |
