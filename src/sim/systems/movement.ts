@@ -1,3 +1,5 @@
+import { MOVEMENT_NUDGE_SCALE } from '../content/formulas';
+import { clamp } from '../core/math';
 import type { SimState } from '../world/world';
 
 /**
@@ -7,18 +9,17 @@ import type { SimState } from '../world/world';
  * 再积分位置。它是每 tick 状态变化的唯一来源，用于让 SIM-04 指纹门禁
  * **非空**（Pitfall 8：对静态状态取指纹证明不了任何东西）。Phase 2 将以真实物理替换。
  *
- * 注：微扰尺度被设为 `0.05`（而非草稿里的 `0.001`）。原因是快照以 1/256 栅格量化：
- * `nudge * 0.001` 远低于该栅格分辨率，会让每 tick 的量化状态不变、门禁退化为空。
- * 取 0.05 使单 tick 的 `vx` 变化稳定跨越量化栅格，保证门禁可判别（见 SUMMARY 偏差记录）。
+ * 微扰尺度集中在 `content/formulas.ts`（`MOVEMENT_NUDGE_SCALE`，D-06 单一数值来源）；
+ * `nudge` 经 `clamp` 夹紧到 [-0.5, 0.5] 作为防御性不变量（`ai.next()` 已在 [0,1)，故为无副作用）。
+ * 尺度取 0.05 而非更小的值：快照以 1/256 栅格量化，过小的 `vx` 变化会被量化抹平、
+ * 使门禁退化为空（见 01-02 SUMMARY 偏差记录）。
  */
-const NUDGE_SCALE = 0.05;
-
 export function movementSystem(w: SimState, dt: number): void {
     const ai = w.rng.stream('ai');
     for (const id of w.store.ids()) {
         const c = w.store.get(id);
-        const nudge = ai.next() - 0.5;
-        c.xform.vx += nudge * NUDGE_SCALE;
+        const nudge = clamp(ai.next() - 0.5, -0.5, 0.5);
+        c.xform.vx += nudge * MOVEMENT_NUDGE_SCALE;
         c.xform.x += c.xform.vx * dt;
         c.xform.y += c.xform.vy * dt;
     }
