@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: Foundation & Deterministic Sim Core
-status: executing
-stopped_at: Completed 01-03-PLAN.md (Command contract, seeded streams, headless boundary)
-last_updated: "2026-10-15T11:14:28.806Z"
+status: verifying
+stopped_at: Completed 01-04-PLAN.md (canonical snapshot/fingerprint, double-run determinism gate, pre-commit wiring)
+last_updated: "2026-10-15T11:28:42.246Z"
 last_activity: 2026-10-15
 last_activity_desc: Phase 1 execution started
-state_head: 5286fccdd86bfe0a4eae677d578d9bd3793baa75
+state_head: 7ec52bbf43bd7710228641131ea869db573b5612
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-15)
 
 Phase: 1 (Foundation & Deterministic Sim Core) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-15 — Phase 1 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 1 P01 | 11 | 2 tasks | 30 files |
 | Phase 1 P02 | 6 | 1 tasks | 11 files |
 | Phase 1 P03 | 11 | 3 tasks | 12 files |
+| Phase 1 P4 | 7 | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -81,6 +82,10 @@ Recent decisions affecting current work:
 - [Phase 1]: [Phase 1]: Command intake is a total function — submit() accepts readonly unknown[] and validates at runtime, dropping+counting unknown kind/missing fields (T-01-05); commands drain exactly once at the TOP of step().
 - [Phase 1]: [Phase 1]: MOVEMENT_NUDGE_SCALE moved to content/formulas.ts (D-06 single source); torque/weaponAbility/unitAbility/spawn and damage/kill/levelup/contact are reserved, wired-but-inert contract surfaces (emit events, never silent no-ops).
 - [Phase 1]: [Phase 1]: sim/** headless boundary is enforced twice — ESLint sim/** block (no-restricted-imports/globals/properties/syntax) plus the DOM-free tsconfig.sim.json; Math global NOT banned (D-02 allows sin/cos), only Math.random.
+- [Phase 1]: Serialization scope = clock + seeded RNG + entities; the command queue and event log are per-tick transient input/output and are excluded as non-future-affecting state at a quiescent point.
+- [Phase 1]: Named RNG streams serialize in dictionary-sorted order so canonical bytes are independent of RandomStreams construction order; deserializeState rebuilds the facade from decoded names and restores exact (non-quantized) integer states.
+- [Phase 1]: A quantized snapshot is an approximate restart: the round-trip invariant is fingerprint/byte identity, 'restore + re-step matches original' is asserted within one QUANT_GRID, and two restores of the same snapshot re-step exactly.
+- [Phase 1]: Determinism gate is same-machine only (D-09), no CI; .gitattributes pins LF under .githooks/ so core.autocrlf=true cannot CRLF the shebang and silently disable the gate.
 
 ### Pending Todos
 
@@ -102,6 +107,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-15T11:14:28.779Z
-Stopped at: Completed 01-03-PLAN.md (Command contract, seeded streams, headless boundary)
+Last session: 2026-10-15T11:28:42.214Z
+Stopped at: Completed 01-04-PLAN.md (canonical snapshot/fingerprint, double-run determinism gate, pre-commit wiring)
 Resume file: None
