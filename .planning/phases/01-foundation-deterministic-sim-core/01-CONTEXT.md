@@ -36,6 +36,16 @@
 ### 规模与录制约束（Scale & Recording — 对话中新引入）
 - **D-11:** 一集完整模拟预期 **1 小时以上**；全图累计单位可能**上万**（但同屏高保真 AI 单位仍为十几/方）。录制产物按 1080p60 H.264 估为 **GB 级**（8–16 Mbps → 约 3.6–11 GB/集），故 D-10 必不可少；编码优先考虑 H.265/AV1 + CRF 以降体积。 — **Reversibility:** reversible（属录制层约束，Phase 6 落地）。
 
+### 代码风格合规（Style Compliance — 用户在 Phase 1 执行后追加）
+用户追加的强制风格约定（详见 `AGENTS.md` → `## Code Style Requirements (project-locked)`）。本阶段已写代码需**追溯合规**：
+- **D-12:** 所有类、接口、枚举、成员、方法、函数、类型别名都必须有 JSDoc；函数**每个参数**用 `@param`、**返回值**用 `@returns` 说明（中文 JSDoc）。 — **Reversibility:** reversible。
+- **D-13:** 每个类必须先定义 `I<ClassName>` 接口并 `implements`；**禁止直接用类当类型**；所有接口名以 `I` 开头。 — **Reversibility:** costly — 触及所有类型的声明与引用处（跨全项目，但机械可改）。
+- **D-14:** 枚举一律使用**数字成员值**；禁止字符串字面量联合（`'abc' | 'def'`）冒充枚举。 — **Reversibility:** reversible。
+- **D-15:** 私有成员**不加 `_` 前缀**（用 `private` 关键字）。 — **Reversibility:** reversible。
+- **D-16:** 避免内联类型；联合类型优先写成**多个具名 interface 的联合**。 — **Reversibility:** reversible。
+
+> 本约定为**项目级、长期有效**，适用于 Phase 1 及后续所有阶段。Phase 1 需要一个"风格合规改造"计划（retrofit 现有 `src/sim/**`、`src/host/**`、`src/config/**`、`tests/**`），并与缺口修复（CR-01 序列化缺 `nextId`）一并交付。
+
 ### the agent's Discretion
 - 无头泵的具体实现（`raf` | `headless` | `fixed-fps`）细节、指纹的具体哈希算法与快照格式、`content/` 目录的内部组织——由规划/执行决定。
 - 工具链具体小版本号（TS 7.x / Vite 8.x）以锁定时的 npm registry 实测为准。

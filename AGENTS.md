@@ -387,6 +387,20 @@ Use these entry points:
 Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
 <!-- GSD:workflow-end -->
 
+<!-- project-locked:start — 手工维护，勿删；与上方自动生成的 Conventions/Code Style 冲突时，以本节为准 -->
+
+## Code Style Requirements (project-locked)
+
+> 这些是**强制约定**。当上方自动生成的「Conventions / Code Style」与此冲突时，**以本节为准**。所有规划、执行 agent 必须遵守。
+
+1. **JSDoc 全覆盖** — 每个类、接口、枚举、成员、方法、函数、类型别名都必须有 JSDoc 注释。函数的**每个参数**用 `@param` 说明，**返回值**用 `@returns` 说明。（用中文 JSDoc，便于阅读。）
+2. **先接口后类，接口一律 `I` 前缀** — 每个类都必须先定义 `I<ClassName>` 接口，类再 `implements` 它。**禁止直接用类当类型**（成员、参数、返回值都应使用对应接口类型）。所有接口名一律以 `I` 开头（如 `IBattleSim`、`ICommandQueue`）。
+3. **枚举用数字值** — 所有枚举使用数字成员值；**禁止**用字符串字面量联合（`'abc' | 'def'`）冒充枚举。
+4. **私有成员不加 `_` 前缀** — 私有字段/方法使用 `private` 关键字修饰，**不带** `_` 前缀。
+5. **避免内联类型** — 尽量不写内联对象类型；联合类型优先写成**多个具名 interface 的联合**，而不是一堆内联类型的联合。
+
+<!-- project-locked:end -->
+
 <!-- GSD:profile-start -->
 
 ## Developer Profile
