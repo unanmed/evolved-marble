@@ -23,10 +23,7 @@ import { describe, expect, it } from 'vitest';
  * （01-09/01-10/01-11/01-12）在补齐各自目录时**同步**追加到此列表，使门禁在任意
  * 时刻都恰好覆盖"已文档化"的集合。
  */
-export const SCAN_ROOTS: readonly string[] = [
-    'src/sim/core',
-    'src/sim/content'
-];
+export const SCAN_ROOTS: readonly string[] = ['src/sim'];
 
 /**
  * 匹配顶层 `export` 声明行的正则。
