@@ -1,4 +1,6 @@
+import type { CommandQueue } from '../commands';
 import type { TickClock } from '../core/clock';
+import type { EventLog } from '../core/events';
 import type { RandomStreams } from '../core/rng';
 import type { EntityStore } from './entity-store';
 
@@ -7,9 +9,13 @@ import type { EntityStore } from './entity-store';
  *
  * 由 `BattleSim` 构造后以参数形式传给各系统（如 `movementSystem(w, dt)`），
  * 避免旧原型 `renderer`/`scene`/`recorder` 全局单例导致的 reset 泄漏。
+ *
+ * 组成：实体存储 + 逻辑时钟 + 命名随机流 + 内向命令队列 + 每 tick 事件日志。
  */
 export interface SimState {
     store: EntityStore;
     clock: TickClock;
     rng: RandomStreams;
+    commands: CommandQueue;
+    events: EventLog;
 }
