@@ -17,4 +17,14 @@ export class TickClock {
     step(): void {
         this._tick++;
     }
+
+    /**
+     * 恢复步计数（快照反序列化专用，SIM-04）。
+     *
+     * 语义：把时钟设回某一 tick。这是 `step()` 之外**唯一**改变步数的入口，
+     * 且只由 `deserializeState()` 调用——正常运行期绝不使用。
+     */
+    restore(tick: number): void {
+        this._tick = tick;
+    }
 }

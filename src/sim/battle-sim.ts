@@ -3,7 +3,7 @@ import { CommandQueue, type Command } from './commands';
 import { TickClock } from './core/clock';
 import { EventLog } from './core/events';
 import { RandomStreams } from './core/rng';
-import { fingerprint, serializeState } from './snapshot';
+import { deserializeState, fingerprint, serializeState } from './snapshot';
 import { movementSystem } from './systems/movement';
 import { EntityStore, type EntityId } from './world/entity-store';
 import type { SimState } from './world/world';
@@ -149,9 +149,19 @@ export class BattleSim {
         });
     }
 
-    /** 规范状态字节。 */
+    /** 规范状态字节（SIM-04 门禁原语）。 */
     snapshot(): Uint8Array {
         return serializeState(this._state);
+    }
+
+    /**
+     * 用快照字节恢复状态（`snapshot()` 的逆操作）。
+     *
+     * 重建时钟步数、随机流状态与实体；命令队列/事件日志重置为空。恢复后继续
+     * `step()` 即从该 tick 起确定性地重放。`dt` 保持本实例的配置值。
+     */
+    restore(bytes: Uint8Array): void {
+        this._state = deserializeState(bytes, this.cfg.dt);
     }
 
     /** 状态指纹（非加密诊断值）。 */

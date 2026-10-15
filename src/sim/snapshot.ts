@@ -1,51 +1,211 @@
+import { FIXED_DT } from '../config/sim';
+import { CommandQueue } from './commands';
+import { TickClock } from './core/clock';
+import { EventLog } from './core/events';
+import { RandomStreams, type RngState } from './core/rng';
+import { EntityStore, type EntitySnapshot } from './world/entity-store';
 import type { SimState } from './world/world';
 
 /**
  * 规范序列化 + 指纹（SIM-04 门禁原语）。
  *
- * 与哈希分离：`serializeState()` 产出规范、有序、量化的字节；
- * `fingerprint()` 对字节做哈希。日后状态变大时可单独把哈希换成原生/向量化实现（Pitfall 3）。
+ * 关注点分离（Pitfall 3）：`serializeState()` 产出**规范、有序、量化**的字节；
+ * `fingerprint()` 对字节做哈希。二者保持可分离，日后状态变大时可单独把哈希换成
+ * 原生/向量化实现，而**无需触碰**模拟逻辑（D-03）。
+ *
+ * 序列化是**穷尽**的：时钟步数 + 全部命名随机流状态 + 全部实体（含 id）。
+ * 命令队列与事件日志被刻意排除——它们是**每 tick 的瞬时输入/输出**（命令在
+ * `step()` 顶部 drain 后为空，事件每 tick 清空），不影响未来走向，故不属于
+ * "状态"。两个分岔的世界若仅命令/事件不同，其未来演进仍一致。
  */
 
-/** 量化栅格 1/256（研究假设 A3）：先量化再哈希，避免良性分配顺序差异造成假分歧。 */
-const QUANT_SCALE = 256;
+/**
+ * 量化栅格：1/256（研究假设 A3）。序列化前把浮点量化到该栅格，避免良性分配顺序
+ * 差异造成的假分歧；栅格同时是"变异者普查"的判据（扰动超过一个栅格必须改变指纹）。
+ */
+export const QUANT_GRID = 256;
+
+/** 快照格式魔数（'EMS1'）与版本号，用于确定性反序列化与版本护栏。 */
+const MAGIC = 0x454d5331;
+const VERSION = 1;
+/** 头部预留 2 字节（对齐/扩展）。 */
+const HEADER_SIZE = 8;
+/** 每个随机流的固定字节数：4 × uint32。 */
+const STREAM_STATE_BYTES = 16;
+/** 每个实体的固定字节数：7 × int32（id + hp + level + x + y + vx + vy）。 */
+const ENTITY_BYTES = 28;
 
 function quantize(v: number): number {
-    return Math.round(v * QUANT_SCALE);
+    return Math.round(v * QUANT_GRID);
+}
+
+function dequantize(q: number): number {
+    return q / QUANT_GRID;
 }
 
 /**
- * 规范字节编码：字段顺序固定；实体按 `EntityStore.ids()` 的有序数组遍历；
- * 浮点量化到 1/256 栅格。字节序固定为小端。
+ * 规范字节编码。字段顺序固定；实体按 `EntityStore.ids()` 的**有序数组**遍历；
+ * 随机流按名字**字典序**排序以保证规范（与构造顺序无关）；浮点量化到 `QUANT_GRID` 栅格。
+ * 字节序固定为小端。同一逻辑状态在任何调用点都编码为**完全相同**的字节。
  */
 export function serializeState(s: SimState): Uint8Array {
+    const rngEntries = Object.entries(s.rng.save()).sort(([a], [b]) =>
+        a < b ? -1 : a > b ? 1 : 0
+    );
     const ids = s.store.ids();
-    const values: number[] = [s.clock.tick, ids.length];
+
+    let size = HEADER_SIZE + 4 + 2; // header + tick(int32) + streamCount(uint16)
+    for (const [name] of rngEntries) {
+        size += 2 + name.length + STREAM_STATE_BYTES;
+    }
+    size += 4; // entityCount(uint32)
+    size += ids.length * ENTITY_BYTES;
+
+    const bytes = new Uint8Array(size);
+    const view = new DataView(bytes.buffer);
+    let o = 0;
+    const u16 = (v: number): void => {
+        view.setUint16(o, v, true);
+        o += 2;
+    };
+    const u32 = (v: number): void => {
+        view.setUint32(o, v >>> 0, true);
+        o += 4;
+    };
+    const i32 = (v: number): void => {
+        view.setInt32(o, v, true);
+        o += 4;
+    };
+
+    u32(MAGIC);
+    u16(VERSION);
+    u16(0); // reserved
+    i32(s.clock.tick);
+    u16(rngEntries.length);
+    for (const [name, state] of rngEntries) {
+        u16(name.length);
+        for (let i = 0; i < name.length; i++) {
+            bytes[o++] = name.charCodeAt(i) & 0xff;
+        }
+        u32(state[0]);
+        u32(state[1]);
+        u32(state[2]);
+        u32(state[3]);
+    }
+    u32(ids.length);
     for (const id of ids) {
         const c = s.store.get(id);
-        values.push(
-            id,
-            quantize(c.attrs.hp),
-            quantize(c.attrs.level),
-            quantize(c.xform.x),
-            quantize(c.xform.y),
-            quantize(c.xform.vx),
-            quantize(c.xform.vy)
-        );
-    }
-    const bytes = new Uint8Array(values.length * 4);
-    const view = new DataView(bytes.buffer);
-    for (let i = 0; i < values.length; i++) {
-        view.setUint32(i * 4, values[i] >>> 0, true);
+        i32(id);
+        i32(quantize(c.attrs.hp));
+        i32(quantize(c.attrs.level));
+        i32(quantize(c.xform.x));
+        i32(quantize(c.xform.y));
+        i32(quantize(c.xform.vx));
+        i32(quantize(c.xform.vy));
     }
     return bytes;
+}
+
+/**
+ * 反序列化：`serializeState()` 的逆操作，重建一个**等价**的 `SimState`。
+ *
+ * 恢复时钟步数、全部随机流状态（整数状态为**精确**恢复，非量化）与全部实体
+ * （id + 组件，浮点为量化后的栅格值）。命令队列/事件日志为全新的空实例。
+ * 自描述：随机流名字编码在字节内，故无需外部传入配置。
+ *
+ * `dt` 不属于序列化状态（它是构造期配置），默认取 `FIXED_DT`；`BattleSim.restore`
+ * 会传入其自身的 `dt`。
+ */
+export function deserializeState(
+    bytes: Uint8Array,
+    dt: number = FIXED_DT
+): SimState {
+    const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let o = 0;
+    const readU16 = (): number => {
+        const v = view.getUint16(o, true);
+        o += 2;
+        return v;
+    };
+    const readU32 = (): number => {
+        const v = view.getUint32(o, true);
+        o += 4;
+        return v;
+    };
+    const readI32 = (): number => {
+        const v = view.getInt32(o, true);
+        o += 4;
+        return v;
+    };
+
+    if (readU32() !== MAGIC) throw new Error('snapshot: bad magic');
+    const version = readU16();
+    if (version !== VERSION) {
+        throw new Error(`snapshot: unsupported version ${version}`);
+    }
+    readU16(); // reserved
+
+    const tick = readI32();
+
+    const streamCount = readU16();
+    const names: string[] = [];
+    const states: Record<string, RngState> = {};
+    for (let i = 0; i < streamCount; i++) {
+        const nameLen = readU16();
+        let name = '';
+        for (let k = 0; k < nameLen; k++) {
+            name += String.fromCharCode(bytes[o++]);
+        }
+        names.push(name);
+        states[name] = [readU32(), readU32(), readU32(), readU32()];
+    }
+
+    const entityCount = readU32();
+    const entries: EntitySnapshot[] = [];
+    for (let i = 0; i < entityCount; i++) {
+        const id = readI32();
+        const hp = readI32();
+        const level = readI32();
+        const x = readI32();
+        const y = readI32();
+        const vx = readI32();
+        const vy = readI32();
+        entries.push({
+            id,
+            components: {
+                attrs: { hp: dequantize(hp), level: dequantize(level) },
+                xform: {
+                    x: dequantize(x),
+                    y: dequantize(y),
+                    vx: dequantize(vx),
+                    vy: dequantize(vy)
+                }
+            }
+        });
+    }
+
+    const store = new EntityStore();
+    store.restore(entries);
+    const rng = new RandomStreams(0, names);
+    rng.restore(states);
+    const clock = new TickClock(dt);
+    clock.restore(tick);
+
+    return {
+        store,
+        clock,
+        rng,
+        commands: new CommandQueue(),
+        events: new EventLog()
+    };
 }
 
 /**
  * 对规范字节做**非加密**哈希（cyrb53 变体，53 位）。
  *
  * 注意：这是**诊断**用途的状态指纹，**绝不可**作为安全令牌/认证器（研究安全域 V6，
- * 威胁 T-01-03 disposition=accept）。任何安全决策都不应消费它。
+ * 威胁 T-01-03 disposition=accept）。任何安全决策都不应消费它。哈希与序列化保持
+ * 可分离：状态规模变大时可在此处换成原生/向量化哈希，模拟逻辑不受影响（D-03）。
  */
 export function fingerprint(bytes: Uint8Array): string {
     let h1 = 0xdeadbeef ^ bytes.length;

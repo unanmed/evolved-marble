@@ -17,6 +17,12 @@ export interface UnitComponents {
     xform: { x: number; y: number; vx: number; vy: number };
 }
 
+/** 单实体的快照条目（`restore()` 的输入，见 `src/sim/snapshot.ts`）。 */
+export interface EntitySnapshot {
+    id: EntityId;
+    components: UnitComponents;
+}
+
 export class EntityStore {
     private nextId = 1;
     /** 迭代契约：有序 id 数组。 */
@@ -52,5 +58,28 @@ export class EntityStore {
     /** 迭代契约：只读的有序 id 视图。 */
     ids(): readonly EntityId[] {
         return this.orderedIds;
+    }
+
+    /**
+     * 恢复：清空并按下标顺序重建实体，保持 `orderedIds` 契约（SIM-04 快照反序列化）。
+     *
+     * 组件做深拷贝，使恢复后的 store 独占其数据（不回指调用方的对象）。
+     * `nextId` 重置为 `max(id) + 1`，从而保证 id 继续单调（D-05），绝不与既有 id 冲突。
+     */
+    restore(entries: readonly EntitySnapshot[]): void {
+        this.orderedIds = [];
+        this.byId.clear();
+        let maxId = 0;
+        for (const entry of entries) {
+            const { hp, level } = entry.components.attrs;
+            const { x, y, vx, vy } = entry.components.xform;
+            this.byId.set(entry.id, {
+                attrs: { hp, level },
+                xform: { x, y, vx, vy }
+            });
+            this.orderedIds.push(entry.id);
+            if (entry.id > maxId) maxId = entry.id;
+        }
+        this.nextId = maxId + 1;
     }
 }
