@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: Foundation & Deterministic Sim Core
 status: executing
-stopped_at: Completed 01-08-PLAN.md (WR-04 ESLint boundary covers src/config + WR-05 dangling coverage removed)
-last_updated: "2026-10-15T13:59:58.146Z"
+stopped_at: Completed 01-07-PLAN.md (D-12 JSDoc on sim/core + content/formulas + convention gate)
+last_updated: "2026-10-15T14:15:30.390Z"
 last_activity: 2026-10-15
 last_activity_desc: Phase 1 execution started
-state_head: 19dbb537187e4fbaf50827f131e7874d03a5dc29
+state_head: 5f1bb3a2f629c29e9c35c51a0165ae5bedfe5163
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 12
-  completed_plans: 7
+  completed_plans: 8
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-15)
 ## Current Position
 
 Phase: 1 (Foundation & Deterministic Sim Core) — EXECUTING
-Plan: 4 of 12
+Plan: 9 of 12
 Status: Ready to execute
 Last activity: 2026-10-15 — Phase 1 execution started
 
@@ -65,6 +65,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 1 P5 | 12 | 3 tasks | 4 files |
 | Phase 1 P6 | 18 | 2 tasks | 17 files |
 | Phase 1 P08 | 3 | 2 tasks | 2 files |
+| Phase 1 P07 | 7 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,8 @@ Recent decisions affecting current work:
 - [Phase 1]: The retrofit is byte-for-byte behavior-preserving: the fixed-seed fingerprint trace (12 ticks, seed 12345, final ed670b76a9019) is identical before and after.
 - [Phase 1]: [Phase 1]: The ESLint headless boundary block files selector now covers ['src/sim/**/*.ts','src/config/**/*.ts'], matching tsconfig.sim.json's DOM-free include, so Date/Math.random in a config module are lint errors too (WR-04, D-03/SIM-03).
 - [Phase 1]: [Phase 1]: The dangling vitest coverage block was deleted (not installed): it referenced undeclared @vitest/coverage-v8 and backed no test:coverage script; coverage can be re-introduced deliberately with provider dependency + script together (WR-05, D-08).
+- [Phase 1]: [Phase 1]: D-12 JSDoc pass edited only math.ts + rng.ts (clamp/xmur3/mixSeed/makeSfc32); clock.ts/events.ts/content/formulas.ts already carried declaration-level Chinese JSDoc, so the pass is comment-only and behavior-preserving (fingerprint ed670b76a9019 unchanged).
+- [Phase 1]: [Phase 1]: D-12 convention gate (tests/style/conventions.test.ts) is structural (JSDoc block existence + /** opener + tag presence) over exported top-level declarations only; SCAN_ROOTS = ['src/sim/core','src/sim/content'] widen plan-by-plan (01-09..01-12), so the gate is never green over undocumented files.
 
 ### Pending Todos
 
@@ -121,6 +124,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-15T13:59:30.262Z
-Stopped at: Completed 01-08-PLAN.md (WR-04 ESLint boundary covers src/config + WR-05 dangling coverage removed)
+Last session: 2026-10-15T14:15:30.337Z
+Stopped at: Completed 01-07-PLAN.md (D-12 JSDoc on sim/core + content/formulas + convention gate)
 Resume file: None
