@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: Foundation & Deterministic Sim Core
 status: executing
-stopped_at: Completed 01-01-PLAN.md (toolchain bootstrap)
-last_updated: "2026-10-15T10:48:02.086Z"
+stopped_at: Completed 01-02-PLAN.md (headless sim tracer)
+last_updated: "2026-10-15T10:58:03.991Z"
 last_activity: 2026-10-15
 last_activity_desc: Phase 1 execution started
-state_head: 9a5e88cb97dec835c810a05a16d097f154cae91e
+state_head: 169881b410df7c75865e0bef2e7691a143115924
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-15)
 ## Current Position
 
 Phase: 1 (Foundation & Deterministic Sim Core) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-10-15 — Phase 1 execution started
 
@@ -59,6 +59,7 @@ Progress: [░░░░░░░░░░] 0%
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 1 P01 | 11 | 2 tasks | 30 files |
+| Phase 1 P02 | 6 | 1 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,10 @@ Recent decisions affecting current work:
 - Phase 2: pin the Rapier2D **deterministic** build (resolve `-deterministic` vs `-compat` + `enhanced-determinism` via a cross-machine golden-hash spike; settle pixel↔meter scale).
 - [Phase 1]: TS7 removed baseUrl: the @/* -> src/* alias is expressed as a relative paths entry (./src/*); baseUrl dropped.
 - [Phase 1]: Phase 1 removed only the TS predecessor tree (src/** + index.html); model/ + requirements.txt deferred to the Python-rebuild phase (tsc never checks them).
+- [Phase 1]: [Phase 1]: A minimal but genuinely state-mutating movementSystem is a labelled Phase-1 stand-in (A1) so the SIM-04 fingerprint gate is non-vacuous.
+- [Phase 1]: [Phase 1]: movementSystem nudge scale set to 0.05 (not 0.001) — 0.001 is below the 1/256 fingerprint quantization grid and would make the gate vacuous.
+- [Phase 1]: [Phase 1]: Fingerprint is a non-cryptographic diagnostic (cyrb53 over canonical quantized bytes), never a security token.
+- [Phase 1]: [Phase 1]: Base tsconfig rootDir widened from src to . so tests/ is under rootDir under TS7; tsconfig.sim.json still narrows to src.
 
 ### Pending Todos
 
@@ -93,6 +98,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-15T10:48:02.062Z
-Stopped at: Completed 01-01-PLAN.md (toolchain bootstrap)
+Last session: 2026-10-15T10:57:53.655Z
+Stopped at: Completed 01-02-PLAN.md (headless sim tracer)
 Resume file: None
