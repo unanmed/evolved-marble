@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: Foundation & Deterministic Sim Core
 status: executing
-stopped_at: Completed 01-05-PLAN.md (entity-id cursor serialized; WR-02/WR-03 guards)
-last_updated: "2026-10-15T13:26:50.579Z"
+stopped_at: Completed 01-06-PLAN.md (D-13/D-14/D-15/D-16 style retrofit; behavior byte-identical)
+last_updated: "2026-10-15T13:51:21.939Z"
 last_activity: 2026-10-15
 last_activity_desc: Phase 1 execution started
-state_head: 75e1e9967a617bcae9ac83619e1dbaa773932c00
+state_head: 6c92d3b07a3377593ef1640098eecef79c201bb9
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 12
-  completed_plans: 5
+  completed_plans: 6
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-15)
 ## Current Position
 
 Phase: 1 (Foundation & Deterministic Sim Core) — EXECUTING
-Plan: 2 of 12
+Plan: 3 of 12
 Status: Ready to execute
 Last activity: 2026-10-15 — Phase 1 execution started
 
@@ -63,6 +63,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 1 P03 | 11 | 3 tasks | 12 files |
 | Phase 1 P4 | 7 | 3 tasks | 11 files |
 | Phase 1 P5 | 12 | 3 tasks | 4 files |
+| Phase 1 P6 | 18 | 2 tasks | 17 files |
 
 ## Accumulated Context
 
@@ -90,6 +91,12 @@ Recent decisions affecting current work:
 - [Phase 1]: The snapshot VERSION is bumped 1 -> 2 because the canonical byte layout gains the entity-id cursor; the version guard throws 'unsupported version' and no v1 migration path was added (no snapshot is persisted this phase).
 - [Phase 1]: EntityStore.restore(entries, nextId?) adopts the serialized id cursor when supplied and falls back to max(id)+1 only when omitted; ids are never reused across a despawn->snapshot->restore->spawn round-trip (D-05, CR-01).
 - [Phase 1]: quantize() throws a deterministic int32-range error rather than silently wrapping setInt32 (WR-03); applyCommands() has a never-typed exhaustiveness guard so an unhandled Command variant is a compile error, not a silent no-op (WR-02).
+- [Phase 1]: Command/event kinds became numeric enums with a fixed ordinal (CommandKind: Force=0, Torque=1, WeaponAbility=2, UnitAbility=3, Spawn=4; SimEventKind: Command=0, Rejected=1, Damage=2, Kill=3, Levelup=4, Contact=5), preserving the existing switch grouping and reserved branches.
+- [Phase 1]: isKnownKind now accepts only numeric enum values (typeof number + membership); strings, NaN and unknown numbers stay deterministically rejected and counted - the reject+count contract (T-01-05) is unchanged.
+- [Phase 1]: Renamed interfaces gain the mandatory I prefix (IRngStream, IUnitComponents, IEntitySnapshot, IStepTarget, IRunLoopConfig, IBattleSimConfig, ISimState, IRunTraceOptions); non-interface/enum aliases (EntityId, RngState, Command, SimEvent, ValidateResult) keep their names per the plan.
+- [Phase 1]: IUnitComponents was split into named IUnitAttrs/IUnitXform (D-16); the mocked performance global and the snapshot mutator case became named interfaces (IPerformanceStub/IPerformanceGlobal, IMutatorCase).
+- [Phase 1]: D-13 landed as one globally-atomic task (interface-first classes, no class-as-type) because TypeScript cannot compile a half-renamed type graph; the pre-commit hook (lint + determinism gate) stays green after each task.
+- [Phase 1]: The retrofit is byte-for-byte behavior-preserving: the fixed-seed fingerprint trace (12 ticks, seed 12345, final ed670b76a9019) is identical before and after.
 
 ### Pending Todos
 
@@ -111,6 +118,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-15T13:26:50.533Z
-Stopped at: Completed 01-05-PLAN.md (entity-id cursor serialized; WR-02/WR-03 guards)
+Last session: 2026-10-15T13:51:21.886Z
+Stopped at: Completed 01-06-PLAN.md (D-13/D-14/D-15/D-16 style retrofit; behavior byte-identical)
 Resume file: None

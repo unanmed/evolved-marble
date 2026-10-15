@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A headless mode runs a full simulation with no rendering/display and produces the same result as any rendered run.
   4. An automated determinism gate (state fingerprint / snapshot hash) runs in CI and fails the build on any divergence.
 
-**Plans**: 5/12 plans executed (4 executed; 8 gap-closure added after verification)
+**Plans**: 6/12 plans executed (4 executed; 8 gap-closure added after verification)
 
 Plans:
 **Wave 1**
@@ -59,7 +59,7 @@ Plans:
 
 **Wave 6** *(gap closure — code-style retrofit; 01-06 & 01-08 run in parallel, disjoint files)*
 
-- [ ] 01-06-PLAN.md — Retrofit interface-first classes (D-13) + numeric enums (D-14) + no `_` prefix (D-15) + named inline types (D-16) (atomic 23-file type-identity graph — scope-justified)
+- [x] 01-06-PLAN.md — Retrofit interface-first classes (D-13) + numeric enums (D-14) + no `_` prefix (D-15) + named inline types (D-16) (atomic 23-file type-identity graph — scope-justified)
 - [ ] 01-08-PLAN.md — Tooling fixes: ESLint boundary covers src/config (WR-04) + dangling coverage config resolved (WR-05)
 
 **Wave 7** *(gap closure — JSDoc/D-12 documentation, split by directory)*
@@ -192,7 +192,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Deterministic Sim Core | 5/12 | In Progress|  |
+| 1. Foundation & Deterministic Sim Core | 6/12 | In Progress|  |
 | 2. Physics & Composite Units | 0/3 | Not started | - |
 | 3. Combat Mechanics, Data & Progression | 0/3 | Not started | - |
 | 4. Unit AI & Autonomous Battle | 0/3 | Not started | - |
