@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: Foundation & Deterministic Sim Core
 status: executing
-stopped_at: Completed 01-04-PLAN.md (canonical snapshot/fingerprint, double-run determinism gate, pre-commit wiring)
-last_updated: "2026-10-15T13:03:23.830Z"
+stopped_at: Completed 01-05-PLAN.md (entity-id cursor serialized; WR-02/WR-03 guards)
+last_updated: "2026-10-15T13:26:50.579Z"
 last_activity: 2026-10-15
 last_activity_desc: Phase 1 execution started
-state_head: 9dd4d78abdab1d08056fb5d3bbe43963d391fb25
+state_head: 75e1e9967a617bcae9ac83619e1dbaa773932c00
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 12
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-10-15)
 
 ## Current Position
 
-Phase: 1 (Foundation & Deterministic Sim Core) — READY TO EXECUTE
-Plan: 4 of 4
+Phase: 1 (Foundation & Deterministic Sim Core) — EXECUTING
+Plan: 2 of 12
 Status: Ready to execute
 Last activity: 2026-10-15 — Phase 1 execution started
 
@@ -62,6 +62,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 1 P02 | 6 | 1 tasks | 11 files |
 | Phase 1 P03 | 11 | 3 tasks | 12 files |
 | Phase 1 P4 | 7 | 3 tasks | 11 files |
+| Phase 1 P5 | 12 | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -86,6 +87,9 @@ Recent decisions affecting current work:
 - [Phase 1]: Named RNG streams serialize in dictionary-sorted order so canonical bytes are independent of RandomStreams construction order; deserializeState rebuilds the facade from decoded names and restores exact (non-quantized) integer states.
 - [Phase 1]: A quantized snapshot is an approximate restart: the round-trip invariant is fingerprint/byte identity, 'restore + re-step matches original' is asserted within one QUANT_GRID, and two restores of the same snapshot re-step exactly.
 - [Phase 1]: Determinism gate is same-machine only (D-09), no CI; .gitattributes pins LF under .githooks/ so core.autocrlf=true cannot CRLF the shebang and silently disable the gate.
+- [Phase 1]: The snapshot VERSION is bumped 1 -> 2 because the canonical byte layout gains the entity-id cursor; the version guard throws 'unsupported version' and no v1 migration path was added (no snapshot is persisted this phase).
+- [Phase 1]: EntityStore.restore(entries, nextId?) adopts the serialized id cursor when supplied and falls back to max(id)+1 only when omitted; ids are never reused across a despawn->snapshot->restore->spawn round-trip (D-05, CR-01).
+- [Phase 1]: quantize() throws a deterministic int32-range error rather than silently wrapping setInt32 (WR-03); applyCommands() has a never-typed exhaustiveness guard so an unhandled Command variant is a compile error, not a silent no-op (WR-02).
 
 ### Pending Todos
 
@@ -107,6 +111,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-15T11:28:42.214Z
-Stopped at: Completed 01-04-PLAN.md (canonical snapshot/fingerprint, double-run determinism gate, pre-commit wiring)
+Last session: 2026-10-15T13:26:50.533Z
+Stopped at: Completed 01-05-PLAN.md (entity-id cursor serialized; WR-02/WR-03 guards)
 Resume file: None
