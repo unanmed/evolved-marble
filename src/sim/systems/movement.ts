@@ -1,6 +1,6 @@
 import { MOVEMENT_NUDGE_SCALE } from '../content/formulas';
 import { clamp } from '../core/math';
-import type { SimState } from '../world/world';
+import type { ISimState } from '../world/world';
 
 /**
  * Phase-1 最小确定性系统（研究假设 A1 的显式占位）。
@@ -14,7 +14,7 @@ import type { SimState } from '../world/world';
  * 尺度取 0.05 而非更小的值：快照以 1/256 栅格量化，过小的 `vx` 变化会被量化抹平、
  * 使门禁退化为空（见 01-02 SUMMARY 偏差记录）。
  */
-export function movementSystem(w: SimState, dt: number): void {
+export function movementSystem(w: ISimState, dt: number): void {
     const ai = w.rng.stream('ai');
     for (const id of w.store.ids()) {
         const c = w.store.get(id);

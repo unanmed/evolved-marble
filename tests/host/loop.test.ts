@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { FIXED_DT } from '../../src/config/sim';
-import { runLoop, type StepTarget } from '../../src/host/loop';
+import { runLoop, type IStepTarget } from '../../src/host/loop';
 
 /**
  * 固定步长累加器循环（SIM-01 / 研究 Pattern 1）。
@@ -9,8 +9,18 @@ import { runLoop, type StepTarget } from '../../src/host/loop';
  * 命中 maxSteps 时欠账清零（无螺旋）、alpha 恒落于 [0,1)。
  */
 
-class Counter implements StepTarget {
+/** 计数推进目标的公开契约（测试局部，D-13）。 */
+interface ICounter extends IStepTarget {
+    /** 已推进的步数。 */
+    steps: number;
+}
+
+/** 计数推进目标：每步把计数器加一。 */
+class Counter implements ICounter {
+    /** 已推进的步数。 */
     steps = 0;
+
+    /** 推进一步。 */
     step(): void {
         this.steps++;
     }

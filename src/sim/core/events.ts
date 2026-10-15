@@ -112,10 +112,24 @@ export type SimEvent =
     | IContactEvent;
 
 /**
+ * 类型化事件日志的公开契约（D-13：先接口后类）。
+ */
+export interface IEventLog {
+    /** 当前未读事件数。 */
+    readonly size: number;
+    /** 记录一个事件（存浅拷贝）。 */
+    emit(event: SimEvent): void;
+    /** 取走全部事件（副本数组）并清空。 */
+    drain(): readonly SimEvent[];
+    /** 丢弃未读事件。 */
+    clear(): void;
+}
+
+/**
  * 类型化事件日志。`emit` 记录（浅拷贝，避免消费者持有生产者可变对象），
  * `drain` 取走并清空副本数组，`clear` 丢弃未读事件。
  */
-export class EventLog {
+export class EventLog implements IEventLog {
     /** 尚未读取的事件缓冲。 */
     private events: SimEvent[] = [];
 

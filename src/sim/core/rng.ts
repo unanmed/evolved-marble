@@ -10,7 +10,7 @@
 export type RngState = readonly [number, number, number, number];
 
 /** 单个随机流：只暴露取值与状态读写，绝不暴露内部闭包变量。 */
-export interface RngStream {
+export interface IRngStream {
     /** 返回 [0,1) 区间的下一个浮点随机数。 */
     next(): number;
     /** 返回当前状态（纯数字，可 JSON 序列化）。 */
@@ -44,7 +44,7 @@ export function mixSeed(seed: number, name: string): RngState {
 }
 
 /** 用初始状态构造一个 sfc32 随机流。 */
-export function makeSfc32(init: RngState): RngStream {
+export function makeSfc32(init: RngState): IRngStream {
     let a = init[0] >>> 0;
     let b = init[1] >>> 0;
     let c = init[2] >>> 0;
@@ -77,14 +77,32 @@ export function makeSfc32(init: RngState): RngStream {
 }
 
 /**
+ * 命名随机流门面的公开契约（D-13：先接口后类）。
+ */
+export interface IRandomStreams {
+    /** 取命名流；未定义的名字抛错。 */
+    stream(name: string): IRngStream;
+    /** 导出全部流状态（按构造时的名字顺序）。 */
+    save(): Record<string, RngState>;
+    /** 恢复全部流状态（逆操作）。 */
+    restore(state: Record<string, RngState>): void;
+}
+
+/**
  * 命名随机流门面：一个主种子 → 多个独立流。
  *
  * 命名集合可枚举，故整体状态可快照/恢复（save/restore）。
  */
-export class RandomStreams {
+export class RandomStreams implements IRandomStreams {
+    /** 构造时的名字顺序（决定 save() 的遍历顺序）。 */
     private readonly names: readonly string[];
-    private readonly streams = new Map<string, RngStream>();
+    /** 名字 → 流实例。 */
+    private readonly streams = new Map<string, IRngStream>();
 
+    /**
+     * @param seed 主种子。
+     * @param names 命名流的名字集合。
+     */
     constructor(seed: number, names: readonly string[]) {
         this.names = names;
         for (const name of names) {
@@ -92,14 +110,23 @@ export class RandomStreams {
         }
     }
 
-    /** 取命名流；未定义的名字抛错（拼写错误是 bug，不能静默）。 */
-    stream(name: string): RngStream {
+    /**
+     * 取命名流；未定义的名字抛错（拼写错误是 bug，不能静默）。
+     *
+     * @param name 流名。
+     * @returns 对应的命名流。
+     */
+    stream(name: string): IRngStream {
         const s = this.streams.get(name);
         if (!s) throw new Error(`Unknown RNG stream: ${name}`);
         return s;
     }
 
-    /** 导出全部流状态（按构造时的名字顺序，保证规范）。 */
+    /**
+     * 导出全部流状态（按构造时的名字顺序，保证规范）。
+     *
+     * @returns 名字 → 状态。
+     */
     save(): Record<string, RngState> {
         const out: Record<string, RngState> = {};
         for (const name of this.names) {
@@ -108,7 +135,11 @@ export class RandomStreams {
         return out;
     }
 
-    /** 恢复全部流状态（逆操作）。 */
+    /**
+     * 恢复全部流状态（逆操作）。
+     *
+     * @param state 名字 → 状态。
+     */
     restore(state: Record<string, RngState>): void {
         for (const name of this.names) {
             this.stream(name).setState(state[name]);

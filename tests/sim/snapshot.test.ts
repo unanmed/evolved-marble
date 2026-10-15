@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SEED } from '../../src/config/sim';
-import { BattleSim } from '../../src/sim/battle-sim';
+import { BattleSim, type IBattleSim } from '../../src/sim/battle-sim';
 import {
     QUANT_GRID,
     deserializeState,
@@ -16,15 +16,23 @@ import {
  * 确定性重启点，以及"恢复后重跑不偏离原始轨迹超过一个栅格"。
  */
 
-function steppedSim(seed: number, spawns: number, ticks: number): BattleSim {
+function steppedSim(seed: number, spawns: number, ticks: number): IBattleSim {
     const sim = new BattleSim(seed);
     for (let i = 0; i < spawns; i++) sim.spawn();
     for (let i = 0; i < ticks; i++) sim.step();
     return sim;
 }
 
-function fp(sim: BattleSim): string {
+function fp(sim: IBattleSim): string {
     return fingerprint(sim.snapshot());
+}
+
+/** 变异者普查的一条用例（D-16：具名接口，替代内联元组类型）。 */
+interface IMutatorCase {
+    /** 用例名（用于 `it.each` 标题插值）。 */
+    name: string;
+    /** 对该 sim 施加的变异。 */
+    mutate: (sim: IBattleSim) => void;
 }
 
 describe('canonical serialization & restore (SIM-04)', () => {
@@ -60,7 +68,7 @@ describe('canonical serialization & restore (SIM-04)', () => {
 
 describe('mutator census — every tracked mutator moves the fingerprint', () => {
     const baseline = fp(
-        ((): BattleSim => {
+        ((): IBattleSim => {
             const sim = new BattleSim(DEFAULT_SEED);
             sim.spawn(); // id 1
             return sim;
@@ -68,51 +76,51 @@ describe('mutator census — every tracked mutator moves the fingerprint', () =>
     );
 
     const grid = 1 / QUANT_GRID;
-    const fieldCases: readonly [string, (sim: BattleSim) => void][] = [
-        [
-            'xform.x',
-            sim => {
+    const fieldCases: readonly IMutatorCase[] = [
+        {
+            name: 'xform.x',
+            mutate: sim => {
                 sim.state.store.get(1).xform.x += grid;
             }
-        ],
-        [
-            'xform.y',
-            sim => {
+        },
+        {
+            name: 'xform.y',
+            mutate: sim => {
                 sim.state.store.get(1).xform.y += grid;
             }
-        ],
-        [
-            'xform.vx',
-            sim => {
+        },
+        {
+            name: 'xform.vx',
+            mutate: sim => {
                 sim.state.store.get(1).xform.vx += grid;
             }
-        ],
-        [
-            'xform.vy',
-            sim => {
+        },
+        {
+            name: 'xform.vy',
+            mutate: sim => {
                 sim.state.store.get(1).xform.vy += grid;
             }
-        ],
-        [
-            'attrs.hp',
-            sim => {
+        },
+        {
+            name: 'attrs.hp',
+            mutate: sim => {
                 sim.state.store.get(1).attrs.hp += 1;
             }
-        ],
-        [
-            'attrs.level',
-            sim => {
+        },
+        {
+            name: 'attrs.level',
+            mutate: sim => {
                 sim.state.store.get(1).attrs.level += 1;
             }
-        ]
+        }
     ];
 
     it.each(fieldCases)(
-        'perturbing %s moves the fingerprint',
-        (_name, mutate) => {
+        'perturbing $name moves the fingerprint',
+        mutatorCase => {
             const sim = new BattleSim(DEFAULT_SEED);
             sim.spawn();
-            mutate(sim);
+            mutatorCase.mutate(sim);
             expect(fp(sim)).not.toBe(baseline);
         }
     );

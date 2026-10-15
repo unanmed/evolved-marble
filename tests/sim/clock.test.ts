@@ -8,6 +8,18 @@ import { TickClock } from '../../src/sim/core/clock';
  * 时间是一个单调递增的步计数，绝不读取墙上时钟：`step()` 是时间前进的唯一途径。
  */
 
+/** 被 mock 的 `performance` 全局的最小契约（D-16）。 */
+interface IPerformanceStub {
+    /** 返回当前时间（本测试中被打桩）。 */
+    now: () => number;
+}
+
+/** 承载可选 `performance` 的全局对象视图（D-16：具名接口，避免内联类型）。 */
+interface IPerformanceGlobal {
+    /** 浏览器的 performance 全局（可选）。 */
+    performance?: IPerformanceStub;
+}
+
 describe('TickClock (fixed-step, SIM-01)', () => {
     it('starts at tick 0', () => {
         expect(new TickClock(FIXED_DT).tick).toBe(0);
@@ -23,11 +35,7 @@ describe('TickClock (fixed-step, SIM-01)', () => {
 
     it('never reads the wall clock', () => {
         const realNow = Date.now;
-        const perf = (
-            globalThis as {
-                performance?: { now: () => number };
-            }
-        ).performance;
+        const perf = (globalThis as IPerformanceGlobal).performance;
         const realPerfNow = perf?.now;
 
         let wallClockReads = 0;

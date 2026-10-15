@@ -9,27 +9,73 @@
  * 杀怪/重生会静默改序从而破坏确定性（Pitfall 4）。
  */
 
+/** 实体标识（稳定、单调递增的整数）。 */
 export type EntityId = number;
 
+/** 单位属性组件（D-16：具名接口，避免内联对象类型）。 */
+export interface IUnitAttrs {
+    /** 生命值。 */
+    hp: number;
+    /** 等级。 */
+    level: number;
+}
+
+/** 单位位姿组件（D-16：具名接口）。 */
+export interface IUnitXform {
+    /** 位置 x。 */
+    x: number;
+    /** 位置 y。 */
+    y: number;
+    /** 线速度 vx。 */
+    vx: number;
+    /** 线速度 vy。 */
+    vy: number;
+}
+
 /** 单位组件（Phase 1 仅含基础属性与位姿；后续阶段扩展 ai/equip/faction）。 */
-export interface UnitComponents {
-    attrs: { hp: number; level: number };
-    xform: { x: number; y: number; vx: number; vy: number };
+export interface IUnitComponents {
+    /** 属性组件。 */
+    attrs: IUnitAttrs;
+    /** 位姿组件。 */
+    xform: IUnitXform;
 }
 
 /** 单实体的快照条目（`restore()` 的输入，见 `src/sim/snapshot.ts`）。 */
-export interface EntitySnapshot {
+export interface IEntitySnapshot {
+    /** 实体 id。 */
     id: EntityId;
-    components: UnitComponents;
+    /** 组件。 */
+    components: IUnitComponents;
 }
 
-export class EntityStore {
+/**
+ * 实体存储的公开契约（D-13：先接口后类）。
+ */
+export interface IEntityStore {
+    /** 实体 id 游标（下一个待分配 id，属未来影响状态）。 */
+    readonly nextId: number;
+    /** 以单调 id 生成实体，追加到有序数组。 */
+    spawn(): EntityId;
+    /** 同时从索引与有序数组移除，保持数组顺序。 */
+    despawn(id: EntityId): void;
+    /** 按 id 取组件；未知 id 抛错。 */
+    get(id: EntityId): IUnitComponents;
+    /** 迭代契约：只读的有序 id 视图。 */
+    ids(): readonly EntityId[];
+    /** 恢复：清空并按下标顺序重建实体。 */
+    restore(entries: readonly IEntitySnapshot[], nextId?: number): void;
+}
+
+/**
+ * 组合优先的实体存储（D-04/D-05）。
+ */
+export class EntityStore implements IEntityStore {
     /** id 游标：下一个 `spawn()` 分配的 id。属"未来影响状态"（D-05）。 */
     private nextEntityId = 1;
     /** 迭代契约：有序 id 数组。 */
     private orderedIds: EntityId[] = [];
     /** 仅作查找索引，绝不用于迭代。 */
-    private byId = new Map<EntityId, UnitComponents>();
+    private byId = new Map<EntityId, IUnitComponents>();
 
     /**
      * 只读访问器：实体 id 游标（下一个待分配 id）。
@@ -42,7 +88,11 @@ export class EntityStore {
         return this.nextEntityId;
     }
 
-    /** 以单调 id（D-05）生成实体，追加到有序数组。 */
+    /**
+     * 以单调 id（D-05）生成实体，追加到有序数组。
+     *
+     * @returns 新分配的实体 id。
+     */
     spawn(): EntityId {
         const id = this.nextEntityId++;
         this.orderedIds.push(id);
@@ -53,21 +103,34 @@ export class EntityStore {
         return id;
     }
 
-    /** 同时从索引与有序数组移除，保持数组顺序。 */
+    /**
+     * 同时从索引与有序数组移除，保持数组顺序。未知 id 为无副作用 no-op。
+     *
+     * @param id 要移除的实体 id。
+     */
     despawn(id: EntityId): void {
         if (!this.byId.delete(id)) return;
         const i = this.orderedIds.indexOf(id);
         if (i >= 0) this.orderedIds.splice(i, 1);
     }
 
-    /** 按 id 取组件；未知 id 抛错（程序性错误，不静默）。 */
-    get(id: EntityId): UnitComponents {
+    /**
+     * 按 id 取组件；未知 id 抛错（程序性错误，不静默）。
+     *
+     * @param id 实体 id。
+     * @returns 该实体的组件。
+     */
+    get(id: EntityId): IUnitComponents {
         const c = this.byId.get(id);
         if (!c) throw new Error(`Unknown entity: ${id}`);
         return c;
     }
 
-    /** 迭代契约：只读的有序 id 视图。 */
+    /**
+     * 迭代契约：只读的有序 id 视图。
+     *
+     * @returns 有序 id 数组。
+     */
     ids(): readonly EntityId[] {
         return this.orderedIds;
     }
@@ -81,7 +144,7 @@ export class EntityStore {
      * @param nextId 调用方序列化出的 id 游标；传入时直接采用（D-05，CR-01 的正确来源）。
      *   省略时回退为 `max(id) + 1`，仅供未序列化游标的旧调用方保持 id 单调。
      */
-    restore(entries: readonly EntitySnapshot[], nextId?: number): void {
+    restore(entries: readonly IEntitySnapshot[], nextId?: number): void {
         this.orderedIds = [];
         this.byId.clear();
         let maxId = 0;

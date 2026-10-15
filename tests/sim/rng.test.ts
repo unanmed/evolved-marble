@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RandomStreams } from '../../src/sim/core/rng';
+import { RandomStreams, type IRandomStreams } from '../../src/sim/core/rng';
 
 /**
  * 命名种子随机流门面（SIM-02 / D-01）。
@@ -11,7 +11,7 @@ import { RandomStreams } from '../../src/sim/core/rng';
 const NAMES = ['ai', 'spawn', 'damage'] as const;
 
 /** 从某命名流连续取 `n` 个数。 */
-function draw(rs: RandomStreams, name: string, n: number): number[] {
+function draw(rs: IRandomStreams, name: string, n: number): number[] {
     const s = rs.stream(name);
     const out: number[] = [];
     for (let i = 0; i < n; i++) out.push(s.next());

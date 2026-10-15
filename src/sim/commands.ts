@@ -164,22 +164,38 @@ function isKnownKind(v: unknown): v is CommandKind {
 }
 
 /**
+ * 命令队列的公开契约（D-13：先接口后类）。
+ */
+export interface ICommandQueue {
+    /** 累计被拒绝命令数（单调，直到重建队列）。 */
+    readonly rejectedTotal: number;
+    /** 当前缓冲（尚未 drain）的命令数。 */
+    readonly pending: number;
+    /** 接受一批外部命令：结构合法者入队，非法者确定性丢弃并记录。 */
+    submit(commands: readonly unknown[]): void;
+    /** 取走全部缓冲命令（**插入顺序**）并清空缓冲。 */
+    drain(): Command[];
+    /** 取走本批拒绝记录并清空。 */
+    drainRejections(): IRejectedCommand[];
+}
+
+/**
  * 命令队列：外部控制的**信任边界入口**（威胁 T-01-05）。
  *
  * 结构校验是**全函数（total）**：未知 `kind` 或缺失/非法字段者被**确定性丢弃并计入拒绝记录**，
  * 绝不静默忽略、绝不因 `undefined` 解引用而抛错（旧原型 `TypeError` 类缺陷的反面）。
  */
-export class CommandQueue {
+export class CommandQueue implements ICommandQueue {
     /** 尚未 drain 的命令缓冲（插入顺序）。 */
     private buffer: Command[] = [];
     /** 尚未 drain 的拒绝记录。 */
     private rejections: IRejectedCommand[] = [];
     /** 累计被拒绝命令数（单调）。 */
-    private _rejectedTotal = 0;
+    private rejectedCount = 0;
 
     /** 累计被拒绝命令数（单调，直到重建队列）。 */
     get rejectedTotal(): number {
-        return this._rejectedTotal;
+        return this.rejectedCount;
     }
 
     /** 当前缓冲（尚未 drain）的命令数。 */
@@ -199,7 +215,7 @@ export class CommandQueue {
                 this.buffer.push(parsed.command);
             } else {
                 this.rejections.push({ reason: parsed.reason, raw });
-                this._rejectedTotal++;
+                this.rejectedCount++;
             }
         }
     }

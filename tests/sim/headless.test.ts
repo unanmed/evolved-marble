@@ -7,7 +7,7 @@ import {
 } from '../../src/config/sim';
 import { runLoop } from '../../src/host/loop';
 import { headlessPump } from '../../src/host/pump';
-import { BattleSim } from '../../src/sim/battle-sim';
+import { BattleSim, type IBattleSim } from '../../src/sim/battle-sim';
 
 /**
  * 无头固定步长端到端切片（SIM-01 / SIM-03）。
@@ -17,7 +17,7 @@ import { BattleSim } from '../../src/sim/battle-sim';
  * 全程无 DOM、无墙上时钟。
  */
 
-function buildSim(seed: number): BattleSim {
+function buildSim(seed: number): IBattleSim {
     const sim = new BattleSim(seed);
     sim.spawn();
     sim.spawn();

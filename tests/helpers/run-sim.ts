@@ -12,8 +12,10 @@ import { BattleSim } from '../../src/sim/battle-sim';
  */
 
 /** `runTrace` 的入参。 */
-export interface RunTraceOptions {
+export interface IRunTraceOptions {
+    /** 主种子。 */
     seed: number;
+    /** 要推进的 tick 数。 */
     ticks: number;
 }
 
@@ -24,8 +26,11 @@ const FIXED_ENTITY_COUNT = 3;
  * 跑 `ticks` 个固定步，返回逐 tick 指纹轨迹（长度 = `ticks`）。
  *
  * 泵预算取 `FIXED_DT`，故每次 `tick()` 恰好推进 1 步；`ticks` 即轨迹长度。
+ *
+ * @param options 种子与 tick 数。
+ * @returns 逐 tick 的状态指纹轨迹。
  */
-export function runTrace({ seed, ticks }: RunTraceOptions): string[] {
+export function runTrace({ seed, ticks }: IRunTraceOptions): string[] {
     const sim = new BattleSim(seed);
     for (let i = 0; i < FIXED_ENTITY_COUNT; i++) sim.spawn();
 

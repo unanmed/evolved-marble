@@ -8,11 +8,13 @@
  */
 
 /** 循环所需的最小接口：只要求能推进一步。 */
-export interface StepTarget {
+export interface IStepTarget {
+    /** 推进一步。 */
     step(): void;
 }
 
-export interface RunLoopConfig {
+/** 固定步长累加器循环的配置。 */
+export interface IRunLoopConfig {
     /** 固定步长（秒）。 */
     dt: number;
     /** 单帧最大累加时间（秒），防螺旋死亡。 */
@@ -24,12 +26,18 @@ export interface RunLoopConfig {
 /**
  * 返回一个“推进一帧”的函数；调用方按宿主节奏反复调用它。
  * 命中步数上限时清零欠账（绝不累积螺旋）。
+ *
+ * @param pump 返回本帧时间预算（秒）的泵。
+ * @param sim 只要求 `step()` 的推进目标。
+ * @param onRendered 每帧回调（参数为渲染插值因子 alpha）。
+ * @param cfg 循环配置。
+ * @returns 一个“推进一帧”的函数。
  */
 export function runLoop(
     pump: () => number,
-    sim: StepTarget,
+    sim: IStepTarget,
     onRendered: (alpha: number) => void,
-    cfg: RunLoopConfig
+    cfg: IRunLoopConfig
 ): () => void {
     let acc = 0;
     return () => {

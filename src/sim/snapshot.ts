@@ -3,8 +3,8 @@ import { CommandQueue } from './commands';
 import { TickClock } from './core/clock';
 import { EventLog } from './core/events';
 import { RandomStreams, type RngState } from './core/rng';
-import { EntityStore, type EntitySnapshot } from './world/entity-store';
-import type { SimState } from './world/world';
+import { EntityStore, type IEntitySnapshot } from './world/entity-store';
+import type { ISimState } from './world/world';
 
 /**
  * 规范序列化 + 指纹（SIM-04 门禁原语）。
@@ -71,7 +71,7 @@ function dequantize(q: number): number {
  * 随机流按名字**字典序**排序以保证规范（与构造顺序无关）；浮点量化到 `QUANT_GRID` 栅格。
  * 字节序固定为小端。同一逻辑状态在任何调用点都编码为**完全相同**的字节。
  */
-export function serializeState(s: SimState): Uint8Array {
+export function serializeState(s: ISimState): Uint8Array {
     const rngEntries = Object.entries(s.rng.save()).sort(([a], [b]) =>
         a < b ? -1 : a > b ? 1 : 0
     );
@@ -132,7 +132,7 @@ export function serializeState(s: SimState): Uint8Array {
 }
 
 /**
- * 反序列化：`serializeState()` 的逆操作，重建一个**等价**的 `SimState`。
+ * 反序列化：`serializeState()` 的逆操作，重建一个**等价**的 `ISimState`。
  *
  * 恢复时钟步数、全部随机流状态（整数状态为**精确**恢复，非量化）与全部实体
  * （id + 组件，浮点为量化后的栅格值）。命令队列/事件日志为全新的空实例。
@@ -144,7 +144,7 @@ export function serializeState(s: SimState): Uint8Array {
 export function deserializeState(
     bytes: Uint8Array,
     dt: number = FIXED_DT
-): SimState {
+): ISimState {
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     let o = 0;
     const readU16 = (): number => {
@@ -187,7 +187,7 @@ export function deserializeState(
 
     const entityCount = readU32();
     const nextId = readU32();
-    const entries: EntitySnapshot[] = [];
+    const entries: IEntitySnapshot[] = [];
     for (let i = 0; i < entityCount; i++) {
         const id = readI32();
         const hp = readI32();
