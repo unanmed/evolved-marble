@@ -49,11 +49,12 @@ export default tseslint.config(
         }
     },
     {
-        /* 无头边界（SIM-03 / D-03）：sim/** 不得越层导入，不得引用 DOM/时钟全局，
-           不得使用未播种随机（D-02 允许 Math.sin/cos，故**不**禁用 Math 全局，
-           只经 no-restricted-properties 禁 Math.random）。与 DOM-free 的
-           tsconfig.sim.json 互补：lint 拦截"想得到的导入"，tsconfig 拦截"每一个 DOM 全局"。 */
-        files: ['src/sim/**/*.ts'],
+        /* 无头边界（SIM-03 / D-03）：sim/** 与 config/** 同属无头面，二者均不得越层导入，
+           不得引用 DOM/时钟全局，不得使用未播种随机（D-02 允许 Math.sin/cos，故**不**禁用
+           Math 全局，只经 no-restricted-properties 禁 Math.random）。与 DOM-free 的
+           tsconfig.sim.json 互补——其 include 恰为同一组目录（src/sim、src/config）：
+           lint 拦截"想得到的导入"，tsconfig 拦截"每一个 DOM 全局"。 */
+        files: ['src/sim/**/*.ts', 'src/config/**/*.ts'],
         rules: {
             'no-restricted-imports': [
                 'error',
