@@ -17,6 +17,12 @@ import { BattleSim, type IBattleSim } from '../../src/sim/battle-sim';
  * 全程无 DOM、无墙上时钟。
  */
 
+/**
+ * 构造一个含 3 个实体的种子化 `BattleSim`。
+ *
+ * @param seed 主种子。
+ * @returns 已生成 3 个实体、尚未推进的战斗模拟实例。
+ */
 function buildSim(seed: number): IBattleSim {
     const sim = new BattleSim(seed);
     sim.spawn();
@@ -25,7 +31,13 @@ function buildSim(seed: number): IBattleSim {
     return sim;
 }
 
-/** 无头跑 `frames` 帧，返回逐 tick 的指纹轨迹。 */
+/**
+ * 无头跑 `frames` 帧，返回逐 tick 的指纹轨迹。
+ *
+ * @param seed 主种子。
+ * @param frames 要推进的 tick 数。
+ * @returns 逐 tick 的状态指纹轨迹。
+ */
 function runTrace(seed: number, frames: number): string[] {
     const sim = buildSim(seed);
     const trace: string[] = [];

@@ -8,9 +8,17 @@ import { RandomStreams, type IRandomStreams } from '../../src/sim/core/rng';
  * 未知流名抛错、同 (seed, names) 的 save() 字节一致。
  */
 
+/** 测试用的命名随机流集合。 */
 const NAMES = ['ai', 'spawn', 'damage'] as const;
 
-/** 从某命名流连续取 `n` 个数。 */
+/**
+ * 从某命名流连续取 `n` 个数。
+ *
+ * @param rs 随机流门面。
+ * @param name 命名流名称。
+ * @param n 抽取个数。
+ * @returns 依次抽取的 `n` 个数值。
+ */
 function draw(rs: IRandomStreams, name: string, n: number): number[] {
     const s = rs.stream(name);
     const out: number[] = [];

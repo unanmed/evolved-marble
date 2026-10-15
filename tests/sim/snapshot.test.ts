@@ -16,6 +16,14 @@ import {
  * 确定性重启点，以及"恢复后重跑不偏离原始轨迹超过一个栅格"。
  */
 
+/**
+ * 构造一个生成 `spawns` 个实体、再推进 `ticks` 步的种子化 `BattleSim`。
+ *
+ * @param seed 主种子。
+ * @param spawns 生成的实体数。
+ * @param ticks 推进的 tick 数。
+ * @returns 生成并推进后的战斗模拟实例。
+ */
 function steppedSim(seed: number, spawns: number, ticks: number): IBattleSim {
     const sim = new BattleSim(seed);
     for (let i = 0; i < spawns; i++) sim.spawn();
@@ -23,6 +31,12 @@ function steppedSim(seed: number, spawns: number, ticks: number): IBattleSim {
     return sim;
 }
 
+/**
+ * 取该 sim 当前快照的规范指纹。
+ *
+ * @param sim 目标战斗模拟实例。
+ * @returns 其快照的规范指纹字符串。
+ */
 function fp(sim: IBattleSim): string {
     return fingerprint(sim.snapshot());
 }
