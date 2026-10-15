@@ -684,22 +684,22 @@ export class TickClock {
 
 ## Open Questions
 
-1. **Does `tsc` (TS 7 native) fully type-check the DOM-free `tsconfig.sim.json` + the DOM `tsconfig.json` with zero surprises on this toolchain (TS 7.0.2 / Node 24.21)?**
+1. **(RESOLVED — TS 7.0.2 / Node 24.21 type-check the DOM-free `tsconfig.sim.json` and the base project cleanly; `pnpm run typecheck` is a green required verify in Plans 01-01…01-08.)** **Does `tsc` (TS 7 native) fully type-check the DOM-free `tsconfig.sim.json` + the DOM `tsconfig.json` with zero surprises on this toolchain (TS 7.0.2 / Node 24.21)?**
    - What we know: TS 7 is designed to match TS 6 type-checking/CLI behavior; `rootDir` must be explicit; `downlevelIteration` removed.
    - What's unclear: whether any option in the existing `tsconfig.json` is deprecated/removed and errors under TS 7.
    - Recommendation: **Spike task at the start of Plan 01-01** — install the side-by-side layout, run `tsc --version` (expect 7.x), `tsc6 --version` (expect 6.x), and `pnpm typecheck` on a trivial `sim/` file; confirm ESLint starts.
 
-2. **Does `typescript-eslint@8.71.2` typed linting (`projectService: true`) run cleanly against the aliased TS 6 API on ESLint 10?**
+2. **(RESOLVED — ESLint 10 + typescript-eslint (aliased TS 6 API) ran; Plan 01-03 wired the `sim/**` boundary block and `pnpm run lint` is a required gate. Plan 01-08 extends the block to `src/config/**`.)** **Does `typescript-eslint@8.71.2` typed linting (`projectService: true`) run cleanly against the aliased TS 6 API on ESLint 10?**
    - What we know: peer ranges accept `eslint ^10` and `typescript <6.1.0`; TS 7 has no API until 7.1.
    - What's unclear: whether the project-service resolves the aliased TS6 correctly under pnpm.
    - Recommendation: **Spike in Plan 01-01** alongside Q1; if typed linting is problematic, fall back to non-type-aware rules for Phase 1 (boundary rules are non-type-aware anyway).
 
-3. **What is the exact quantization + hash choice for the fingerprint?**
+3. **(RESOLVED — `QUANT_GRID = 1/256` is a documented constant in `src/sim/snapshot.ts`; `tests/sim/snapshot.test.ts` (Plan 01-04) perturbs one field by more than `1/256` and asserts the fingerprint changes.)** **What is the exact quantization + hash choice for the fingerprint?**
    - What we know: quantization is cheap insurance; hash cost matters only at scale.
    - What's unclear: the "right" grid for this sim's magnitude.
    - Recommendation: pick 1/256, document it as a constant in `snapshot.ts`, and add a test that perturbing one field by >1/256 changes the fingerprint.
 
-4. **Does the pre-commit gate belong on `git commit` (slow) or as a manual `pnpm gate` plus a documented rule?**
+4. **(RESOLVED — the pre-commit hook (`.githooks/`, Plan 01-04) runs `pnpm gate`; the gate is fast at Phase-1 scale. No CI this phase, per D-09.)** **Does the pre-commit gate belong on `git commit` (slow) or as a manual `pnpm gate` plus a documented rule?**
    - What we know: D-09 says "scripted and used as a pre-commit gate".
    - What's unclear: acceptable commit latency.
    - Recommendation: keep the gate test fast (<~2 s at Phase-1 scale); if it grows, split into a fast subset on commit and full `pnpm test` manually.

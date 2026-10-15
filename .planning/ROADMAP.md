@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A headless mode runs a full simulation with no rendering/display and produces the same result as any rendered run.
   4. An automated determinism gate (state fingerprint / snapshot hash) runs in CI and fails the build on any divergence.
 
-**Plans**: 8 plans (4 executed; 4 gap-closure added after verification)
+**Plans**: 12 plans (4 executed; 8 gap-closure added after verification)
 
 Plans:
 **Wave 1**
@@ -59,12 +59,28 @@ Plans:
 
 **Wave 6** *(gap closure — code-style retrofit; 01-06 & 01-08 run in parallel, disjoint files)*
 
-- [ ] 01-06-PLAN.md — Retrofit interface-first classes (D-13) + numeric enums (D-14) + no `_` prefix (D-15) + named inline types (D-16)
+- [ ] 01-06-PLAN.md — Retrofit interface-first classes (D-13) + numeric enums (D-14) + no `_` prefix (D-15) + named inline types (D-16) (atomic 23-file type-identity graph — scope-justified)
 - [ ] 01-08-PLAN.md — Tooling fixes: ESLint boundary covers src/config (WR-04) + dangling coverage config resolved (WR-05)
 
-**Wave 7** *(gap closure — documentation, blocked on Wave 6)*
+**Wave 7** *(gap closure — JSDoc/D-12 documentation, split by directory)*
 
-- [ ] 01-07-PLAN.md — JSDoc coverage (D-12) across src/** + tests/** + committed automated convention gate
+- [ ] 01-07-PLAN.md — JSDoc (D-12) on src/sim/core + src/sim/content + create the automated convention gate
+
+**Wave 8** *(blocked on Wave 7)*
+
+- [ ] 01-09-PLAN.md — JSDoc (D-12) on the rest of src/sim + widen the gate to `['src/sim']`
+
+**Wave 9** *(blocked on Wave 8)*
+
+- [ ] 01-10-PLAN.md — JSDoc (D-12) on src/host + src/config + widen the gate to `['src']`
+
+**Wave 10** *(blocked on Wave 9)*
+
+- [ ] 01-11-PLAN.md — JSDoc (D-12) on tests/sim + widen the gate to `['src','tests/sim']`
+
+**Wave 11** *(blocked on Wave 10)*
+
+- [ ] 01-12-PLAN.md — JSDoc (D-12) on tests/determinism + tests/helpers + tests/host + widen the gate to `['src','tests']` (whole tree)
 
 ### Phase 2: Physics & Composite Units
 
