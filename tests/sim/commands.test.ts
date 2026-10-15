@@ -157,6 +157,11 @@ describe('BattleSim commands', () => {
     });
 
     it('same seed + same command log → identical fingerprints', () => {
+        /**
+         * 用固定的双向命令流跑 10 tick，收集逐 tick 指纹。
+         *
+         * @returns 10 个 tick 的状态指纹轨迹。
+         */
         const run = (): string[] => {
             const sim = new BattleSim(DEFAULT_SEED);
             const a = sim.spawn();
