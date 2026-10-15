@@ -13,7 +13,7 @@ import type { SimState } from './world/world';
  * `fingerprint()` 对字节做哈希。二者保持可分离，日后状态变大时可单独把哈希换成
  * 原生/向量化实现，而**无需触碰**模拟逻辑（D-03）。
  *
- * 序列化是**穷尽**的：时钟步数 + 全部命名随机流状态 + 全部实体（含 id）。
+ * 序列化是**穷尽**的：时钟步数 + 全部命名随机流状态 + 实体 id 游标 + 全部实体（含 id）。
  * 命令队列与事件日志被刻意排除——它们是**每 tick 的瞬时输入/输出**（命令在
  * `step()` 顶部 drain 后为空，事件每 tick 清空），不影响未来走向，故不属于
  * "状态"。两个分岔的世界若仅命令/事件不同，其未来演进仍一致。
@@ -25,9 +25,14 @@ import type { SimState } from './world/world';
  */
 export const QUANT_GRID = 256;
 
-/** 快照格式魔数（'EMS1'）与版本号，用于确定性反序列化与版本护栏。 */
+/**
+ * 快照格式魔数（'EMS1'）与版本号，用于确定性反序列化与版本护栏。
+ *
+ * VERSION=2 起，规范字节在实体计数后新增 **id 游标**（`EntityStore.nextId`）字段——见 CR-01。
+ * 版本护栏对任何非当前版本确定性抛错（无 v1 迁移路径：本阶段快照不出进程）。
+ */
 const MAGIC = 0x454d5331;
-const VERSION = 1;
+const VERSION = 2;
 /** 头部预留 2 字节（对齐/扩展）。 */
 const HEADER_SIZE = 8;
 /** 每个随机流的固定字节数：4 × uint32。 */
@@ -59,6 +64,7 @@ export function serializeState(s: SimState): Uint8Array {
         size += 2 + name.length + STREAM_STATE_BYTES;
     }
     size += 4; // entityCount(uint32)
+    size += 4; // nextId cursor(uint32)
     size += ids.length * ENTITY_BYTES;
 
     const bytes = new Uint8Array(size);
@@ -93,6 +99,7 @@ export function serializeState(s: SimState): Uint8Array {
         u32(state[3]);
     }
     u32(ids.length);
+    u32(s.store.nextId); // id 游标：属未来影响状态，必须序列化（D-05，CR-01）
     for (const id of ids) {
         const c = s.store.get(id);
         i32(id);
@@ -161,6 +168,7 @@ export function deserializeState(
     }
 
     const entityCount = readU32();
+    const nextId = readU32();
     const entries: EntitySnapshot[] = [];
     for (let i = 0; i < entityCount; i++) {
         const id = readI32();
@@ -185,7 +193,7 @@ export function deserializeState(
     }
 
     const store = new EntityStore();
-    store.restore(entries);
+    store.restore(entries, nextId);
     const rng = new RandomStreams(0, names);
     rng.restore(states);
     const clock = new TickClock(dt);

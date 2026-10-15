@@ -24,15 +24,27 @@ export interface EntitySnapshot {
 }
 
 export class EntityStore {
-    private nextId = 1;
+    /** id 游标：下一个 `spawn()` 分配的 id。属"未来影响状态"（D-05）。 */
+    private nextEntityId = 1;
     /** 迭代契约：有序 id 数组。 */
     private orderedIds: EntityId[] = [];
     /** 仅作查找索引，绝不用于迭代。 */
     private byId = new Map<EntityId, UnitComponents>();
 
+    /**
+     * 只读访问器：实体 id 游标（下一个待分配 id）。
+     *
+     * 该游标是**未来影响状态**：序列化快照必须包含它，否则恢复后会重用已死 id（D-05，CR-01）。
+     *
+     * @returns 下一次 `spawn()` 将分配的实体 id。
+     */
+    get nextId(): number {
+        return this.nextEntityId;
+    }
+
     /** 以单调 id（D-05）生成实体，追加到有序数组。 */
     spawn(): EntityId {
-        const id = this.nextId++;
+        const id = this.nextEntityId++;
         this.orderedIds.push(id);
         this.byId.set(id, {
             attrs: { hp: 100, level: 1 },
@@ -64,9 +76,12 @@ export class EntityStore {
      * 恢复：清空并按下标顺序重建实体，保持 `orderedIds` 契约（SIM-04 快照反序列化）。
      *
      * 组件做深拷贝，使恢复后的 store 独占其数据（不回指调用方的对象）。
-     * `nextId` 重置为 `max(id) + 1`，从而保证 id 继续单调（D-05），绝不与既有 id 冲突。
+     *
+     * @param entries 按下标顺序排列的实体快照条目（含 id 与组件）。
+     * @param nextId 调用方序列化出的 id 游标；传入时直接采用（D-05，CR-01 的正确来源）。
+     *   省略时回退为 `max(id) + 1`，仅供未序列化游标的旧调用方保持 id 单调。
      */
-    restore(entries: readonly EntitySnapshot[]): void {
+    restore(entries: readonly EntitySnapshot[], nextId?: number): void {
         this.orderedIds = [];
         this.byId.clear();
         let maxId = 0;
@@ -80,6 +95,6 @@ export class EntityStore {
             this.orderedIds.push(entry.id);
             if (entry.id > maxId) maxId = entry.id;
         }
-        this.nextId = maxId + 1;
+        this.nextEntityId = nextId ?? maxId + 1;
     }
 }

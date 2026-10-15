@@ -165,6 +165,23 @@ describe('entity-id cursor survives a snapshot round-trip (CR-01, D-05)', () => 
         expect(usedIds).not.toContain(restoredNext);
         expect(restoredNext).toBeGreaterThan(Math.max(...usedIds));
     });
+
+    it('a despawn→snapshot→restore→despawn→spawn churn reproduces identically', () => {
+        const churn = (): number[] => {
+            const sim = new BattleSim(DEFAULT_SEED);
+            sim.spawn(); // id 1
+            sim.spawn(); // id 2
+            sim.spawn(); // id 3
+            const restored = new BattleSim(DEFAULT_SEED);
+            restored.restore(new Uint8Array(sim.snapshot()));
+            restored.state.store.despawn(3);
+            const out: number[] = [restored.spawn()];
+            restored.state.store.despawn(out[0]);
+            out.push(restored.spawn());
+            return out;
+        };
+        expect(churn()).toEqual(churn());
+    });
 });
 
 describe('snapshot as a deterministic restart point', () => {
