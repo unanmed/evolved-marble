@@ -133,6 +133,38 @@ describe('mutator census — every tracked mutator moves the fingerprint', () =>
         sim.state.rng.stream('ai').setState([s[0] ^ 1, s[1], s[2], s[3]]);
         expect(fp(sim)).not.toBe(before);
     });
+
+    it('a differing id cursor (identical live entities) moves the fingerprint', () => {
+        // A: 单个活实体（id 1），id 游标停在 2。
+        const a = new BattleSim(DEFAULT_SEED);
+        a.spawn();
+        // B: 同样的单个活实体（id 1），但游标停在 3（id 2 生成后又被 despawn）。
+        const b = new BattleSim(DEFAULT_SEED);
+        b.spawn();
+        const dead = b.spawn();
+        b.state.store.despawn(dead);
+        expect(fp(a)).not.toBe(fp(b));
+    });
+});
+
+describe('entity-id cursor survives a snapshot round-trip (CR-01, D-05)', () => {
+    it('does not reuse a dead id after despawn(max) → snapshot → restore → spawn', () => {
+        const original = new BattleSim(DEFAULT_SEED);
+        const first = original.spawn(); // id 1
+        const second = original.spawn(); // id 2
+        original.state.store.despawn(second); // 快照前移除最高 id
+        const usedIds = [first, second];
+
+        const restored = new BattleSim(DEFAULT_SEED);
+        restored.restore(new Uint8Array(original.snapshot()));
+
+        const originalNext = original.spawn();
+        const restoredNext = restored.spawn();
+
+        expect(restoredNext).toBe(originalNext);
+        expect(usedIds).not.toContain(restoredNext);
+        expect(restoredNext).toBeGreaterThan(Math.max(...usedIds));
+    });
 });
 
 describe('snapshot as a deterministic restart point', () => {
