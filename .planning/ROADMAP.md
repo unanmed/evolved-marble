@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A headless mode runs a full simulation with no rendering/display and produces the same result as any rendered run.
   4. An automated determinism gate (state fingerprint / snapshot hash) runs in CI and fails the build on any divergence.
 
-**Plans**: 4/4 plans executed
+**Plans**: 8 plans (4 executed; 4 gap-closure added after verification)
 
 Plans:
 **Wave 1**
@@ -52,6 +52,19 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [x] 01-04-PLAN.md — Canonical snapshot/fingerprint + double-run determinism gate + pre-commit wiring
+
+**Wave 5** *(gap closure — CR-01 serializer completeness + review hardening)*
+
+- [ ] 01-05-PLAN.md — Serialize/restore the entity-id cursor (CR-01/T-01-04) + int32 range guard (WR-03) + exhaustiveness guard (WR-02)
+
+**Wave 6** *(gap closure — code-style retrofit; 01-06 & 01-08 run in parallel, disjoint files)*
+
+- [ ] 01-06-PLAN.md — Retrofit interface-first classes (D-13) + numeric enums (D-14) + no `_` prefix (D-15) + named inline types (D-16)
+- [ ] 01-08-PLAN.md — Tooling fixes: ESLint boundary covers src/config (WR-04) + dangling coverage config resolved (WR-05)
+
+**Wave 7** *(gap closure — documentation, blocked on Wave 6)*
+
+- [ ] 01-07-PLAN.md — JSDoc coverage (D-12) across src/** + tests/** + committed automated convention gate
 
 ### Phase 2: Physics & Composite Units
 
