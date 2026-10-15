@@ -1,0 +1,4 @@
+# POSIX hook scripts must keep LF endings even with core.autocrlf=true on
+# Windows; a CRLF shebang (`#!/bin/sh\r`) breaks execution and silently
+# disables the D-09 determinism pre-commit gate. Force LF under .githooks/.
+/.githooks/* text eol=lf

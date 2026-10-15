@@ -1,0 +1,12 @@
+#!/bin/sh
+# 确定性门禁（D-09）：同机双跑指纹比对 + lint。
+#
+# 由 `git config core.hooksPath .githooks` 挂载，在每次 `git commit` 前运行。
+# 明确**不接 CI**（GitHub Actions 已按 D-09 推迟）；这是本仓库唯一的自动化门禁。
+# Windows 下由 Git-for-Windows 的 sh 执行（POSIX 脚本）。
+#
+# 任一失败即拒绝提交（非零退出）。
+pnpm run lint && pnpm vitest run tests/determinism --reporter=dot || {
+    echo "Determinism gate failed — refusing to commit."
+    exit 1
+}
