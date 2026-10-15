@@ -35,7 +35,9 @@ export function runTrace({ seed, ticks }: IRunTraceOptions): string[] {
     for (let i = 0; i < FIXED_ENTITY_COUNT; i++) sim.spawn();
 
     const trace: string[] = [];
+    /** 记录器：每步推进仿真并把该 tick 的状态指纹压入轨迹。 */
     const recorder = {
+        /** 推进一步，并把该 tick 的状态指纹追加到轨迹末尾。 */
         step(): void {
             sim.step();
             trace.push(sim.fingerprint());

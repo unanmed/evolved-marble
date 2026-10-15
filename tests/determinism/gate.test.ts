@@ -10,8 +10,11 @@ import { runTrace } from '../helpers/run-sim';
  *   3. 轨迹非常量（状态确实在演化）——反"空门禁"护栏（Pitfall 8）。
  */
 
+/** 主种子：同种子双跑应逐 tick 指纹一致。 */
 const SEED = 12345;
+/** 对照种子：与 `SEED` 不同，用于断言"不同种子 → 不同轨迹"。 */
 const OTHER_SEED = 99999;
+/** 每条轨迹推进的 tick 数（200 足够让状态充分演化）。 */
 const TICKS = 200;
 
 describe('determinism gate (SIM-04)', () => {
