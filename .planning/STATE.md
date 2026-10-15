@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: Foundation & Deterministic Sim Core
 status: executing
-stopped_at: Phase 1 context gathered
-last_updated: "2026-10-15T10:30:46.188Z"
+stopped_at: Completed 01-01-PLAN.md (toolchain bootstrap)
+last_updated: "2026-10-15T10:48:02.086Z"
 last_activity: 2026-10-15
-last_activity_desc: Roadmap created (6 phases, 27/27 v1 requirements mapped)
-state_head: 93557506683c4e884965c8e1e087633fce59616d
+last_activity_desc: Phase 1 execution started
+state_head: 9a5e88cb97dec835c810a05a16d097f154cae91e
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 4
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-10-15)
 
 ## Current Position
 
-Phase: 1 (Foundation & Deterministic Sim Core) — READY TO EXECUTE
-Plan: 0 of 3 in current phase
+Phase: 1 (Foundation & Deterministic Sim Core) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-10-15 — Roadmap created (6 phases, 27/27 v1 requirements mapped)
+Last activity: 2026-10-15 — Phase 1 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -54,6 +54,11 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: —
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 1 P01 | 11 | 2 tasks | 30 files |
 
 ## Accumulated Context
 
@@ -65,6 +70,8 @@ Recent decisions affecting current work:
 - Milestone 1: Scope is the tactical combat layer only; kingdom/economy, LLM commander/director, and RL control are out of scope (interfaces reserved).
 - Roadmap structure: determinism (Phases 1–2) is proven before any I/O or rendering attaches.
 - Phase 2: pin the Rapier2D **deterministic** build (resolve `-deterministic` vs `-compat` + `enhanced-determinism` via a cross-machine golden-hash spike; settle pixel↔meter scale).
+- [Phase 1]: TS7 removed baseUrl: the @/* -> src/* alias is expressed as a relative paths entry (./src/*); baseUrl dropped.
+- [Phase 1]: Phase 1 removed only the TS predecessor tree (src/** + index.html); model/ + requirements.txt deferred to the Python-rebuild phase (tsc never checks them).
 
 ### Pending Todos
 
@@ -86,6 +93,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-15T09:43:40.487Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-foundation-deterministic-sim-core/01-CONTEXT.md
+Last session: 2026-10-15T10:48:02.062Z
+Stopped at: Completed 01-01-PLAN.md (toolchain bootstrap)
+Resume file: None
