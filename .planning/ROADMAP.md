@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. A headless mode runs a full simulation with no rendering/display and produces the same result as any rendered run.
   4. An automated determinism gate (state fingerprint / snapshot hash) runs in CI and fails the build on any divergence.
 
-**Plans**: 10/12 plans executed (4 executed; 8 gap-closure added after verification)
+**Plans**: 11/12 plans executed (4 executed; 8 gap-closure added after verification)
 
 Plans:
 **Wave 1**
@@ -76,7 +76,7 @@ Plans:
 
 **Wave 10** *(blocked on Wave 9)*
 
-- [ ] 01-11-PLAN.md — JSDoc (D-12) on tests/sim + widen the gate to `['src','tests/sim']`
+- [x] 01-11-PLAN.md — JSDoc (D-12) on tests/sim + widen the gate to `['src','tests/sim']`
 
 **Wave 11** *(blocked on Wave 10)*
 
@@ -192,7 +192,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation & Deterministic Sim Core | 10/12 | In Progress|  |
+| 1. Foundation & Deterministic Sim Core | 11/12 | In Progress|  |
 | 2. Physics & Composite Units | 0/3 | Not started | - |
 | 3. Combat Mechanics, Data & Progression | 0/3 | Not started | - |
 | 4. Unit AI & Autonomous Battle | 0/3 | Not started | - |
