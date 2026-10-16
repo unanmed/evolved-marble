@@ -94,20 +94,25 @@ Plans:
   3. Physics is built on the Rapier2D deterministic build with a fixed step, and the determinism fingerprint stays green after physics is introduced.
   4. The physics fingerprint is stable across two machines (cross-machine golden-hash spike), and fast weapons do not tunnel through targets (CCD configured).
 
-**Plans**: 3 plans
+**Plans**: 5 plans
 
 Plans:
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — Rapier2D integration foundation: exact-pinned deterministic build + idempotent `initPhysics` + single-source physics constants + version smoke (PHYS-03)
+- [ ] 02-01-PLAN.md — Rapier2D integration foundation: exact-pinned deterministic build + idempotent `initPhysics` + single-source physics constants + version/golden smoke (PHYS-03)
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 02-02-PLAN.md — Composite rig + typed-contact tracer: `PhysicsWorld`/`CompositeFactory`/`ContactBridge`, pose mirror, snapshot v3, determinism gate, CCD (PHYS-01, PHYS-02, PHYS-03)
+- [ ] 02-02-PLAN.md — Composite-rig + typed-contact tracer (end-to-end slice): `PhysicsWorld`/`CompositeFactory`/`ContactBridge`, part map, pre-step Δv, determinism gate (PHYS-01, PHYS-02, PHYS-03)
 
-**Wave 3** *(blocked on Wave 2)*
+**Wave 3** *(blocked on Wave 2; 02-03 and 02-04 run in parallel — disjoint files)*
 
-- [ ] 02-03-PLAN.md — Contact semantics hardening (pre-step Δv, null guard) + snapshot v3 census and round-trip (PHYS-02, PHYS-03)
+- [ ] 02-03-PLAN.md — Sim-core integration: `BattleSim` step, pose mirror, Force/Torque→Rapier impulses, snapshot v3, safety belt (PHYS-01, PHYS-03)
+- [ ] 02-04-PLAN.md — Composite factory build-out: weapon/armor arrays, collision groups, ordered lifecycle, CCD, sustained swing (PHYS-01, PHYS-03)
+
+**Wave 4** *(blocked on Waves 2–3)*
+
+- [ ] 02-05-PLAN.md — Contact semantics hardening (pre-step Δv, null guard) + snapshot v3 census and round-trip (PHYS-02, PHYS-03)
 
 ### Phase 3: Combat Mechanics, Data & Progression
 
@@ -200,7 +205,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Deterministic Sim Core | 12/12 | Complete    | 2026-10-15 |
-| 2. Physics & Composite Units | 0/3 | Not started | - |
+| 2. Physics & Composite Units | 0/5 | Not started | - |
 | 3. Combat Mechanics, Data & Progression | 0/3 | Not started | - |
 | 4. Unit AI & Autonomous Battle | 0/3 | Not started | - |
 | 5. Watchable Rendering, HUD & Action-Follow Camera | 0/2 | Not started | - |

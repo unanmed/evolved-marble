@@ -485,20 +485,22 @@ await RAPIER.init();   // safe — verified no error
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Joint-motor swing vs direct angular drive (D-36 simplification candidate).**
+> All three questions below are **RESOLVED** and folded into the plans; none blocks the phase goal.
+
+1. **Joint-motor swing vs direct angular drive (D-36 simplification candidate).** — **(RESOLVED: keep the revolute joint for attachment (D-24); drive the swing by direct angular velocity/`applyTorqueImpulse` per D-36. Plans 02-02/02-04 do this: the tracer drives directly, and plan 02-04 attempts the D-24 motor before falling back to the direct drive, recording the final choice in its SUMMARY.)**
    - What we know: a minimal rig with `configureMotorVelocity(6.0, 1.0)` produced an angular-velocity *spike that decayed to ~0* over 30 steps (observed `[0.9191, 0.1223, -0.0064, …, 0]`), i.e. the naive motor call did not sustain a swing.
    - What's unclear: whether a tuned `configureMotorModel(MotorModel.ForceBased)` + stronger `factor`, or a larger target velocity, yields a clean swing; vs. simply driving the weapon body's angular velocity directly.
    - Recommendation: keep the revolute **joint** (attachment is locked by D-24), but make the *drive* an early spike decision. A direct `setAngvel`/`applyTorqueImpulse` on the weapon body is simpler, needs no motor tuning, and still creates independent weapon velocity for Δv — strongly aligned with D-36. Defer the final choice to a one-task spike.
 
-2. **Which package variant to lock.**
+2. **Which package variant to lock.** — **(RESOLVED: lock `@dimforge/rapier2d-deterministic-compat@0.21.0`, exact-pinned. Plan 02-01 installs it and folds the D-18 literal-string substitution into its blocking-human legitimacy checkpoint for explicit user approval.)**
    - What we know: compat is strictly simpler and verified; raw honours PHYS-03's literal name but breaks plain-Node resolution.
-   - Recommendation: recommend `-compat` and surface as a `checkpoint:human-verify` (it revises D-18's literal string, though not its intent).
+   - Recommendation: `-compat` via a `checkpoint:human-verify` (it revises D-18's literal string, though not its intent).
 
-3. **README/browser-bundle verification of the compat build under Vite 8.**
+3. **README/browser-bundle verification of the compat build under Vite 8.** — **(RESOLVED: tracked as a Manual-Only verification in 02-VALIDATION.md; no plan task blocks on it. Run `pnpm build` and confirm the `-compat` Rapier import resolves in the production bundle.)**
    - What we know: Node + Vitest verified; Vite/Chrome reasoned.
-   - Recommendation: first task of the plan should include a 5-minute `pnpm build` smoke of a one-line Rapier import.
+   - Recommendation: include a 5-minute `pnpm build` smoke of a one-line Rapier import.
 
 ---
 
