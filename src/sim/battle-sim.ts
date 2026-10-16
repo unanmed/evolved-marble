@@ -27,7 +27,8 @@ import { deserializeState, fingerprint, serializeState } from './snapshot';
 import {
     CompositeFactory,
     type ICompositeFactory,
-    type ICompositeSpec
+    type ICompositeSpec,
+    type IUnitPhysics
 } from './world/composite';
 import { ContactBridge, type IContactBridge } from './world/contact';
 import { EntityStore, type EntityId } from './world/entity-store';
@@ -57,6 +58,8 @@ export interface IBattleSim {
     reset(seed: number): void;
     /** 便捷入口：以 Store 的单调 id 生成一个复合单位。 */
     spawn(): EntityId;
+    /** 销毁一个复合单位（`spawn` 的对称生命周期入口；未知 id 为 no-op）。 */
+    despawn(entityId: EntityId): void;
     /** 提交外部命令（信任边界入口）。 */
     submit(commands: readonly unknown[]): void;
     /** 推进一个固定步。 */
@@ -155,6 +158,21 @@ export class BattleSim implements IBattleSim {
         const unit = this.factory.spawn(this.spawnSpec(id), id);
         this.simState.store.get(id).physics = unit;
         return id;
+    }
+
+    /**
+     * 销毁一个复合单位（`spawn` 的对称生命周期入口）。
+     *
+     * 顺序：先经工厂移除该单位的 Rapier 刚体/碰撞体/关节（工厂须在 store 丢弃 id 前读到其
+     * 句柄与成员掩码，见 `CompositeFactory.despawn`），再从 store 移除实体。未知 id 为
+     * 无副作用 no-op（与 `IEntityStore.despawn` 语义一致）。本入口也是 Phase 4 单位死亡复用的
+     * 生命周期点。
+     *
+     * @param entityId 目标单位 id。
+     */
+    despawn(entityId: EntityId): void {
+        this.factory.despawn(entityId);
+        this.simState.store.despawn(entityId);
     }
 
     /**
@@ -411,10 +429,17 @@ export class BattleSim implements IBattleSim {
             this.simState.events
         );
         this.bridge = bridge;
+        /* 从**有序** id 数组派生还原后的存活单位映射（绝不迭代 Map/Set），据此重播工厂的
+           单位索引与成员池：还原单位可被 `despawn` 命中，且后续 spawn 不会复用其掩码（WR-03） */
+        const restoredUnits = new Map<EntityId, IUnitPhysics>();
+        for (const id of this.simState.store.ids()) {
+            restoredUnits.set(id, this.simState.store.get(id).physics);
+        }
         this.factory = new CompositeFactory(
             this.simState.physics.world,
             (handle, ref) => bridge.register(handle, ref),
-            handle => this.simState.physics.unregisterPart(handle)
+            handle => this.simState.physics.unregisterPart(handle),
+            restoredUnits
         );
     }
 

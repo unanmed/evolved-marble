@@ -7,10 +7,11 @@ import type {
 } from '@dimforge/rapier2d-deterministic-compat';
 import { ANGULAR_DAMPING, LINEAR_DAMPING, RESTITUTION } from '../../config/sim';
 import {
-    GROUP_COUNT,
+    GROUP_BIT_COUNT,
     GROUP_MASK_ALL,
     GROUP_MASK_ENEMY,
-    GROUP_UNIT_MEMBERSHIP,
+    GROUP_MEMBERSHIP_BITS_PER_UNIT,
+    GROUP_UNIT_CAPACITY,
     SWING_AMPLITUDE,
     SWING_ANGULAR_SPEED
 } from '../content/physics';
@@ -26,8 +27,9 @@ import type { EntityId } from './entity-store';
  * 防具，直接服务 Phase 3 的职业装备表。
  *
  * 碰撞过滤（D-27）：同一单位各部件互为无损，敌我单位之间仍保持物理碰撞。实现为单位级
- * `InteractionGroups`：同单位各碰撞体共享同一成员位，且过滤掩码排除该成员位（见
- * `unitGroups`）。CCD 装在武器刚体上（Pitfall 4）。
+ * `InteractionGroups`：每个存活单位从**确定性存活池**领取一个互异成员掩码，同单位各碰撞体
+ * 共享该掩码、且过滤掩码排除之（见 `unitMembership`/`interactionGroups`）。CCD 装在武器
+ * 刚体上（Pitfall 4）。
  *
  * 生命周期：`spawn`/`despawn` 只按调用方给定的**有序** `store.ids()` 顺序创建/销毁；
  * `despawn` 移除刚体（连带其碰撞体与关节）并注销全部部件句柄（T-02-01）。
@@ -151,6 +153,57 @@ export interface ICompositeFactory {
 }
 
 /**
+ * 确定性枚举全部存活单位成员掩码池。
+ *
+ * 在 `GROUP_BIT_COUNT` 个位位置上按**升序组合下标**（字典序）取
+ * `GROUP_MEMBERSHIP_BITS_PER_UNIT` 位，返回**全新**的 `number[]`。每个掩码互异；等势掩码
+ * 在位包含下互不包含，故任意两个不同单位的成员位各自至少命中对方过滤掩码——不同单位必
+ * 交互；而某单位自身掩码被其自身过滤掩码清除——同单位不交互。升序枚举保证同一构造序列
+ * 产出同一掩码（D-17 同机确定性）。
+ *
+ * @returns 按升序枚举的成员掩码池（每次调用返回新数组）。
+ */
+function enumerateMembershipPool(): number[] {
+    const pool: number[] = [];
+    const chosen: number[] = [];
+    /**
+     * 递归选取下一个位下标，凑满每单位位数即产出一个掩码。
+     *
+     * @param start 下一个可选位下标的下界。
+     */
+    const choose = (start: number): void => {
+        if (chosen.length === GROUP_MEMBERSHIP_BITS_PER_UNIT) {
+            let mask = 0;
+            for (const bit of chosen) mask |= 1 << bit;
+            pool.push(mask);
+            return;
+        }
+        for (let i = start; i < GROUP_BIT_COUNT; i++) {
+            chosen.push(i);
+            choose(i + 1);
+            chosen.pop();
+        }
+    };
+    choose(0);
+    return pool;
+}
+
+/**
+ * 成员池容量一致性断言：把枚举出的池长与 `GROUP_UNIT_CAPACITY` 比对，不符即**导入期抛错**。
+ *
+ * `GROUP_UNIT_CAPACITY` 是手写字面量，而池按 `GROUP_BIT_COUNT × GROUP_MEMBERSHIP_BITS_PER_UNIT`
+ * 枚举；改动每单位位数会让二者**静默**失配（耗尽守护与 `>16` 回归测试的期望基数随之偏移）。
+ * 此处把不一致变成显式失败，并同时报出两个值。
+ */
+const MEMBERSHIP_POOL_LENGTH = enumerateMembershipPool().length;
+if (MEMBERSHIP_POOL_LENGTH !== GROUP_UNIT_CAPACITY) {
+    throw new Error(
+        `collision groups: membership pool length ${MEMBERSHIP_POOL_LENGTH}` +
+            ` != GROUP_UNIT_CAPACITY ${GROUP_UNIT_CAPACITY}`
+    );
+}
+
+/**
  * 复合单位装配工厂。创建/销毁顺序由调用方按 `EntityStore.ids()` 的有序数组决定
  * （Pitfall 3）；本类自身的 `units` 索引仅作查找，绝不用作创建顺序来源。
  */
@@ -163,20 +216,28 @@ export class CompositeFactory implements ICompositeFactory {
     private readonly unregister: UnregisterCollider;
     /** 已生成单位的句柄索引（仅查找；创建顺序由调用方决定）。 */
     private readonly units = new Map<EntityId, IUnitPhysics>();
+    /** 存活单位 → 已分配的成员掩码（D-27）。 */
+    private readonly membership = new Map<EntityId, number>();
+    /** 可用成员掩码池（每工厂一份全新升序副本；`pop` 领取、`push` 归还）。 */
+    private readonly freeMasks: number[] = enumerateMembershipPool();
 
     /**
      * @param world 底层 Rapier 世界。
      * @param register 碰撞体登记回调（接到接触桥的部件映射）。
      * @param unregister 碰撞体注销回调（despawn 时清理部件映射）。
+     * @param restoredUnits 还原后的存活单位映射（`BattleSim.restore` 专用）；提供时据此重播
+     *   工厂的单位索引与成员池（WR-03）。省略时为全新工厂（既有调用点不变）。
      */
     constructor(
         world: World,
         register: RegisterCollider,
-        unregister: UnregisterCollider
+        unregister: UnregisterCollider,
+        restoredUnits?: ReadonlyMap<EntityId, IUnitPhysics>
     ) {
         this.world = world;
         this.register = register;
         this.unregister = unregister;
+        if (restoredUnits) this.reseed(restoredUnits);
     }
 
     /**
@@ -320,18 +381,63 @@ export class CompositeFactory implements ICompositeFactory {
         }
         this.removeBody(unit.bodyHandle);
         this.units.delete(entityId);
+        /* 归还成员掩码：后续 spawn 可复用，但绝不与仍存活单位共享（D-27） */
+        const mask = this.membership.get(entityId);
+        if (mask !== undefined) {
+            this.freeMasks.push(mask);
+            this.membership.delete(entityId);
+        }
     }
 
     /**
-     * 计算某单位全部部件共享的成员位（D-27）：基准成员位按 `(entityId - 1) % GROUP_COUNT`
-     * 左移，16 位内循环（`InteractionGroups` 成员字段上限）。
+     * 用还原后的存活单位映射重播工厂状态（WR-03）：按 id **升序**为每个还原单位登记单位索引，
+     * 并从其还原碰撞体读回成员掩码（本体碰撞体 `collisionGroups()` 的高 16 位），记入
+     * `membership` 并从可用池中移除，使后续 `spawn` 不会复用还原单位的掩码。
      *
-     * @param entityId 单位 id（从 1 起）。
-     * @returns 该单位的成员位（高 16 位编码前的值）。
+     * 防御（T-02-08）：还原单位缺失本体刚体/碰撞体时**抛错**，而非读取错误句柄的分组。
+     *
+     * @param restoredUnits 还原后的存活单位映射。
+     */
+    private reseed(restoredUnits: ReadonlyMap<EntityId, IUnitPhysics>): void {
+        const ids = [...restoredUnits.keys()].sort((a, b) => a - b);
+        for (const id of ids) {
+            const unit = restoredUnits.get(id);
+            if (!unit) continue;
+            const body = this.world.getRigidBody(unit.bodyHandle);
+            if (!body || body.numColliders() === 0) {
+                throw new Error(
+                    `restore: unit ${id} has no body collider to read groups from`
+                );
+            }
+            const mask =
+                (body.collider(0).collisionGroups() >>> 16) & GROUP_MASK_ALL;
+            this.units.set(id, unit);
+            this.membership.set(id, mask);
+            const idx = this.freeMasks.indexOf(mask);
+            if (idx >= 0) this.freeMasks.splice(idx, 1);
+        }
+    }
+
+    /**
+     * 领取某单位的成员掩码（D-27）：已分配则原样返回；否则从可用池 `pop` 一个**互异**掩码。
+     * 池为空（存活单位数超 `GROUP_UNIT_CAPACITY`）时**抛错**——绝不静默复用其他存活单位的位。
+     *
+     * @param entityId 单位 id。
+     * @returns 该单位本次分配的成员掩码。
+     * @throws 当可用成员池耗尽（超过 `GROUP_UNIT_CAPACITY` 个存活单位）时抛出。
      */
     private unitMembership(entityId: EntityId): number {
-        const shift = (entityId - 1) % GROUP_COUNT;
-        return (GROUP_UNIT_MEMBERSHIP << shift) & GROUP_MASK_ALL;
+        const existing = this.membership.get(entityId);
+        if (existing !== undefined) return existing;
+        const mask = this.freeMasks.pop();
+        if (mask === undefined) {
+            throw new Error(
+                `collision groups exhausted: cannot spawn more than ` +
+                    `${GROUP_UNIT_CAPACITY} live units`
+            );
+        }
+        this.membership.set(entityId, mask);
+        return mask;
     }
 
     /**
