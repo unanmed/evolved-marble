@@ -52,15 +52,14 @@ export interface IContactBridge {
 }
 
 /**
- * 接触桥。持有部件映射（仅作查找，绝不用于迭代）并把 Rapier 事件翻译进 `IEventLog`。
+ * 接触桥。把 Rapier 碰撞事件翻译进 `IEventLog`；部件映射由 `IPhysicsWorld` 持有
+ * （这样快照 v3 的部件段可从聚合状态根 `ISimState.physics` 直接序列化/还原，D-34）。
  */
 export class ContactBridge implements IContactBridge {
-    /** 物理世界（读取队列、世界与步前速度）。 */
+    /** 物理世界（读取队列、世界、步前速度与部件映射）。 */
     private readonly physics: IPhysicsWorld;
     /** 事件日志（输出目标）。 */
     private readonly events: IEventLog;
-    /** 部件映射：碰撞体句柄 → 部位标记（仅查找）。 */
-    private readonly parts = new Map<ColliderHandle, IUnitPartRef>();
 
     /**
      * @param physics 物理世界。
@@ -72,13 +71,13 @@ export class ContactBridge implements IContactBridge {
     }
 
     /**
-     * 登记 `colliderHandle → 部位标记` 映射。
+     * 登记 `colliderHandle → 部位标记` 映射（委托给物理世界的部件映射）。
      *
      * @param handle 碰撞体句柄。
      * @param ref 该碰撞体的部位标记。
      */
     register(handle: ColliderHandle, ref: IUnitPartRef): void {
-        this.parts.set(handle, ref);
+        this.physics.registerPart(handle, ref);
     }
 
     /**
@@ -88,7 +87,7 @@ export class ContactBridge implements IContactBridge {
      * @returns 部位标记；未登记返回 `null`。
      */
     lookup(handle: ColliderHandle): IUnitPartRef | null {
-        return this.parts.get(handle) ?? null;
+        return this.physics.lookupPart(handle);
     }
 
     /**

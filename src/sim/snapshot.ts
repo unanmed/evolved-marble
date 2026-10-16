@@ -1,9 +1,16 @@
+import RAPIER from '@dimforge/rapier2d-deterministic-compat';
 import { FIXED_DT } from '../config/sim';
 import { CommandQueue } from './commands';
 import { TickClock } from './core/clock';
-import { EventLog } from './core/events';
+import {
+    ArmorSubtype,
+    EventLog,
+    PartKind,
+    type IUnitPartRef
+} from './core/events';
 import { RandomStreams, type RngState } from './core/rng';
 import { EntityStore, type IEntitySnapshot } from './world/entity-store';
+import { PhysicsWorld } from './world/physics-world';
 import type { ISimState } from './world/world';
 
 /**
@@ -13,10 +20,10 @@ import type { ISimState } from './world/world';
  * `fingerprint()` 对字节做哈希。二者保持可分离，日后状态变大时可单独把哈希换成
  * 原生/向量化实现，而**无需触碰**模拟逻辑（D-03）。
  *
- * 序列化是**穷尽**的：时钟步数 + 全部命名随机流状态 + 实体 id 游标 + 全部实体（含 id）。
+ * 序列化是**穷尽**的：时钟步数 + 全部命名随机流状态 + 实体 id 游标 + 全部实体
+ * （含 id + 位姿 + 旋转/角速度）+ **Rapier 世界快照字节** + **部件映射段**。
  * 命令队列与事件日志被刻意排除——它们是**每 tick 的瞬时输入/输出**（命令在
- * `step()` 顶部 drain 后为空，事件每 tick 清空），不影响未来走向，故不属于
- * "状态"。两个分岔的世界若仅命令/事件不同，其未来演进仍一致。
+ * `step()` 顶部 drain 后为空，事件每 tick 清空），不影响未来走向，故不属于"状态"。
  */
 
 /**
@@ -29,16 +36,22 @@ export const QUANT_GRID = 256;
  * 快照格式魔数（'EMS1'）与版本号，用于确定性反序列化与版本护栏。
  *
  * VERSION=2 起，规范字节在实体计数后新增 **id 游标**（`EntityStore.nextId`）字段——见 CR-01。
- * 版本护栏对任何非当前版本确定性抛错（无 v1 迁移路径：本阶段快照不出进程）。
+ * VERSION=3 起（D-34），每个实体记录再增 **rotation / angularVelocity**（量化 i32），
+ * 且实体段之后追加 **Rapier `takeSnapshot()` 字节**与 **部件映射段**（句柄为打包 f64）。
+ * 版本护栏对任何非当前版本确定性抛错（无迁移路径：本阶段快照不出进程）。
  */
 const MAGIC = 0x454d5331;
-const VERSION = 2;
+const VERSION = 3;
 /** 头部预留 2 字节（对齐/扩展）。 */
 const HEADER_SIZE = 8;
 /** 每个随机流的固定字节数：4 × uint32。 */
 const STREAM_STATE_BYTES = 16;
-/** 每个实体的固定字节数：7 × int32（id + hp + level + x + y + vx + vy）。 */
-const ENTITY_BYTES = 28;
+/** 每个实体的固定字节数：9 × int32（id + hp + level + x + y + vx + vy + rotation + angularVelocity）。 */
+const ENTITY_BYTES = 36;
+/** 每个部件映射条目的固定字节数：f64(handle) + i32(entityId) + u8(part) + u8(armorSubtype)。 */
+const PART_ENTRY_BYTES = 14;
+/** 防具子类型缺省的哨兵值（`u8` 无法表示 `null`）。 */
+const ARMOR_NONE = 255;
 /** 有符号 int32 上界（`DataView.setInt32` 溢出会静默按模 2³² 回绕）。 */
 const INT32_MAX = 2147483647;
 
@@ -73,9 +86,36 @@ function dequantize(q: number): number {
 }
 
 /**
+ * 实体段解码出的原始字段（量化整数，尚未反量化）。
+ *
+ * 物理句柄由**部件映射段**反推，故此处先只承载实体段的 9 个 `int32` 字段（D-34）。
+ */
+interface IDecodedEntity {
+    /** 实体 id。 */
+    id: number;
+    /** 生命值（量化）。 */
+    hp: number;
+    /** 等级（量化）。 */
+    level: number;
+    /** 位置 x（量化）。 */
+    x: number;
+    /** 位置 y（量化）。 */
+    y: number;
+    /** 线速度 vx（量化）。 */
+    vx: number;
+    /** 线速度 vy（量化）。 */
+    vy: number;
+    /** 朝向角（量化）。 */
+    rotation: number;
+    /** 角速度（量化）。 */
+    angularVelocity: number;
+}
+
+/**
  * 规范字节编码。字段顺序固定；实体按 `EntityStore.ids()` 的**有序数组**遍历；
- * 随机流按名字**字典序**排序以保证规范（与构造顺序无关）；浮点量化到 `QUANT_GRID` 栅格。
- * 字节序固定为小端。同一逻辑状态在任何调用点都编码为**完全相同**的字节。
+ * 随机流按名字**字典序**排序以保证规范（与构造顺序无关）；浮点量化到 `QUANT_GRID` 栅格；
+ * 部件映射按创建顺序（`partEntries()` 的 Map 插入序）写出。字节序固定为小端。
+ * 同一逻辑状态在任何调用点都编码为**完全相同**的字节。
  *
  * @param s 待序列化的聚合状态根。
  * @returns 规范、有序、量化的状态字节（小端）。
@@ -85,6 +125,8 @@ export function serializeState(s: ISimState): Uint8Array {
         a < b ? -1 : a > b ? 1 : 0
     );
     const ids = s.store.ids();
+    const rapierBytes = s.physics.takeSnapshot();
+    const parts = s.physics.partEntries();
 
     let size = HEADER_SIZE + 4 + 2; // header + tick(int32) + streamCount(uint16)
     for (const [name] of rngEntries) {
@@ -93,10 +135,16 @@ export function serializeState(s: ISimState): Uint8Array {
     size += 4; // entityCount(uint32)
     size += 4; // nextId cursor(uint32)
     size += ids.length * ENTITY_BYTES;
+    size += 4 + rapierBytes.length; // rapierLen(uint32) + bytes
+    size += 4 + parts.length * PART_ENTRY_BYTES; // partMapCount(uint32) + entries
 
     const bytes = new Uint8Array(size);
     const view = new DataView(bytes.buffer);
     let o = 0;
+    const u8 = (v: number): void => {
+        view.setUint8(o, v);
+        o += 1;
+    };
     const u16 = (v: number): void => {
         view.setUint16(o, v, true);
         o += 2;
@@ -108,6 +156,10 @@ export function serializeState(s: ISimState): Uint8Array {
     const i32 = (v: number): void => {
         view.setInt32(o, v, true);
         o += 4;
+    };
+    const f64 = (v: number): void => {
+        view.setFloat64(o, v, true);
+        o += 8;
     };
 
     u32(MAGIC);
@@ -136,6 +188,21 @@ export function serializeState(s: ISimState): Uint8Array {
         i32(quantize(c.xform.y));
         i32(quantize(c.xform.vx));
         i32(quantize(c.xform.vy));
+        i32(quantize(c.xform.rotation));
+        i32(quantize(c.xform.angularVelocity));
+    }
+    /* Rapier 世界快照字节（含内部竞技场顺序；句柄还原后不变，D-34） */
+    u32(rapierBytes.length);
+    for (let i = 0; i < rapierBytes.length; i++) {
+        bytes[o++] = rapierBytes[i];
+    }
+    /* 部件映射段：colliderHandle:f64 + entityId:i32 + part:u8 + armorSubtype:u8 */
+    u32(parts.length);
+    for (const entry of parts) {
+        f64(entry.handle);
+        i32(entry.ref.entityId);
+        u8(entry.ref.part);
+        u8(entry.ref.armorSubtype ?? ARMOR_NONE);
     }
     return bytes;
 }
@@ -143,12 +210,13 @@ export function serializeState(s: ISimState): Uint8Array {
 /**
  * 反序列化：`serializeState()` 的逆操作，重建一个**等价**的 `ISimState`。
  *
- * 恢复时钟步数、全部随机流状态（整数状态为**精确**恢复，非量化）与全部实体
- * （id + 组件，浮点为量化后的栅格值）。命令队列/事件日志为全新的空实例。
- * 自描述：随机流名字编码在字节内，故无需外部传入配置。
+ * 恢复时钟步数、全部随机流状态（整数状态为**精确**恢复，非量化）、全部实体
+ * （id + 组件，浮点为量化后的栅格值）与物理世界：`World.restoreSnapshot(bytes)` 还原
+ * Rapier 世界（句柄保持不变），据此重登记部件映射，并由部件映射反推各实体的物理句柄。
+ * 命令队列/事件日志为全新的空实例。
  *
- * `dt` 不属于序列化状态（它是构造期配置），默认取 `FIXED_DT`；`BattleSim.restore`
- * 会传入其自身的 `dt`。
+ * 自描述：随机流名字编码在字节内，故无需外部传入配置。`dt` 不属于序列化状态
+ * （它是构造期配置），默认取 `FIXED_DT`；`BattleSim.restore` 会传入其自身的 `dt`。
  *
  * @param bytes `serializeState()` 产出的规范字节。
  * @param dt 逻辑时钟的固定步长（不属于序列化状态；省略时取 `FIXED_DT`）。
@@ -160,6 +228,11 @@ export function deserializeState(
 ): ISimState {
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     let o = 0;
+    const readU8 = (): number => {
+        const v = view.getUint8(o);
+        o += 1;
+        return v;
+    };
     const readU16 = (): number => {
         const v = view.getUint16(o, true);
         o += 2;
@@ -173,6 +246,11 @@ export function deserializeState(
     const readI32 = (): number => {
         const v = view.getInt32(o, true);
         o += 4;
+        return v;
+    };
+    const readF64 = (): number => {
+        const v = view.getFloat64(o, true);
+        o += 8;
         return v;
     };
 
@@ -200,28 +278,74 @@ export function deserializeState(
 
     const entityCount = readU32();
     const nextId = readU32();
-    const entries: IEntitySnapshot[] = [];
+    const raw: IDecodedEntity[] = [];
     for (let i = 0; i < entityCount; i++) {
-        const id = readI32();
-        const hp = readI32();
-        const level = readI32();
-        const x = readI32();
-        const y = readI32();
-        const vx = readI32();
-        const vy = readI32();
-        entries.push({
-            id,
-            components: {
-                attrs: { hp: dequantize(hp), level: dequantize(level) },
-                xform: {
-                    x: dequantize(x),
-                    y: dequantize(y),
-                    vx: dequantize(vx),
-                    vy: dequantize(vy)
-                }
-            }
+        raw.push({
+            id: readI32(),
+            hp: readI32(),
+            level: readI32(),
+            x: readI32(),
+            y: readI32(),
+            vx: readI32(),
+            vy: readI32(),
+            rotation: readI32(),
+            angularVelocity: readI32()
         });
     }
+
+    /* Rapier 世界快照字节 → 还原世界（句柄保持不变，D-34） */
+    const rapierLen = readU32();
+    const rapierBytes = bytes.slice(o, o + rapierLen);
+    o += rapierLen;
+    const world = RAPIER.World.restoreSnapshot(rapierBytes);
+    const physics = new PhysicsWorld(dt, world);
+
+    /* 部件映射段 → 重登记到物理世界，并按实体聚合句柄 */
+    const partCount = readU32();
+    const bodyByEntity = new Map<number, number>();
+    const weaponsByEntity = new Map<number, number[]>();
+    for (let i = 0; i < partCount; i++) {
+        const handle = readF64();
+        const entityId = readI32();
+        const part = readU8() as PartKind;
+        const armorRaw = readU8();
+        const ref: IUnitPartRef = {
+            entityId,
+            part,
+            armorSubtype:
+                armorRaw === ARMOR_NONE ? null : (armorRaw as ArmorSubtype)
+        };
+        physics.registerPart(handle, ref);
+        const parent = world.getCollider(handle).parent();
+        if (!parent) continue;
+        if (part === PartKind.Body) {
+            bodyByEntity.set(entityId, parent.handle);
+        } else if (part === PartKind.Weapon) {
+            const list = weaponsByEntity.get(entityId);
+            if (list) list.push(parent.handle);
+            else weaponsByEntity.set(entityId, [parent.handle]);
+        }
+    }
+
+    const entries: IEntitySnapshot[] = raw.map(e => ({
+        id: e.id,
+        components: {
+            attrs: { hp: dequantize(e.hp), level: dequantize(e.level) },
+            xform: {
+                x: dequantize(e.x),
+                y: dequantize(e.y),
+                vx: dequantize(e.vx),
+                vy: dequantize(e.vy),
+                rotation: dequantize(e.rotation),
+                angularVelocity: dequantize(e.angularVelocity)
+            },
+            physics: {
+                entityId: e.id,
+                bodyHandle: bodyByEntity.get(e.id) ?? 0,
+                weaponHandles: weaponsByEntity.get(e.id) ?? []
+            }
+        }
+    }));
 
     const store = new EntityStore();
     store.restore(entries, nextId);
@@ -235,7 +359,8 @@ export function deserializeState(
         clock,
         rng,
         commands: new CommandQueue(),
-        events: new EventLog()
+        events: new EventLog(),
+        physics
     };
 }
 

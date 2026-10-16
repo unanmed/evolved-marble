@@ -9,6 +9,8 @@
  * 杀怪/重生会静默改序从而破坏确定性（Pitfall 4）。
  */
 
+import type { IUnitPhysics } from './composite';
+
 /** 实体标识（稳定、单调递增的整数）。 */
 export type EntityId = number;
 
@@ -30,14 +32,20 @@ export interface IUnitXform {
     vx: number;
     /** 线速度 vy。 */
     vy: number;
+    /** 朝向角（弧度，D-34：Rapier 为真源，此处为只读镜像）。 */
+    rotation: number;
+    /** 角速度（rad/s，D-34：Rapier 为真源，此处为只读镜像）。 */
+    angularVelocity: number;
 }
 
-/** 单位组件（Phase 1 仅含基础属性与位姿；后续阶段扩展 ai/equip/faction）。 */
+/** 单位组件（Phase 1 含基础属性与位姿；Phase 2 增物理句柄组件）。 */
 export interface IUnitComponents {
     /** 属性组件。 */
     attrs: IUnitAttrs;
     /** 位姿组件。 */
     xform: IUnitXform;
+    /** 物理句柄组件（Rapier 为真源；此处仅为句柄镜像，D-34）。 */
+    physics: IUnitPhysics;
 }
 
 /** 单实体的快照条目（`restore()` 的输入，见 `src/sim/snapshot.ts`）。 */
@@ -98,7 +106,16 @@ export class EntityStore implements IEntityStore {
         this.orderedIds.push(id);
         this.byId.set(id, {
             attrs: { hp: 100, level: 1 },
-            xform: { x: 0, y: 0, vx: 0, vy: 0 }
+            xform: {
+                x: 0,
+                y: 0,
+                vx: 0,
+                vy: 0,
+                rotation: 0,
+                angularVelocity: 0
+            },
+            /* 占位句柄：`BattleSim.spawn()` 随即用复合工厂返回的真实句柄覆盖。 */
+            physics: { entityId: id, bodyHandle: 0, weaponHandles: [] }
         });
         return id;
     }
@@ -150,10 +167,17 @@ export class EntityStore implements IEntityStore {
         let maxId = 0;
         for (const entry of entries) {
             const { hp, level } = entry.components.attrs;
-            const { x, y, vx, vy } = entry.components.xform;
+            const { x, y, vx, vy, rotation, angularVelocity } =
+                entry.components.xform;
+            const physics = entry.components.physics;
             this.byId.set(entry.id, {
                 attrs: { hp, level },
-                xform: { x, y, vx, vy }
+                xform: { x, y, vx, vy, rotation, angularVelocity },
+                physics: {
+                    entityId: physics.entityId,
+                    bodyHandle: physics.bodyHandle,
+                    weaponHandles: [...physics.weaponHandles]
+                }
             });
             this.orderedIds.push(entry.id);
             if (entry.id > maxId) maxId = entry.id;
