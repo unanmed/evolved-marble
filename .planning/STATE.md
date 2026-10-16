@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: Physics & Composite Units
-status: executing
-stopped_at: Completed 02-04-PLAN.md
-last_updated: "2026-10-16T08:06:48.277Z"
+status: verifying
+stopped_at: Completed 02-05-PLAN.md
+last_updated: "2026-10-16T08:32:59.919Z"
 last_activity: 2026-10-16
 last_activity_desc: Phase 2 execution started
-state_head: 018fcd6955a5874e7a495fe4565ede0e5592a598
+state_head: 52a350f1f1e863256df7a1825efbc6c92a0f2c55
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 17
-  completed_plans: 16
+  completed_plans: 17
   percent: 0
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-15)
 
 Phase: 2 (Physics & Composite Units) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-16 — Phase 2 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -74,6 +74,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02 P02 | 12 min | 1 tasks | 6 files |
 | Phase 02 P03 | 17 min | 1 tasks | 8 files |
 | Phase 02 P04 | 10 min | 1 tasks | 7 files |
+| Phase 02 P05 | 14 min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -131,6 +132,9 @@ Recent decisions affecting current work:
 - [Phase 2]: 02-04: final swing drive = direct angular drive (theta'=A*omega*cos(tick*omega*dt)); a bounded joint-motor sweep produced a constant angular velocity, never a reciprocating oscillation (D-36 reversible simplification).
 - [Phase 2]: 02-04: same-unit non-collision is enforced solely by unit-level InteractionGroups (joint.setContactsEnabled(false) removed); membership = GROUP_UNIT_MEMBERSHIP << ((entityId-1) % GROUP_COUNT=16), filter excludes own bit, encoded (membership<<16)|filter.
 - [Phase 2]: 02-04: added IPhysicsWorld.unregisterPart + a required UnregisterCollider factory callback so despawn clears the part map (T-02-01); despawn removes weapon bodies then the body, unregistering colliders first, unknown id is a no-op.
+- [Phase 2]: 02-05: Task 1 needed no production change - the tracer (02-02) already shipped pre-step dv + part tagging + null guard + enter-only, and 02-03 wired bridge.drain into step(); contact + snapshot verification tests passed green-first (D-36 restraint, contact.ts/battle-sim.ts left unchanged).
+- [Phase 2]: 02-05: dv tolerance for the head-on-8 assertion is 0.2 m/s; the real-BattleSim weapon-vs-armor enter yields dv~0.593 for a 0.6 m/s approach, drained in the same tick (phase-goal key link).
+- [Phase 2]: 02-05: BattleSim.step() does not wire driveSwing - real-sim weapons do not yet swing (only tests/helpers/run-physics drives it); flagged out-of-scope for Phase 4 unit-AI / a follow-up.
 
 ### Pending Todos
 
@@ -152,6 +156,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-16T08:06:48.193Z
-Stopped at: Completed 02-04-PLAN.md
+Last session: 2026-10-16T08:32:29.899Z
+Stopped at: Completed 02-05-PLAN.md
 Resume file: None

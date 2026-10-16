@@ -94,7 +94,7 @@ Plans:
   3. Physics is built on the Rapier2D deterministic build with a fixed step, and the determinism fingerprint stays green after physics is introduced.
   4. The physics fingerprint is stable across two machines (cross-machine golden-hash spike), and fast weapons do not tunnel through targets (CCD configured).
 
-**Plans**: 4/5 plans executed
+**Plans**: 5/5 plans executed
 
 Plans:
 **Wave 1**
@@ -112,7 +112,7 @@ Plans:
 
 **Wave 4** *(blocked on Waves 2–3)*
 
-- [ ] 02-05-PLAN.md — Contact semantics hardening (pre-step Δv, null guard) + snapshot v3 census and round-trip (PHYS-02, PHYS-03)
+- [x] 02-05-PLAN.md — Contact semantics hardening (pre-step Δv, null guard) + snapshot v3 census and round-trip (PHYS-02, PHYS-03)
 
 ### Phase 3: Combat Mechanics, Data & Progression
 
@@ -205,7 +205,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation & Deterministic Sim Core | 12/12 | Complete    | 2026-10-15 |
-| 2. Physics & Composite Units | 4/5 | In Progress|  |
+| 2. Physics & Composite Units | 5/5 | In Progress|  |
 | 3. Combat Mechanics, Data & Progression | 0/3 | Not started | - |
 | 4. Unit AI & Autonomous Battle | 0/3 | Not started | - |
 | 5. Watchable Rendering, HUD & Action-Follow Camera | 0/2 | Not started | - |
