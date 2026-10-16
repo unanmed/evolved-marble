@@ -94,7 +94,7 @@ Plans:
   3. Physics is built on the Rapier2D deterministic build with a fixed step, and the determinism fingerprint stays green after physics is introduced.
   4. The physics fingerprint is stable across two machines (cross-machine golden-hash spike), and fast weapons do not tunnel through targets (CCD configured).
 
-**Plans**: 5/5 plans executed
+**Plans**: 6 plans (5 executed; 02-06 gap closure pending)
 
 Plans:
 **Wave 1**
@@ -113,6 +113,10 @@ Plans:
 **Wave 4** *(blocked on Waves 2–3)*
 
 - [x] 02-05-PLAN.md — Contact semantics hardening (pre-step Δv, null guard) + snapshot v3 census and round-trip (PHYS-02, PHYS-03)
+
+**Wave 5** *(gap closure — D-27 unit-level collision groups fail beyond 16 units; CR-01)*
+
+- [ ] 02-06-PLAN.md — Live-pool membership allocator (widened masks, release on despawn, fail loud) + `>16`-concurrent-unit collision regression + restore re-seed (PHYS-01)
 
 ### Phase 3: Combat Mechanics, Data & Progression
 
