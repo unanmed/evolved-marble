@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: Physics & Composite Units
 status: executing
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-10-16T07:41:57.630Z"
+stopped_at: Completed 02-04-PLAN.md
+last_updated: "2026-10-16T08:06:48.277Z"
 last_activity: 2026-10-16
 last_activity_desc: Phase 2 execution started
-state_head: 1ae001436c6c7ed55e415da6c5140e917d2cd2f1
+state_head: 018fcd6955a5874e7a495fe4565ede0e5592a598
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 17
-  completed_plans: 15
+  completed_plans: 16
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-15)
 ## Current Position
 
 Phase: 2 (Physics & Composite Units) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-10-16 — Phase 2 execution started
 
@@ -73,6 +73,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02 P01 | 5 | 3 tasks | 8 files |
 | Phase 02 P02 | 12 min | 1 tasks | 6 files |
 | Phase 02 P03 | 17 min | 1 tasks | 8 files |
+| Phase 02 P04 | 10 min | 1 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -127,6 +128,9 @@ Recent decisions affecting current work:
 - [Phase 02]: 02-03: the colliderHandle->IUnitPartRef map lives on IPhysicsWorld (not ContactBridge) so ISimState.physics can serialize/restore it; ContactBridge delegates.
 - [Phase 02]: 02-03: spawn() derives its composite spec from a ring (position by ordered id) + seeded ai-stream velocity, preserving the Phase-1 different-seed trace assertions after movementSystem is removed.
 - [Phase 02]: 02-03: canonical snapshot VERSION 2->3 (per-entity rotation/angularVelocity + Rapier takeSnapshot bytes + part map); Round-trip holds with physics present.
+- [Phase 2]: 02-04: final swing drive = direct angular drive (theta'=A*omega*cos(tick*omega*dt)); a bounded joint-motor sweep produced a constant angular velocity, never a reciprocating oscillation (D-36 reversible simplification).
+- [Phase 2]: 02-04: same-unit non-collision is enforced solely by unit-level InteractionGroups (joint.setContactsEnabled(false) removed); membership = GROUP_UNIT_MEMBERSHIP << ((entityId-1) % GROUP_COUNT=16), filter excludes own bit, encoded (membership<<16)|filter.
+- [Phase 2]: 02-04: added IPhysicsWorld.unregisterPart + a required UnregisterCollider factory callback so despawn clears the part map (T-02-01); despawn removes weapon bodies then the body, unregistering colliders first, unknown id is a no-op.
 
 ### Pending Todos
 
@@ -148,6 +152,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-16T07:41:57.536Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-10-16T08:06:48.193Z
+Stopped at: Completed 02-04-PLAN.md
 Resume file: None
