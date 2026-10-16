@@ -116,6 +116,20 @@ describe('mutator census — every tracked mutator moves the fingerprint', () =>
             }
         },
         {
+            /* D-34：rotation 属未来影响状态，必须序列化（1/256 栅格之上一格即变指纹）。 */
+            name: 'xform.rotation',
+            mutate: sim => {
+                sim.state.store.get(1).xform.rotation += grid;
+            }
+        },
+        {
+            /* D-34：angularVelocity 属未来影响状态，必须序列化。 */
+            name: 'xform.angularVelocity',
+            mutate: sim => {
+                sim.state.store.get(1).xform.angularVelocity += grid;
+            }
+        },
+        {
             name: 'attrs.hp',
             mutate: sim => {
                 sim.state.store.get(1).attrs.hp += 1;
@@ -262,5 +276,63 @@ describe('snapshot as a deterministic restart point', () => {
                 expect(Math.abs(a.vy - b.vy)).toBeLessThanOrEqual(tol);
             }
         }
+    });
+});
+
+describe('composite-unit snapshot v3 completeness (PHYS-03 / D-34)', () => {
+    it('a ≥2-composite-unit round-trip is fingerprint-identical and restores the part map exactly', () => {
+        const sim = new BattleSim(DEFAULT_SEED);
+        sim.spawn();
+        sim.spawn();
+        sim.step(); // 填充位姿镜像（spawn() 本身不写 xform）
+        const startX = sim.state.store
+            .ids()
+            .map(id => sim.state.store.get(id).xform.x);
+        for (let i = 0; i < 40; i++) sim.step();
+
+        /* 反空门禁：单位确实移动超过一个量化栅格。 */
+        const moved = sim.state.store
+            .ids()
+            .some(
+                (id, i) =>
+                    Math.abs(sim.state.store.get(id).xform.x - startX[i]) >
+                    1 / QUANT_GRID
+            );
+        expect(moved).toBe(true);
+
+        const bytes = new Uint8Array(sim.snapshot());
+        const beforeParts = sim.state.physics.partEntries();
+        /* 两个复合单位各有 本体 + 防具 + 武器 三个已登记碰撞体。 */
+        expect(beforeParts.length).toBeGreaterThanOrEqual(6);
+
+        const restored = new BattleSim(DEFAULT_SEED);
+        restored.restore(bytes);
+
+        /* 指纹恒等（物理快照字节 + 部件段均参与）。 */
+        expect(restored.fingerprint()).toBe(sim.fingerprint());
+
+        /* 部件映射随快照还原：每个原句柄仍解析到同一 (entityId, part, armorSubtype)（句柄为 f64）。 */
+        for (const entry of beforeParts) {
+            expect(restored.state.physics.lookupPart(entry.handle)).toEqual(
+                entry.ref
+            );
+        }
+    });
+
+    it('two restores of the same composite snapshot re-step identically (physics path)', () => {
+        const bytes = new Uint8Array(
+            steppedSim(DEFAULT_SEED, 2, 20).snapshot()
+        );
+        const trace = (): string[] => {
+            const sim = new BattleSim(DEFAULT_SEED);
+            sim.restore(bytes);
+            const out: string[] = [];
+            for (let i = 0; i < 20; i++) {
+                sim.step();
+                out.push(sim.fingerprint());
+            }
+            return out;
+        };
+        expect(trace()).toEqual(trace());
     });
 });
