@@ -90,7 +90,54 @@ export interface ILevelupEvent {
     level: number;
 }
 
-/** 一次物理接触（Phase 2 预留）。 */
+/**
+ * 命中部位（数字枚举，D-28）。
+ *
+ * 与规格"武器/防具/本体"三分类一一对应；数字成员值便于 `switch` 收窄，
+ * 并避免以字符串字面量联合冒充枚举（项目锁定规则 #3）。
+ */
+export enum PartKind {
+    /** 本体（球）。 */
+    Body = 0,
+    /** 武器（独立刚体，铰接于本体）。 */
+    Weapon = 1,
+    /** 防具（跟随本体的独立碰撞体）。 */
+    Armor = 2
+}
+
+/**
+ * 防具子类型（数字枚举，D-28）。
+ *
+ * 规格的破甲矩阵**按防具类型**给（不同武器对头盔/盾牌破甲比率不同），故 `Armor`
+ * 部位必须带此子类型，否则 Phase 3 无法兑现软克制。数字成员值（项目锁定规则 #3）。
+ */
+export enum ArmorSubtype {
+    /** 头盔。 */
+    Helmet = 0,
+    /** 盾牌。 */
+    Shield = 1
+}
+
+/**
+ * 带部位标记的碰撞体引用（D-28，项目锁定规则 #5：具名 interface，非内联类型）。
+ *
+ * 由 `colliderHandle → IUnitPartRef` 映射产出，供接触事件与 Phase 3 伤害管线消费。
+ */
+export interface IUnitPartRef {
+    /** 所属单位 id。 */
+    entityId: EntityId;
+    /** 命中部位。 */
+    part: PartKind;
+    /** 防具子类型；仅当 `part === PartKind.Armor` 时非 `null`。 */
+    armorSubtype: ArmorSubtype | null;
+}
+
+/**
+ * 一次物理接触（PHYS-02 / D-28..D-30）。
+ *
+ * 由 `ContactBridge` 从 Rapier collision-enter 事件翻译而来；两侧均带部位标记，
+ * `dv` 为碰撞法向相对速度大小（非负标量，来自**步前**速度，见研究 Pitfall 1）。
+ */
 export interface IContactEvent {
     /** 判别字段。 */
     kind: SimEventKind.Contact;
@@ -100,6 +147,16 @@ export interface IContactEvent {
     a: EntityId;
     /** 接触方 b 单位 id。 */
     b: EntityId;
+    /** a 侧命中部位。 */
+    partA: PartKind;
+    /** b 侧命中部位。 */
+    partB: PartKind;
+    /** a 侧防具子类型（非防具为 `null`）。 */
+    armorA: ArmorSubtype | null;
+    /** b 侧防具子类型（非防具为 `null`）。 */
+    armorB: ArmorSubtype | null;
+    /** 碰撞法向相对速度大小（非负，D-30；来自**步前**速度，Pitfall 1）。 */
+    dv: number;
 }
 
 /** 每 tick 事件的判别联合（D-16：每个成员为**具名 interface**）。 */
