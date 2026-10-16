@@ -20,11 +20,11 @@
 
 - ✓ 游戏设计规格（机制与数值）—— 已由用户在飞书中确立，缓存于 `.planning/reference/ai-marble-kingdom.md`
 - ✓ 美术资产 `public/battle.webp` —— 可直接复用
+- ✓ 用 **Rapier2D** 重建单位物理，支持复合刚体（本体/武器/防具为独立碰撞体并按部位打标），接触转为带部位标记的类型化事件 —— Phase 2
 
 ### Active
 
 - [ ] 用 **PixiJS** 重建可观看的 2D 顶视渲染层
-- [ ] 用 **Rapier2D** 重建单位物理，支持复合刚体（单位本体 + 武器 + 防具）
 - [ ] 支持单场战斗内十几单位混战（每方 10+ 单位），维持可交互帧率
 - [ ] 实现文档中的战斗机制：7 个职业、6 种武器、2 种防具、等级/经验、伤害与减伤公式（以参考文档为准）
 - [ ] 单位由**规则/行为树 AI** 驱动，行为多样、能自主打起来
@@ -58,9 +58,10 @@
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
+| 物理换 Rapier2D | 十几单位混战需要性能 + 跨平台确定性 + 活跃维护 | ✓ Phase 2 — 采用 `@dimforge/rapier2d-deterministic-compat@0.21.0`（确定性构建，精确钉版） |
+| 确定性档位 = 同机可复现 | 不买单跨机成本；架构保留收紧空间（Phase 1 D-02 / Phase 2 D-17） | ✓ Phase 2 — 双指纹门禁（sim 指纹 + Rapier 快照哈希）同机双跑一致 |
 | 全部重写源码 | 现有架构难以继续演进（重复渲染、硬编码场景、stub 层、无测试） | — Pending |
 | 渲染换 PixiJS | 更主流、生态与文档更好，替换自研的 `@motajs/client` | — Pending |
-| 物理换 Rapier2D | 十几单位混战需要性能 + 跨平台确定性 + 活跃维护 | — Pending |
 | 浏览器跑模拟 | 沿用已验证的"浏览器做模拟宿主、Python 驱动训练"模式 | — Pending |
 | 首期只做战斗层 | 战斗是好片与 RL 研究的地基；王国/LLM 层依赖它 | — Pending |
 | 单位 AI 先用规则/行为树 | 先跑通战斗、渲染、录制闭环，RL 后续接入 | — Pending |
@@ -84,4 +85,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-15 after initialization*
+*Last updated: 2026-10-16 after Phase 2*
