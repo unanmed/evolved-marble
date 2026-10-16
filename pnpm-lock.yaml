@@ -165,6 +165,10 @@ settings:
 importers:
 
   .:
+    dependencies:
+      '@dimforge/rapier2d-deterministic-compat':
+        specifier: 0.21.0
+        version: 0.21.0
     devDependencies:
       '@eslint/js':
         specifier: ^10.0.1
@@ -207,6 +211,9 @@ packages:
 
   '@cacheable/utils@2.5.0':
     resolution: {integrity: sha512-buipgOVDkkPXNR5+xBpDw7Zk2n1EvU7qBJCNUcL7rhQ//kfpOXPAvQ511Os0vpLYJ1pZnvudNytkQt2hst3wqA==}
+
+  '@dimforge/rapier2d-deterministic-compat@0.21.0':
+    resolution: {integrity: sha512-qVwHqqpRX73ktQRqiAa/0JdBfWdzsGHg8r8d+snaZB0WRXaTs3m7GU6jN+Qf3gEjMEUqk3Rc9q87yGXHkktTbA==}
 
   '@dual-bundle/import-meta-resolve@4.2.1':
     resolution: {integrity: sha512-id+7YRUgoUX6CgV0DtuhirQWodeeA7Lf4i2x71JS/vtA5pRb/hIGWlw+G6MeXvsM+MXrz0VAydTGElX1rAfgPg==}
@@ -1195,6 +1202,8 @@ snapshots:
     dependencies:
       hashery: 1.5.1
       keyv: 5.6.0
+
+  '@dimforge/rapier2d-deterministic-compat@0.21.0': {}
 
   '@dual-bundle/import-meta-resolve@4.2.1': {}
 
