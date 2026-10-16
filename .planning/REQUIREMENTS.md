@@ -17,9 +17,9 @@ Requirements for the first milestone (watchable autonomous 10+ v 10+ physics bat
 
 ### PHYS — 物理与复合单位
 
-- [x] **PHYS-01**: 单位为复合刚体：本体/武器/防具是独立碰撞体并按部位打标
-- [x] **PHYS-02**: 物理接触事件被转成带类型的模拟事件（记录命中部位）
-- [x] **PHYS-03**: 使用 Rapier2D 确定性构建（`@dimforge/rapier2d-deterministic`）
+- [ ] **PHYS-01**: 单位为复合刚体：本体/武器/防具是独立碰撞体并按部位打标
+- [ ] **PHYS-02**: 物理接触事件被转成带类型的模拟事件（记录命中部位）
+- [ ] **PHYS-03**: 使用 Rapier2D 确定性构建（`@dimforge/rapier2d-deterministic`）
 
 ### DATA — 单位数据模型
 
@@ -114,9 +114,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SIM-02 | Phase 1 | Complete |
 | SIM-03 | Phase 1 | Complete |
 | SIM-04 | Phase 1 | Complete |
-| PHYS-01 | Phase 2 | Complete |
-| PHYS-02 | Phase 2 | Complete |
-| PHYS-03 | Phase 2 | Complete |
+| PHYS-01 | Phase 2 | Gaps Found |
+| PHYS-02 | Phase 2 | Gaps Found |
+| PHYS-03 | Phase 2 | Gaps Found |
 | DATA-01 | Phase 3 | Pending |
 | DATA-02 | Phase 3 | Pending |
 | DATA-03 | Phase 3 | Pending |
