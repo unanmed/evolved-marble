@@ -249,6 +249,24 @@ describe('BattleSim physics wiring (PHYS-01 / PHYS-03)', () => {
         expect(Math.max(dx, dy)).toBeGreaterThan(1 / 256);
     });
 
+    it('D-33 safety belt pulls a unit back inside the safe area only when out of bounds', () => {
+        const sim = new BattleSim(DEFAULT_SEED);
+        const id = sim.spawn();
+        const body = sim.state.physics.world.getRigidBody(
+            sim.state.store.get(id).physics.bodyHandle
+        );
+        // 直接把它推到安全区外（越过 1000×1000 边界），并给外向速度
+        body.setTranslation({ x: 5000, y: 5000 }, true);
+        body.setLinvel({ x: 100, y: 100 }, true);
+        sim.step();
+        const x = sim.state.store.get(id).xform;
+        // 位置被拉回边界，且外向速度分量不再指向界外
+        expect(x.x).toBe(1000);
+        expect(x.y).toBe(1000);
+        expect(x.vx).toBeLessThanOrEqual(0);
+        expect(x.vy).toBeLessThanOrEqual(0);
+    });
+
     it('same seed + same command log → identical per-tick fingerprint trace after physics', () => {
         /**
          * 物理接入后重跑固定命令流，收集逐 tick 指纹。
