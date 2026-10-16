@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: Physics & Composite Units
 status: executing
-stopped_at: Completed 02-05-PLAN.md
-last_updated: "2026-10-16T09:46:15.317Z"
+stopped_at: Completed 02-06-PLAN.md
+last_updated: "2026-10-16T10:10:38.711Z"
 last_activity: 2026-10-16
 last_activity_desc: Phase 2 execution started
-state_head: d60f1ee1e061f6d3007d97835228613568f0e88c
+state_head: 17001a6c403f35638400294a521019fdd5b5bb2c
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 18
-  completed_plans: 17
+  completed_plans: 18
   percent: 0
 ---
 
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-10-15)
 
 ## Current Position
 
-Phase: 2 (Physics & Composite Units) — READY TO EXECUTE
-Plan: 5 of 5
+Phase: 2 (Physics & Composite Units) — EXECUTING
+Plan: 2 of 6
 Status: Ready to execute
 Last activity: 2026-10-16 — Phase 2 execution started
 
@@ -75,6 +75,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02 P03 | 17 min | 1 tasks | 8 files |
 | Phase 02 P04 | 10 min | 1 tasks | 7 files |
 | Phase 02 P05 | 14 min | 2 tasks | 2 files |
+| Phase 02 P06 | 12 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -135,6 +136,9 @@ Recent decisions affecting current work:
 - [Phase 2]: 02-05: Task 1 needed no production change - the tracer (02-02) already shipped pre-step dv + part tagging + null guard + enter-only, and 02-03 wired bridge.drain into step(); contact + snapshot verification tests passed green-first (D-36 restraint, contact.ts/battle-sim.ts left unchanged).
 - [Phase 2]: 02-05: dv tolerance for the head-on-8 assertion is 0.2 m/s; the real-BattleSim weapon-vs-armor enter yields dv~0.593 for a 0.6 m/s approach, drained in the same tick (phase-goal key link).
 - [Phase 2]: 02-05: BattleSim.step() does not wire driveSwing - real-sim weapons do not yet swing (only tests/helpers/run-physics drives it); flagged out-of-scope for Phase 4 unit-AI / a follow-up.
+- [Phase 2]: 02-06: D-27 inserted by a deterministic live-unit pool of distinct 2-bit masks (capacity C(16,2)=120) replacing the (entityId-1)%16 alias; masks released on despawn and exhaustion fails loud naming GROUP_UNIT_CAPACITY (closes CR-01).
+- [Phase 2]: 02-06: BattleSim.restore re-seeds the factory units index AND membership pool from a store.ids()-derived map read back from restored collider groups (WR-03 folded); additive public BattleSim.despawn(entityId) is the reachable lifecycle entry that makes the re-seed testable at the BattleSim level.
+- [Phase 2]: 02-06: module-level capacity/pool consistency assertion in composite.ts throws at import when the enumerated membership-pool length differs from GROUP_UNIT_CAPACITY, so a GROUP_MEMBERSHIP_BITS_PER_UNIT edit cannot silently desync the guard or the >16 regression cardinality.
 
 ### Pending Todos
 
@@ -156,6 +160,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-16T08:32:29.899Z
-Stopped at: Completed 02-05-PLAN.md
+Last session: 2026-10-16T10:10:24.216Z
+Stopped at: Completed 02-06-PLAN.md
 Resume file: None
