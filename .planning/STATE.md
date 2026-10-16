@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: Physics & Composite Units
 status: executing
-stopped_at: Completed 02-02-PLAN.md
-last_updated: "2026-10-16T07:10:16.691Z"
+stopped_at: Completed 02-03-PLAN.md
+last_updated: "2026-10-16T07:41:57.630Z"
 last_activity: 2026-10-16
 last_activity_desc: Phase 2 execution started
-state_head: 582b242a3563b18d902d07ab71a947d50f47e843
+state_head: 1ae001436c6c7ed55e415da6c5140e917d2cd2f1
 progress:
   total_phases: 6
   completed_phases: 0
   total_plans: 17
-  completed_plans: 14
+  completed_plans: 15
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-15)
 ## Current Position
 
 Phase: 2 (Physics & Composite Units) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
 Last activity: 2026-10-16 — Phase 2 execution started
 
@@ -72,6 +72,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 1 P12 | 5 | 2 tasks | 3 files |
 | Phase 02 P01 | 5 | 3 tasks | 8 files |
 | Phase 02 P02 | 12 min | 1 tasks | 6 files |
+| Phase 02 P03 | 17 min | 1 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -122,6 +123,10 @@ Recent decisions affecting current work:
 - [Phase 2]: 02-02 tracer: weapon swing driven by direct angular velocity (setAngvel from a tick-derived phase), not a joint motor (D-25/D-36); still gives the weapon independent velocity for Δv.
 - [Phase 2]: 02-02 tracer: same-unit parts are non-colliding via joint.setContactsEnabled(false) (implements D-27 with one line); the general collision-group scheme stays deferred to plan 02-04.
 - [Phase 2]: 02-02 tracer: ContactBridge.lookup returns null (never throws) for unregistered handles and drain returns early on null (T-02-01); PhysicsWorld.step captures PRE-STEP velocities as the Δv source (post-step reads 0).
+- [Phase 02]: 02-03: Rapier is now the sim's source of truth inside BattleSim.step (applyCommands via impulses -> physics.step -> contact drain -> pose mirror -> safety belt); EntityStore is a read-only mirror.
+- [Phase 02]: 02-03: the colliderHandle->IUnitPartRef map lives on IPhysicsWorld (not ContactBridge) so ISimState.physics can serialize/restore it; ContactBridge delegates.
+- [Phase 02]: 02-03: spawn() derives its composite spec from a ring (position by ordered id) + seeded ai-stream velocity, preserving the Phase-1 different-seed trace assertions after movementSystem is removed.
+- [Phase 02]: 02-03: canonical snapshot VERSION 2->3 (per-entity rotation/angularVelocity + Rapier takeSnapshot bytes + part map); Round-trip holds with physics present.
 
 ### Pending Todos
 
@@ -143,6 +148,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-16T07:10:16.594Z
-Stopped at: Completed 02-02-PLAN.md
+Last session: 2026-10-16T07:41:57.536Z
+Stopped at: Completed 02-03-PLAN.md
 Resume file: None
