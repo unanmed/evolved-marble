@@ -10,7 +10,7 @@
 
 ## Summary
 
-Phase 1 delivered a headless, fixed-step, seeded sim core with a same-machine double-run fingerprint gate (`src/sim/**`, `tests/deterministic/gate.test.ts`). Phase 2 bolts Rapier2D onto that core without breaking determinism: units become compound rigid bodies (body+armor on one body, weapon as a separate revolute-jointed body), contacts are drained into the existing typed `EventLog` as part-tagged events carrying a collision-normal Δv, and the fingerprint/snapshot contract is extended to include Rapier's own state.
+Phase 1 delivered a headless, fixed-step, seeded sim core with a same-machine double-run fingerprint gate (`src/sim/**`, `tests/determinism/gate.test.ts`). Phase 2 bolts Rapier2D onto that core without breaking determinism: units become compound rigid bodies (body+armor on one body, weapon as a separate revolute-jointed body), contacts are drained into the existing typed `EventLog` as part-tagged events carrying a collision-normal Δv, and the fingerprint/snapshot contract is extended to include Rapier's own state.
 
 The single highest-risk item (D-23) is now resolved empirically: **the two published deterministic packages ship a byte-identical WASM module (SHA-256 `0570D5C8…1155D`, both 2,436,321 bytes)**, so they are the *same physics build* under two packagings. The non-compat build statically imports a `.wasm` file, exposes **no `init()`**, and **cannot be resolved by plain Node** (verified: `Error: Cannot find package .../rapier2d-deterministic/index.js`). The `-compat` build inlines the WASM as base64, exposes `init(): Promise<void>`, and was verified to initialise, step, snapshot, and reproduce bit-identically under **plain Node, Vitest 5.0.4, and a DOM-free `tsc` typecheck**. This makes `-compat` the pragmatic choice for the project's Node-only determinism gate (D-22) with the least machinery (D-36).
 
@@ -31,7 +31,7 @@ Two API assumptions inherited from the prior research docs are **wrong for 0.21.
 | Pose mirroring Rapier → `EntityStore` | sim core | — | D-34: Rapier is the source of truth; store is a read-only mirror for AI/render/snapshot. |
 | Command → Rapier impulse mapping | sim core (`applyCommands`) | — | Force/Torque commands must become `applyImpulse`/`applyTorqueImpulse`, not direct `xform` mutation. |
 | Canonical snapshot + fingerprint (v3) | sim core (`snapshot.ts`) | — | Same primitive as Phase 1; extended, not replaced. |
-| Determinism gate execution | host/test tier (`tests/deterministic`, pre-commit) | — | The gate is Node-only (D-22); wiring is in `tests/`, not `sim/`. |
+| Determinism gate execution | host/test tier (`tests/determinism`, pre-commit) | — | The gate is Node-only (D-22); wiring is in `tests/`, not `sim/`. |
 | Browser rendering of physics state | Phase 5 (`render/`) | — | **Out of scope here** — renderer is a read-only projection of the mirrored store. |
 
 ---
@@ -423,7 +423,7 @@ partMapCount:u32
 
 ### Determinism gate (Node, Vitest) — extends the existing Phase-1 gate
 ```typescript
-// tests/deterministic/physics-gate.test.ts   (lives in tests/deterministic so the pre-commit hook picks it up)
+// tests/determinism/physics-gate.test.ts   (lives in tests/determinism so the pre-commit hook picks it up)
 import { beforeAll, describe, expect, it } from 'vitest';
 import { initPhysics } from '@/sim/world/physics-init';   // or wherever the wrapper lands
 
@@ -447,7 +447,7 @@ describe('physics determinism (PHYS-01/02/03)', () => {
     });
 });
 ```
-The pre-commit hook already runs `pnpm vitest run tests/determinism` (verified in `.githooks/pre-commit`), so placing the physics gate under `tests/deterministic/` wires it in with no hook edit. The convention gate (`tests/style/conventions.test.ts`) has `SCAN_ROOTS = ['src', 'tests']` (verified) — every new `.ts` file must carry full Chinese JSDoc + `I`-prefixed interfaces or the gate fails.
+The pre-commit hook already runs `pnpm vitest run tests/determinism` (verified in `.githooks/pre-commit`), so placing the physics gate under `tests/determinism/` wires it in with no hook edit. The convention gate (`tests/style/conventions.test.ts`) has `SCAN_ROOTS = ['src', 'tests']` (verified) — every new `.ts` file must carry full Chinese JSDoc + `I`-prefixed interfaces or the gate fails.
 
 ### Physics init idempotency (verified)
 ```typescript
@@ -531,7 +531,7 @@ await RAPIER.init();   // safe — verified no error
 |----------|-------|
 | Framework | Vitest 5.0.4 (Node environment) |
 | Config file | `vitest.config.ts` (`environment: 'node'`, `include: ['tests/**/*.test.ts']`) |
-| Quick run command | `pnpm vitest run tests/deterministic --reporter=dot` |
+| Quick run command | `pnpm vitest run tests/determinism --reporter=dot` |
 | Full suite command | `pnpm vitest run` (a.k.a. `pnpm test`) |
 
 ### Phase Requirements → Test Map
@@ -541,19 +541,19 @@ await RAPIER.init();   // safe — verified no error
 | PHYS-01 | part map: collider handle → (entityId, part, armorSubtype) resolves every part | unit | `pnpm vitest run tests/sim/physics-composite.test.ts -x` | ❌ Wave 0 |
 | PHYS-02 | weapon-vs-armor contact emits `IContactEvent` with correct parts + Δv > 0 | unit | `pnpm vitest run tests/sim/contact.test.ts -x` | ❌ Wave 0 |
 | PHYS-02 | Δv uses pre-step velocities (head-on 8 m/s → Δv ≈ 8) | unit | `pnpm vitest run tests/sim/contact.test.ts -x` | ❌ Wave 0 |
-| PHYS-03 | pinned version smoke test (version == '0.21.0' + golden hash) | smoke | `pnpm vitest run tests/deterministic/physics-gate.test.ts -x` | ❌ Wave 0 |
-| PHYS-03 | same-seed double run → identical per-tick fingerprint trace | integration | `pnpm vitest run tests/deterministic/physics-gate.test.ts -x` | ❌ Wave 0 |
-| PHYS-03 | same-seed double run → identical `takeSnapshot()` hash (D-20 dual gate) | integration | `pnpm vitest run tests/deterministic/physics-gate.test.ts -x` | ❌ Wave 0 |
+| PHYS-03 | pinned version smoke test (version == '0.21.0' + golden hash) | smoke | `pnpm vitest run tests/determinism/physics-gate.test.ts -x` | ❌ Wave 0 |
+| PHYS-03 | same-seed double run → identical per-tick fingerprint trace | integration | `pnpm vitest run tests/determinism/physics-gate.test.ts -x` | ❌ Wave 0 |
+| PHYS-03 | same-seed double run → identical `takeSnapshot()` hash (D-20 dual gate) | integration | `pnpm vitest run tests/determinism/physics-gate.test.ts -x` | ❌ Wave 0 |
 | PHYS-03 | `fingerprint(restore(snapshot)) === fingerprint(snapshot)` | integration | `pnpm vitest run tests/sim/snapshot.test.ts -x` (extend existing) | ✅ (extend) |
 | PHYS-03 | CCD sweep: fastest weapon → exactly one hit against a dynamic target | unit | `pnpm vitest run tests/sim/ccd.test.ts -x` | ❌ Wave 0 |
 
 ### Sampling Rate
-- **Per task commit:** `pnpm vitest run tests/deterministic --reporter=dot` (also the pre-commit hook).
+- **Per task commit:** `pnpm vitest run tests/determinism --reporter=dot` (also the pre-commit hook).
 - **Per wave merge:** `pnpm test` (full suite).
 - **Phase gate:** full suite green + convention gate green before `/gsd-verify-work`.
 
 ### Wave 0 Gaps
-- [ ] `tests/deterministic/physics-gate.test.ts` — async `initPhysics()` in `beforeAll`; dual fingerprint + version smoke (D-19/D-20).
+- [ ] `tests/determinism/physics-gate.test.ts` — async `initPhysics()` in `beforeAll`; dual fingerprint + version smoke (D-19/D-20).
 - [ ] `tests/sim/physics-composite.test.ts` — composite rig + part map (PHYS-01).
 - [ ] `tests/sim/contact.test.ts` — typed contact events + Δv semantics (PHYS-02).
 - [ ] `tests/sim/ccd.test.ts` — sweep test (PHYS-03, criterion 4's CCD half).
@@ -618,7 +618,7 @@ The user's explicit principle: *"这个项目不是那种需要长期拓展的�
 - Local Node v24.21.0 execution of the compat build: init/double-init; 240-step composite sim double-run → identical snapshot hash `95d440c5`; revolute joint snapshot → 3,723 bytes, equal restore hash, equal after +60 steps; pre-step Δv = 8.0000 vs post-step 0.0000; CCD 240 m/s dynamic-target tunneling without CCD (0 hits) fixed by CCD (1 hit); insertion-order hash sensitivity `3459bf9d` vs `7b9237b9`; handle stability and `userData` stripping across restore. — determinism + Δv + CCD + snapshot.
 - Vitest 5.0.4 run in Node importing the compat build → green (double-run snapshot-hash equality). — D-22 gate mechanism.
 - `@typescript/native` 7.0.2 `tsc` typecheck of Rapier usage under `lib: ["ESNext"]`, `types: []`, `skipLibCheck: true`, `strict: true` → exit 0. — DOM-free sim boundary (D-03/SIM-03) preserved.
-- In-repo files read this session: `src/sim/battle-sim.ts`, `src/sim/world/world.ts`, `src/sim/world/entity-store.ts`, `src/sim/core/events.ts`, `src/sim/commands.ts`, `src/sim/snapshot.ts`, `src/config/sim.ts`, `src/sim/content/formulas.ts`, `src/sim/systems/movement.ts`, `tests/deterministic/gate.test.ts`, `tests/style/conventions.test.ts`, `tests/helpers/run-sim.ts`, `tsconfig.json`, `tsconfig.sim.json`, `eslint.config.js`, `vitest.config.ts`, `vite.config.ts`, `package.json`, `.githooks/pre-commit`, `.planning/config.json`.
+- In-repo files read this session: `src/sim/battle-sim.ts`, `src/sim/world/world.ts`, `src/sim/world/entity-store.ts`, `src/sim/core/events.ts`, `src/sim/commands.ts`, `src/sim/snapshot.ts`, `src/config/sim.ts`, `src/sim/content/formulas.ts`, `src/sim/systems/movement.ts`, `tests/determinism/gate.test.ts`, `tests/style/conventions.test.ts`, `tests/helpers/run-sim.ts`, `tsconfig.json`, `tsconfig.sim.json`, `eslint.config.js`, `vitest.config.ts`, `vite.config.ts`, `package.json`, `.githooks/pre-commit`, `.planning/config.json`.
 - `.planning/reference/ai-marble-kingdom.md` §伤害计算 / §武器 / §防具 — Δv formula `D̄_R = max[A_A P_A W_A (√Δv − 1), 0]`; armor reduction `ΔD = D_R (1 − 100B_A/(100B_A + A_D P_D S_D))`; final `D = D_R − ΔD`; XP `E = R_D·√(ΔD − 50)`. (File is a non-UTF8 cached export; formulas are ASCII-readable.)
 - npm registry lookups (via the environment's `registry.npmmirror.com` mirror): both packages at `0.21.0`, published 2026-09-25.
 
