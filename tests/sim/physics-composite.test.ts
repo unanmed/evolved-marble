@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { FIXED_DT } from '../../src/config/sim';
+import type { RigidBodyHandle } from '@dimforge/rapier2d-deterministic-compat';
+import { DEFAULT_SEED, FIXED_DT } from '../../src/config/sim';
+import { BattleSim } from '../../src/sim/battle-sim';
 import {
     ARMOR_HALF_X,
     ARMOR_HALF_Y,
@@ -17,17 +19,26 @@ import {
     EventLog,
     PartKind,
     SimEventKind,
-    type IContactEvent
+    type IContactEvent,
+    type IEventLog
 } from '../../src/sim/core/events';
 import {
     CompositeFactory,
     type IArmorSpec,
+    type ICompositeFactory,
     type ICompositeSpec,
     type IUnitPhysics,
     type IWeaponSpec
 } from '../../src/sim/world/composite';
-import { ContactBridge } from '../../src/sim/world/contact';
-import { PhysicsWorld } from '../../src/sim/world/physics-world';
+import {
+    ContactBridge,
+    type IContactBridge
+} from '../../src/sim/world/contact';
+import type { EntityId } from '../../src/sim/world/entity-store';
+import {
+    PhysicsWorld,
+    type IPhysicsWorld
+} from '../../src/sim/world/physics-world';
 
 /**
  * 复合工厂展开后的行为规格（PHYS-01/D-26、D-27、T-02-01、D-25）。
@@ -40,13 +51,13 @@ import { PhysicsWorld } from '../../src/sim/world/physics-world';
 /** 一个复合装配测试台（世界 + 部件映射 + 工厂 + 事件日志）。 */
 interface ICompositeRig {
     /** 物理世界。 */
-    physics: PhysicsWorld;
+    physics: IPhysicsWorld;
     /** 接触桥（部件映射代理）。 */
-    bridge: ContactBridge;
+    bridge: IContactBridge;
     /** 复合工厂。 */
-    factory: CompositeFactory;
+    factory: ICompositeFactory;
     /** 每 tick 事件日志。 */
-    events: EventLog;
+    events: IEventLog;
 }
 
 /**
@@ -155,6 +166,34 @@ function countSignChanges(series: readonly number[]): number {
         if (Math.sign(series[i]) !== Math.sign(series[i - 1])) changes++;
     }
     return changes;
+}
+
+/**
+ * 判定两组编码后的 `InteractionGroups` 是否允许交互（研究 Pattern 3）。
+ *
+ * 交互允许当且仅当 `((a >>> 16) & b) != 0 && ((b >>> 16) & a) != 0`；此处用**逻辑右移**
+ * 以正确处理位 31 置位（高位成员掩码会把编码值推过 2³¹）。
+ *
+ * @param a 组 a 的编码值。
+ * @param b 组 b 的编码值。
+ * @returns 当且仅当双方成员位均命中对方过滤掩码时为 `true`。
+ */
+function interacts(a: number, b: number): boolean {
+    return ((a >>> 16) & b) !== 0 && ((b >>> 16) & a) !== 0;
+}
+
+/**
+ * 读取某刚体首个碰撞体编码后的 `InteractionGroups`（本体球碰撞体）。
+ *
+ * @param physics 物理世界。
+ * @param bodyHandle 目标刚体句柄（复合单位的本体）。
+ * @returns 该刚体首个碰撞体编码后的 `InteractionGroups`。
+ */
+function bodyGroups(
+    physics: IPhysicsWorld,
+    bodyHandle: RigidBodyHandle
+): number {
+    return physics.world.getRigidBody(bodyHandle).collider(0).collisionGroups();
 }
 
 describe('composite factory (PHYS-01 / D-26 / D-27 / T-02-01 / D-25)', () => {
@@ -280,5 +319,133 @@ describe('composite factory (PHYS-01 / D-26 / D-27 / T-02-01 / D-25)', () => {
         expect(maxAbs).toBeGreaterThan(peak * 0.5);
         /* 持续到末段（非一次性尖峰后衰减为 0） */
         expect(lastQuarterMaxAbs).toBeGreaterThan(peak * 0.5);
+    });
+});
+
+describe('collision-group allocation beyond 16 units (D-27 / WR-03)', () => {
+    it('units whose ids differ by a multiple of 16 physically collide (aliasing family)', () => {
+        const rig = makeRig();
+        /* id 1 与 id 17 在旧 `(id-1) % 16` 方案下复用同一位，从而互不碰撞——本用例即为缺陷复现 */
+        const a = rig.factory.spawn(
+            spec({ x: -2, vx: 3, weapons: [weapon()] }),
+            1
+        );
+        const b = rig.factory.spawn(
+            spec({ x: 2, vx: -3, weapons: [weapon()] }),
+            17
+        );
+
+        const contacts = runSwing(rig, [a, b], 120);
+
+        expect(
+            contacts.some(
+                c => (c.a === 1 && c.b === 17) || (c.a === 17 && c.b === 1)
+            )
+        ).toBe(true);
+    });
+
+    it('same-unit parts stay mutually non-damaging with widened multi-bit masks (D-27)', () => {
+        const rig = makeRig();
+        /* id 20 越过 16 单位预算；两把同心重叠武器仍不得产生 a === b 接触 */
+        const unit = rig.factory.spawn(
+            spec({ weapons: [weapon(), weapon()], armors: [] }),
+            20
+        );
+
+        const contacts = runSwing(rig, [unit], 30);
+
+        expect(contacts.filter(c => c.a === c.b)).toEqual([]);
+    });
+
+    it('a factory re-seeded with restored units despawns them and does not alias new spawns (WR-03)', () => {
+        const rig = makeRig();
+        const u1 = rig.factory.spawn(spec({ weapons: [weapon()] }), 1);
+        const u2 = rig.factory.spawn(spec({ weapons: [weapon()] }), 2);
+
+        /* 用还原后的存活单位映射构造第二个工厂：索引与成员池一并重播 */
+        const restored = new Map<EntityId, IUnitPhysics>([
+            [u1.entityId, u1],
+            [u2.entityId, u2]
+        ]);
+        const factory2 = new CompositeFactory(
+            rig.physics.world,
+            (handle, ref) => rig.bridge.register(handle, ref),
+            handle => rig.physics.unregisterPart(handle),
+            restored
+        );
+
+        const handles1 = rig.physics
+            .partEntries()
+            .filter(entry => entry.ref.entityId === 1)
+            .map(entry => entry.handle);
+        const collidersBefore = rig.physics.world.colliders.len();
+        const bodiesBefore = rig.physics.world.bodies.len();
+        const jointsBefore = rig.physics.world.impulseJoints.len();
+
+        factory2.despawn(1);
+
+        /* 本体 + 1 武器 = 2 刚体；1 关节；本体球 + 防具 + 武器胶囊 = handles1.length 碰撞体 */
+        expect(rig.physics.world.colliders.len()).toBe(
+            collidersBefore - handles1.length
+        );
+        expect(rig.physics.world.bodies.len()).toBe(bodiesBefore - 2);
+        expect(rig.physics.world.impulseJoints.len()).toBe(jointsBefore - 1);
+        for (const handle of handles1) {
+            expect(rig.bridge.lookup(handle)).toBeNull();
+        }
+
+        /* 新单位必须与仍存活的还原单位 u2 碰撞（成员池已重播，故不别名） */
+        const u3 = factory2.spawn(spec({ weapons: [weapon()] }), 3);
+        expect(
+            interacts(
+                bodyGroups(rig.physics, u3.bodyHandle),
+                bodyGroups(rig.physics, u2.bodyHandle)
+            )
+        ).toBe(true);
+    });
+
+    it('BattleSim restore re-seeds the factory — despawn drops restored handles, new spawn does not alias (WR-03)', () => {
+        const sim = new BattleSim(DEFAULT_SEED);
+        const a = sim.spawn();
+        const b = sim.spawn();
+        sim.restore(sim.snapshot());
+
+        const handlesA = sim.state.physics
+            .partEntries()
+            .filter(entry => entry.ref.entityId === a)
+            .map(entry => entry.handle);
+        expect(handlesA.length).toBeGreaterThan(0);
+        const collidersBefore = sim.state.physics.world.colliders.len();
+        const bodiesBefore = sim.state.physics.world.bodies.len();
+        const jointsBefore = sim.state.physics.world.impulseJoints.len();
+
+        /* 只有 store.ids() 派生的存活单位映射被传入工厂，despawn 才能命中还原单位 */
+        sim.despawn(a);
+
+        expect(sim.state.store.ids()).not.toContain(a);
+        expect(sim.state.physics.world.colliders.len()).toBe(
+            collidersBefore - handlesA.length
+        );
+        expect(sim.state.physics.world.bodies.len()).toBe(bodiesBefore - 2);
+        expect(sim.state.physics.world.impulseJoints.len()).toBe(
+            jointsBefore - 1
+        );
+        for (const handle of handlesA) {
+            expect(sim.state.physics.lookupPart(handle)).toBeNull();
+        }
+
+        const c = sim.spawn();
+        expect(
+            interacts(
+                bodyGroups(
+                    sim.state.physics,
+                    sim.state.store.get(c).physics.bodyHandle
+                ),
+                bodyGroups(
+                    sim.state.physics,
+                    sim.state.store.get(b).physics.bodyHandle
+                )
+            )
+        ).toBe(true);
     });
 });
