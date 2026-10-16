@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: Physics & Composite Units
 status: executing
-stopped_at: Phase 2 context gathered
-last_updated: "2026-10-16T06:07:22.254Z"
-last_activity: 2026-10-15
-last_activity_desc: Phase 1 complete, transitioned to Phase 2
-state_head: 215a563dad43c2c50d759ad098de018845013324
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-10-16T06:39:51.249Z"
+last_activity: 2026-10-16
+last_activity_desc: Phase 2 execution started
+state_head: 4b47ef2c86845f8ece3a74aafc657f677291947d
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 0
   total_plans: 17
-  completed_plans: 12
+  completed_plans: 13
   percent: 0
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-15)
 
 **Core value:** 战斗必须激烈好看 (battles must be intense and visually appealing)
-**Current focus:** Phase 1 — Foundation & Deterministic Sim Core
+**Current focus:** Phase 2 — Physics & Composite Units
 
 ## Current Position
 
-Phase: 2 (Physics & Composite Units) — READY TO EXECUTE
-Plan: Not started
+Phase: 2 (Physics & Composite Units) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
-Last activity: 2026-10-15 — Phase 1 complete, transitioned to Phase 2
+Last activity: 2026-10-16 — Phase 2 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -70,6 +70,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 1 P10 | 4 | 2 tasks | 2 files |
 | Phase 01 P11 | 4 | 3 tasks | 5 files |
 | Phase 1 P12 | 5 | 2 tasks | 3 files |
+| Phase 02 P01 | 5 | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -115,6 +116,8 @@ Recent decisions affecting current work:
 - [Phase 1]: D-12 convention gate SCAN_ROOTS widened from ['src'] to ['src', 'tests/sim']; the sim test suite is now enforced (gate green, 5 tests; determinism gate unchanged, behavior-preserving).
 - [Phase 1]: [Phase 1]: D-12 pass on the remaining tests/** files added docs only to gate.test.ts (module constants SEED/OTHER_SEED/TICKS) and run-sim.ts's local recorder helper; IRunTraceOptions/runTrace/FIXED_ENTITY_COUNT and loop.test.ts's ICounter/Counter were already documented by 01-06 (plan: 'add only what is missing').
 - [Phase 1]: [Phase 1]: D-12 convention gate SCAN_ROOTS widened from ['src', 'tests/sim'] to ['src', 'tests']; the whole Phase-1 tree (src/** + tests/**), including the gate file itself, is now enforced (gate green, 5 tests; determinism gate unchanged, behavior-preserving).
+- [Phase 2]: [Phase 2]: D-18 literal-string substituted (user-approved at the blocking-human legitimacy gate): installed @dimforge/rapier2d-deterministic-compat@0.21.0 instead of @dimforge/rapier2d-deterministic -- byte-identical deterministic WASM but exposes init() and resolves under plain Node, which the Node-only gate (D-22) requires.
+- [Phase 2]: [Phase 2]: GOLDEN_RAPIER_FINGERPRINT=e1b1f66b73551 recorded for a fixed raw-world scenario as a same-machine version-drift canary (D-19); update only on an intentional Rapier version bump. The sim-level dual-fingerprint gate (D-20) lands with the physics-enabled sim in later plans.
 
 ### Pending Todos
 
@@ -136,6 +139,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-15T16:43:21.660Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-physics-composite-units/02-CONTEXT.md
+Last session: 2026-10-16T06:39:39.063Z
+Stopped at: Completed 02-01-PLAN.md
+Resume file: None
