@@ -113,8 +113,10 @@ export class BattleSim implements IBattleSim {
         const physics = new PhysicsWorld(this.cfg.dt);
         const bridge = new ContactBridge(physics, events);
         this.bridge = bridge;
-        this.factory = new CompositeFactory(physics.world, (handle, ref) =>
-            bridge.register(handle, ref)
+        this.factory = new CompositeFactory(
+            physics.world,
+            (handle, ref) => bridge.register(handle, ref),
+            handle => physics.unregisterPart(handle)
         );
         return {
             store: new EntityStore(),
@@ -411,7 +413,8 @@ export class BattleSim implements IBattleSim {
         this.bridge = bridge;
         this.factory = new CompositeFactory(
             this.simState.physics.world,
-            (handle, ref) => bridge.register(handle, ref)
+            (handle, ref) => bridge.register(handle, ref),
+            handle => this.simState.physics.unregisterPart(handle)
         );
     }
 

@@ -75,8 +75,10 @@ export function runPhysics({ ticks }: IRunPhysicsOptions): IPhysicsRunResult {
     const physics = new PhysicsWorld(FIXED_DT);
     const events = new EventLog();
     const bridge = new ContactBridge(physics, events);
-    const factory = new CompositeFactory(physics.world, (handle, ref) =>
-        bridge.register(handle, ref)
+    const factory = new CompositeFactory(
+        physics.world,
+        (handle, ref) => bridge.register(handle, ref),
+        handle => physics.unregisterPart(handle)
     );
 
     /* 先以 Store 分配单调 id，再**按有序 id 顺序**生成 Rapier 实体（Pitfall 3） */

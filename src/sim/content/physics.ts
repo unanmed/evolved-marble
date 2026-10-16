@@ -86,6 +86,15 @@ export const GROUP_UNIT_MEMBERSHIP = 0x0001;
 export const GROUP_MASK_ALL = 0xffff;
 
 /**
+ * 单位级分组可用的成员位数（D-27）。
+ *
+ * `InteractionGroups` 的成员/过滤字段各占 16 位，故同一时刻最多区分 16 个单位分组
+ * （Rapier 位掩码的硬上限）。单位按其（从 1 起的）实体 id 在 16 位内**循环取位**：
+ * `entityId` 相差 16 的整数倍时复用同一成员位。
+ */
+export const GROUP_COUNT = 16;
+
+/**
  * 武器/防具的敌方过滤掩码（低 16 位）。Phase 2 保持宽松（等于 `GROUP_MASK_ALL`）：
  * 伤害性接触的敌我判定归 Phase 3（D-31），此处仅预留分组位。
  */

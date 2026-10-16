@@ -74,6 +74,12 @@ export interface IPhysicsWorld {
      */
     lookupPart(handle: ColliderHandle): IUnitPartRef | null;
     /**
+     * 注销某碰撞体的部位标记（`CompositeFactory.despawn` 移除碰撞体后调用，
+     * 防悬空部件句柄，T-02-01）。
+     * @param handle 被移除的碰撞体句柄。
+     */
+    unregisterPart(handle: ColliderHandle): void;
+    /**
      * 按创建顺序返回全部部件登记条目（接触桥重建与快照 v3 部件段的规范来源）。
      * @returns 有序的部件登记条目数组。
      */
@@ -188,6 +194,15 @@ export class PhysicsWorld implements IPhysicsWorld {
      */
     lookupPart(handle: ColliderHandle): IUnitPartRef | null {
         return this.parts.get(handle) ?? null;
+    }
+
+    /**
+     * 注销某碰撞体的部位标记（`CompositeFactory.despawn` 移除碰撞体后调用）。
+     *
+     * @param handle 被移除的碰撞体句柄。
+     */
+    unregisterPart(handle: ColliderHandle): void {
+        this.parts.delete(handle);
     }
 
     /**
