@@ -27,7 +27,7 @@
 - [ ] **操控系统** —— 单位级 AI 的输入/输出定义（每 0.1s 决策：64 射线 + 16 敌 + 16 友 → 力/旋转/技能），AI 控制做成**可插拔**接口
 - [ ] **王国系统** —— 地图、行军、视野、军队、城池、驻扎/训练、军队/城池战斗触发与战后结算
 - [ ] **渲染系统** —— PixiJS 顶视渲染、HUD（HP/等级/阵营）、镜头
-- [ ] **录制系统** —— 全程持续帧采集 → 视频（ffmpeg）
+- [ ] **录制系统** —— 全程持续帧采集 → 视频（浏览器 WebCodecs + Mediabunny 库）
 - [ ] **AI 接入系统** —— 可插拔的 LLM 指挥官 / 导演接入点（首期只定义接口，不实际接入）
 - [ ] **统计与精彩回放系统** —— 战斗统计；精彩回放从**已有录像**中原样截取片段
 
@@ -54,7 +54,7 @@
 
 ## Constraints
 
-- **Tech Stack**: 物理用 Rapier2D（`@dimforge/rapier2d`，WASM）；渲染用 PixiJS；模拟主体在浏览器运行；Python 侧训练链路保留设计位。
+- **Tech Stack**: 物理用 Rapier2D（`@dimforge/rapier2d`，WASM）；渲染用 PixiJS；录制用浏览器 WebCodecs + Mediabunny（不用 ffmpeg）；模拟主体在浏览器运行；Python 侧训练链路保留设计位。
 - **Compatibility**: 仅支持 Chrome（不要求 Firefox / Safari）。
 - **Scale / Milestones**: **单里程碑，不拆分**，约 10k–20k 行。
 - **No Determinism**: 不保证物理/模拟跨平台或跨运行可复现；无重放、无指令录像。

@@ -54,7 +54,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### REC — 录制系统
 
 - [ ] **REC-01**: 模拟全程持续采集帧（固定步长）
-- [ ] **REC-02**: 将采集的帧导出为视频文件（ffmpeg）
+- [ ] **REC-02**: 使用浏览器 WebCodecs（配合 Mediabunny 库）将采集的帧编码并导出为视频文件
 - [ ] **REC-03**: 录像附带时间戳/索引，供精彩回放定位片段
 
 ### AI — AI 接入系统（可插拔）
@@ -105,20 +105,59 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UNIT-01..06 | TBD | Pending |
-| PHYS-01..05 | TBD | Pending |
-| CTRL-01..04 | TBD | Pending |
-| KING-01..08 | TBD | Pending |
-| REND-01..05 | TBD | Pending |
-| REC-01..03 | TBD | Pending |
-| AI-01..04 | TBD | Pending |
-| STAT-01..02 | TBD | Pending |
+| UNIT-01 | Phase 1 — 单位系统 | Pending |
+| UNIT-02 | Phase 1 — 单位系统 | Pending |
+| UNIT-03 | Phase 1 — 单位系统 | Pending |
+| UNIT-04 | Phase 1 — 单位系统 | Pending |
+| UNIT-05 | Phase 1 — 单位系统 | Pending |
+| UNIT-06 | Phase 1 — 单位系统 | Pending |
+| PHYS-01 | Phase 2 — 物理模拟系统 | Pending |
+| PHYS-02 | Phase 2 — 物理模拟系统 | Pending |
+| PHYS-03 | Phase 2 — 物理模拟系统 | Pending |
+| PHYS-04 | Phase 2 — 物理模拟系统 | Pending |
+| PHYS-05 | Phase 2 — 物理模拟系统 | Pending |
+| CTRL-01 | Phase 3 — 操控系统 | Pending |
+| CTRL-02 | Phase 3 — 操控系统 | Pending |
+| CTRL-03 | Phase 3 — 操控系统 | Pending |
+| CTRL-04 | Phase 3 — 操控系统 | Pending |
+| KING-01 | Phase 4 — 王国系统 | Pending |
+| KING-02 | Phase 4 — 王国系统 | Pending |
+| KING-03 | Phase 4 — 王国系统 | Pending |
+| KING-04 | Phase 4 — 王国系统 | Pending |
+| KING-05 | Phase 4 — 王国系统 | Pending |
+| KING-06 | Phase 4 — 王国系统 | Pending |
+| KING-07 | Phase 4 — 王国系统 | Pending |
+| KING-08 | Phase 4 — 王国系统 | Pending |
+| REND-01 | Phase 5 — 渲染系统 | Pending |
+| REND-02 | Phase 5 — 渲染系统 | Pending |
+| REND-03 | Phase 5 — 渲染系统 | Pending |
+| REND-04 | Phase 5 — 渲染系统 | Pending |
+| REND-05 | Phase 5 — 渲染系统 | Pending |
+| REC-01 | Phase 6 — 录制系统 | Pending |
+| REC-02 | Phase 6 — 录制系统 | Pending |
+| REC-03 | Phase 6 — 录制系统 | Pending |
+| AI-01 | Phase 7 — AI 接入系统 | Pending |
+| AI-02 | Phase 7 — AI 接入系统 | Pending |
+| AI-03 | Phase 7 — AI 接入系统 | Pending |
+| AI-04 | Phase 7 — AI 接入系统 | Pending |
+| STAT-01 | Phase 8 — 统计与精彩回放系统 | Pending |
+| STAT-02 | Phase 8 — 统计与精彩回放系统 | Pending |
 
 **Coverage:**
 - v1 requirements: 37 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 37 ⚠️
+- Mapped to phases: 37
+- Unmapped: 0 ✓
+
+**Phase → Requirements:**
+- Phase 1 — 单位系统: UNIT-01..06 (6)
+- Phase 2 — 物理模拟系统: PHYS-01..05 (5)
+- Phase 3 — 操控系统: CTRL-01..04 (4)
+- Phase 4 — 王国系统: KING-01..08 (8)
+- Phase 5 — 渲染系统: REND-01..05 (5)
+- Phase 6 — 录制系统: REC-01..03 (3)
+- Phase 7 — AI 接入系统: AI-01..04 (4)
+- Phase 8 — 统计与精彩回放系统: STAT-01..02 (2)
 
 ---
 *Requirements defined: 2026-10-17*
-*Last updated: 2026-10-17 after initial definition*
+*Last updated: 2026-10-17 after roadmap creation (8 phases, 37/37 mapped)*
