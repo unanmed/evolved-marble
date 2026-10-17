@@ -43,7 +43,13 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. 6 种武器与 2 种防具的攻击/防御/破甲比率、质量数据完整，且可按「武器 × 防具」查到破甲比率。
   4. 生成同一职业的多个单位时，受随机影响的 7 项属性（生命上限/控制等级/攻击/防御/武器比率/防具比率/质量）呈均值按职业、标准差 = 均值/8 的正态分布，而非固定值。
   5. 按攻击/防御经验公式与击杀经验累积达到阈值时单位升级，基础属性按职业增长、生命值恢复「生命上限增加值」、并按解锁表获得装备/技能。
-**Plans**: TBD
+**Plans:** 5 plans
+Plans:
+- [ ] 01-01-PLAN.md — Wave 0：修复 Vitest `@` 别名与 tsconfig tests 覆盖；`tests/units/` 脚手架（为全部 6 项需求提供可验证 harness）
+- [ ] 01-02-PLAN.md — 类型先行：`src/units/types.ts` 数字枚举 + `I*` 接口（仅类型，无实现）→ **用户审查门禁**
+- [ ] 01-03-PLAN.md — `src/units/data.ts` 职业/武器/防具常量表 + 破甲矩阵（UNIT-02/03/04）
+- [ ] 01-04-PLAN.md — `class Unit implements IUnit`：`getAttribute` + 升级/经验机制（UNIT-01/06）
+- [ ] 01-05-PLAN.md — `IRng` + `sampleNormal` + `spawnUnit` 正态生成（UNIT-05）
 **Type-first gate**: Wave 1 (type declarations only) writes the unit folder's `types.ts` + `IUnit`/`IClass`/`IWeapon`/`IArmor`/`IUpgrade` interfaces; **user must review and approve the interface design before implementation begins** in Wave 2. Numeric enums for class/weapon/armor kinds; JSDoc on all interface members and top-level `const`.
 
 ### Phase 2: 物理模拟系统
@@ -140,7 +146,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 单位系统 | 0/0 | Not started | - |
+| 1. 单位系统 | 0/5 | Not started | - |
 | 2. 物理模拟系统 | 0/0 | Not started | - |
 | 3. 操控系统 | 0/0 | Not started | - |
 | 4. 王国系统 | 0/0 | Not started | - |
