@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
+import type { IRng } from '@/common/types';
 import {
     ArmorKind,
     AttributeKind,
@@ -7,7 +8,8 @@ import {
     EquipmentKind,
     ModifierMode,
     SkillKind,
-    WeaponKind
+    WeaponKind,
+    type IRng as IRngViaUnits
 } from '@/units/types';
 
 describe('unit-system types — numeric enums', () => {
@@ -58,5 +60,13 @@ describe('unit-system types — numeric enums', () => {
         for (let ordinal = 0; ordinal <= 12; ordinal += 1) {
             expect(typeof AttributeKind[ordinal]).toBe('string');
         }
+    });
+});
+
+describe('unit-system types — shared IRng re-export', () => {
+    it('re-exports the same IRng type from @/common/types through @/units/types', () => {
+        // 类型级断言（`pnpm typecheck` 校验）：再导出的 IRng 与 src/common/types.ts
+        // 中声明的 IRng 是同一类型，证明随机源已迁至 src/common 且别名可解析。
+        expectTypeOf<IRngViaUnits>().toEqualTypeOf<IRng>();
     });
 });
