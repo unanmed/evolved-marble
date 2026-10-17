@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: 单位系统
 status: executing
-stopped_at: Phase 1 context gathered
-last_updated: "2026-10-17T14:59:35.657Z"
+stopped_at: Completed 01-01-PLAN.md
+last_updated: "2026-10-17T15:23:40.746Z"
 last_activity: 2026-10-17
-last_activity_desc: Roadmap created (8 phases, 37/37 requirements mapped)
-state_head: b412572c3992466c4050fae4f32a04ca73f0dddb
+last_activity_desc: Phase 1 execution started
+state_head: 6181bc306c79b77183f227cab841efb5d953d7d9
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 5
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-10-17)
 
 ## Current Position
 
-Phase: 1 (单位系统) — READY TO EXECUTE
-Plan: 0 of 0 in current phase
+Phase: 1 (单位系统) — EXECUTING
+Plan: 2 of 5
 Status: Ready to execute
-Last activity: 2026-10-17 — Roadmap created (8 phases, 37/37 requirements mapped)
+Last activity: 2026-10-17 — Phase 1 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -54,6 +54,11 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: Stable
 
 *Updated after each plan completion*
+**Per-Plan Metrics:**
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 1 P01 | 12 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -66,6 +71,8 @@ Recent decisions affecting current work:
 - 类型先行 + 用户审查门禁：每阶段先写 `types.ts` + `I*` 接口，用户批准后才实现。
 - 移除确定性：不做重放/指令录像；精彩回放 = 录像片段原样截取。
 - 无 runnable 中间态：最终可运行模拟仅在 8 系统全部组装后存在。
+- [Phase 1]: Lint repaired via TypeScript side-by-side alias (devDep typescript -> @typescript/typescript6 for typescript-eslint's JS API; @typescript/native -> TS7 for tsc) instead of pinning the project to TS 6.x
+- [Phase 1]: tsconfig include widened to ['src','tests'] so test files are type-checked (TS18003 cleared); strict stays true — no type-safety weakening
 
 ### Pending Todos
 
@@ -86,6 +93,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-17T12:26:03.931Z
-Stopped at: Phase 1 context gathered
-Resume file: .planning/phases/01-unit-system/01-CONTEXT.md
+Last session: 2026-10-17T15:23:40.714Z
+Stopped at: Completed 01-01-PLAN.md
+Resume file: None
