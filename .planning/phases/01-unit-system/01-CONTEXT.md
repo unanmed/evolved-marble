@@ -22,14 +22,16 @@
 - **D-04:** 随等级成长的派生属性**不存储**，由**统一方法** `getAttribute(kind: AttributeKind): number` 实时计算。 — **Reversibility:** costly — 所有属性读取都将经由该方法，替换需改动全部调用点。
 - **D-05:** **禁止 getter/setter**（用户明确偏好）；属性读取一律走专门方法。
 - **D-06:** 装备用**列表**表示（武器/防具，带 kind 区分），加成用 `IModifier` **修正器列表**表示；解锁表决定装备/技能在何时获得。
+- **D-11（类型风格约定，强制）:** 缺失值区分 null/undefined —— **缺失的“对象”引用用 `null`**（一眼看出是对象）；**缺失的“字面量”（数字/枚举/布尔/字符串）用 `undefined`（可选字段）**。当前 `IEquipment.weapon`/`armor` 是枚举（字面量）却用了 `null`，改为可选（`weapon?: WeaponKind` / `armor?: ArmorKind`）。
+- **D-12:** 单位为每个单位增加一个**名称**（供录像中展示、便于追踪），经专门方法读取（无 getter/setter），例如 `getName(): string`；名称在生成时确定。
 
 ### 随机源
-- **D-07:** 单位生成随机走**可注入的 `IRng` 接口**；默认实现包 `Math.random`（无确定性要求，抽象目的是便于测试注入固定序列）。
+- **D-07:** 单位生成随机走**可注入的 `IRng` 接口**；该接口与默认实现（包 `Math.random`）抽到 **`src/common/`**（通用可复用，供其它系统使用），单位系统按 `@/common/...` 导入（无确定性要求；抽象目的是便于测试注入固定序列）。
 - **D-08:** 正态生成（均值按职业、σ = 均值/8）后**截断到非负**，保证属性（生命上限/控制等级/攻击/防御/武器比率/防具比率/质量）不为负。
 
 ### 模块布局
-- **D-09:** 单位系统代码放在 `src/units/`（如 `types.ts` / `data.ts` / `Unit.ts` / `rng.ts`）；导入走路径别名 `@/units/...`（tsconfig 已配 `@/*` → `./src/*`）。 — **Reversibility:** costly — 目录/路径改动会波及后续所有系统的 import。
-- **D-10:** 单位系统的**所有类型与枚举**（`IUnit`、`AttributeKind`、`ClassKind`、`WeaponKind`、`ArmorKind`、`IClassDef`、`IWeaponDef`、`IArmorDef`、`IModifier`、`IRng` 等）集中在 `src/units/types.ts`（遵守"每文件夹一个 types.ts"）。
+- **D-09:** 单位系统代码放在 `src/units/`（`types.ts` / `data.ts` / `Unit.ts` / `spawn.ts`）；**通用可复用抽象放在 `src/common/`**（如 `IRng`、`MathRng`、`sampleNormal`）；导入走别名 `@/units/...` / `@/common/...`（tsconfig 已配 `@/*` → `./src/*`）。 — **Reversibility:** costly — 目录/路径改动会波及后续所有系统的 import。
+- **D-10:** 单位系统自身的类型与枚举（`IUnit`、`AttributeKind`、`ClassKind`、`WeaponKind`、`ArmorKind`、`IClassDef`、`IWeaponDef`、`IArmorDef`、`IModifier` 等）集中在 `src/units/types.ts`；**通用类型（`IRng`）在 `src/common/types.ts`**（每文件夹一个 `types.ts`）。
 
 ### the agent's Discretion
 - 枚举的具体成员命名与取值、`IClassDef`/`IWeaponDef`/`IArmorDef`/`IModifier` 的字段结构细节。
