@@ -1,6 +1,13 @@
 ---
-gsd_state_version: '1.0'  # placeholder; syncStateFrontmatter overwrites on first state.* call
+gsd_state_version: "1.0"
+current_phase: 1
+current_phase_name: 单位系统
 status: planning
+stopped_at: Phase 1 context gathered
+last_updated: "2026-10-17T12:26:03.948Z"
+last_activity: 2026-10-17
+last_activity_desc: Roadmap created (8 phases, 37/37 requirements mapped)
+state_head: fcdc6e3a651fd1d0b3b5d6e4332c004baeee112d
 progress:
   total_phases: 8
   completed_phases: 0
@@ -30,6 +37,7 @@ Progress: [░░░░░░░░░░] 0%
 ## Performance Metrics
 
 **Velocity:**
+
 - Total plans completed: 0
 - Average duration: -
 - Total execution time: 0.0 hours
@@ -41,6 +49,7 @@ Progress: [░░░░░░░░░░] 0%
 | - | - | - | - |
 
 **Recent Trend:**
+
 - Last 5 plans: -
 - Trend: Stable
 
@@ -77,6 +86,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-17
-Stopped at: Roadmap created — ROADMAP.md and STATE.md written, REQUIREMENTS.md traceability updated
-Resume file: None
+Last session: 2026-10-17T12:26:03.931Z
+Stopped at: Phase 1 context gathered
+Resume file: .planning/phases/01-unit-system/01-CONTEXT.md
