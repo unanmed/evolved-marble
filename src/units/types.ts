@@ -1,7 +1,10 @@
 /**
  * 单位系统的全部类型声明：数字枚举 + `I*` 接口。
  * 本文件只含声明（枚举与接口），不含任何算法、数据表或运行时逻辑。
+ * 通用可复用的 `IRng` 声明在 `src/common/types.ts`，此处仅做再导出。
  */
+
+export type { IRng } from '@/common/types';
 
 /**
  * 可通过 `IUnit.getAttribute` 读取的数值型属性。
@@ -124,12 +127,12 @@ export interface ISpawnAttributes {
 
 /** 一件已装备的物品。 */
 export interface IEquipment {
-    /** 槽位判别式，决定下方两个字段哪一个非空。 */
+    /** 槽位判别式，决定下方两个字段哪一个存在。 */
     readonly kind: EquipmentKind;
-    /** 武器种类；`kind === EquipmentKind.Weapon` 时非空，否则为 `null`。 */
-    readonly weapon: WeaponKind | null;
-    /** 防具种类；`kind === EquipmentKind.Armor` 时非空，否则为 `null`。 */
-    readonly armor: ArmorKind | null;
+    /** 武器种类；`kind === EquipmentKind.Weapon` 时存在，否则为 `undefined`。 */
+    readonly weapon?: WeaponKind;
+    /** 防具种类；`kind === EquipmentKind.Armor` 时存在，否则为 `undefined`。 */
+    readonly armor?: ArmorKind;
 }
 
 /** 一条加成：修正某个数值型属性。 */
@@ -217,16 +220,12 @@ export interface IArmorDef {
     readonly defenseRatio: number;
 }
 
-/** 可注入的随机源；仅暴露均匀采样，便于测试注入固定序列。 */
-export interface IRng {
-    /** 返回 `[0, 1)` 区间内的均匀随机数。 */
-    next(): number;
-}
-
 /** 单位核心契约：数值统一经 `getAttribute` 读取，禁止 getter/setter。 */
 export interface IUnit {
     /** 统一数值读取入口；已存储的值直接返回，随等级派生的值按当前等级实时计算。 */
     getAttribute(kind: AttributeKind): number;
+    /** 返回单位显示名；名称在生成时确定，用于录像中的辨识与追踪。 */
+    getName(): string;
     /** 返回单位职业。 */
     getClass(): ClassKind;
     /** 返回当前装备列表。 */
