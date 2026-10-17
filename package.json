@@ -5,29 +5,23 @@
     "type": "module",
     "packageManager": "pnpm@12.5.1",
     "engines": {
-        "node": ">=22.12.0"
+        "node": ">=24"
     },
     "scripts": {
-        "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.sim.json",
+        "typecheck": "tsc --noEmit -p tsconfig.json",
         "test": "vitest run",
-        "test:watch": "vitest",
-        "gate": "vitest run tests/determinism",
         "lint": "eslint ."
     },
     "devDependencies": {
         "@eslint/js": "^10.0.1",
         "@types/node": "^26.6.5",
-        "@typescript/native": "npm:typescript@^7.0.2",
         "eslint": "^10.12.0",
         "eslint-plugin-prettier": "^5.5.7",
         "globals": "^17.13.0",
         "prettier": "^3.9.10",
-        "typescript": "npm:@typescript/typescript6@^6.0.2",
+        "typescript": "^7.0.2",
         "typescript-eslint": "^8.71.2",
         "vite": "^8.3.4",
         "vitest": "^5.0.4"
-    },
-    "dependencies": {
-        "@dimforge/rapier2d-deterministic-compat": "0.21.0"
     }
 }
