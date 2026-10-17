@@ -17,12 +17,13 @@ This is a single-milestone project delivered as **8 phases, one per system, in a
 ## Phases
 
 **Phase Numbering:**
+
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: 单位系统** - 17 项单位属性、7 职业、6 武器、2 防具、等级/经验/升级、正态随机生成
+- [ ] **Phase 1: 单位系统** - 16 项单位属性、7 职业、6 武器、2 防具、等级/经验/升级、正态随机生成
 - [ ] **Phase 2: 物理模拟系统** - Rapier2D 复合刚体（部位打标）、类型化接触事件、伤害计算、固定 tick 推进
 - [ ] **Phase 3: 操控系统** - 单位级 AI 输入/输出契约、0.1s 决策节奏、可插拔控制 + 默认基线实现
 - [ ] **Phase 4: 王国系统** - 地图、行军、视野、军队、城池、驻扎/训练、军队/城池战斗触发与战后结算
@@ -34,108 +35,144 @@ Decimal phases appear between their surrounding integers in numeric order.
 ## Phase Details
 
 ### Phase 1: 单位系统
-**Goal**: 建立完整可用的单位数据模型——17 项属性、7 个职业、6 种武器、2 种防具、正态随机生成与等级/经验/升级机制。
+
+**Goal**: 建立完整可用的单位数据模型——16 项属性、7 个职业、6 种武器、2 种防具、正态随机生成与等级/经验/升级机制。
 **Depends on**: Nothing (first phase)
 **Requirements**: UNIT-01, UNIT-02, UNIT-03, UNIT-04, UNIT-05, UNIT-06
 **Success Criteria** (what must be TRUE):
-  1. 能按职业创建一个单位并读到全部 17 项属性（含加成与装备），属性集与规格一致。
+
+  1. 能按职业创建一个单位并读到全部 16 项属性（含加成与装备），属性集与规格一致。
   2. 7 个职业的初始属性、每级成长与装备/技能解锁表可查询，数值与规格一致。
   3. 6 种武器与 2 种防具的攻击/防御/破甲比率、质量数据完整，且可按「武器 × 防具」查到破甲比率。
   4. 生成同一职业的多个单位时，受随机影响的 7 项属性（生命上限/控制等级/攻击/防御/武器比率/防具比率/质量）呈均值按职业、标准差 = 均值/8 的正态分布，而非固定值。
   5. 按攻击/防御经验公式与击杀经验累积达到阈值时单位升级，基础属性按职业增长、生命值恢复「生命上限增加值」、并按解锁表获得装备/技能。
+
 **Plans:** 5 plans
 Plans:
+**Wave 1**
+
 - [ ] 01-01-PLAN.md — Wave 0：修复 Vitest `@` 别名与 tsconfig tests 覆盖；`tests/units/` 脚手架（为全部 6 项需求提供可验证 harness）
 - [ ] 01-02-PLAN.md — 类型先行：`src/units/types.ts` 数字枚举 + `I*` 接口（仅类型，无实现）→ **用户审查门禁**
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 01-03-PLAN.md — `src/units/data.ts` 职业/武器/防具常量表 + 破甲矩阵（UNIT-02/03/04）
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 01-04-PLAN.md — `class Unit implements IUnit`：`getAttribute` + 升级/经验机制（UNIT-01/06）
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 01-05-PLAN.md — `IRng` + `sampleNormal` + `spawnUnit` 正态生成（UNIT-05）
+
 **Type-first gate**: Wave 1 (type declarations only) writes the unit folder's `types.ts` + `IUnit`/`IClass`/`IWeapon`/`IArmor`/`IUpgrade` interfaces; **user must review and approve the interface design before implementation begins** in Wave 2. Numeric enums for class/weapon/armor kinds; JSDoc on all interface members and top-level `const`.
 
 ### Phase 2: 物理模拟系统
+
 **Goal**: 用 Rapier2D 复合刚体承载单位，把物理接触转为带部位标记的类型化事件，并按文档公式完成伤害与防具减伤计算，以固定步长 tick 推进。
 **Depends on**: Phase 1
 **Requirements**: PHYS-01, PHYS-02, PHYS-03, PHYS-04, PHYS-05
 **Success Criteria** (what must be TRUE):
+
   1. 一个单位被实例化为复合刚体，本体/武器/防具为独立碰撞体且各自带有部位标记。
   2. 单位间碰撞产生**带部位标记的类型化事件**，可区分击中本体 / 武器 / 防具。
   3. 击中的伤害按 `max[A_A·P_A·W_A·(√Δv−1), 0]` 计算，并带均值/20 的正态抖动，结果可观测。
   4. 击中防具时按破甲比率应用减伤公式、击中本体时不触发减伤，数值与公式一致。
   5. 模拟以固定步长 tick（tick = 游戏 1 分钟）推进，且推进与渲染解耦。
+
 **Plans**: TBD
 **Type-first gate**: Wave 1 writes the physics folder's `types.ts` + interfaces for the compound-body part breakdown and the typed contact event (part tags as a numeric enum); **user reviews and approves before implementation**. Damage/armor formulas implemented only after the gate.
 
 ### Phase 3: 操控系统
+
 **Goal**: 定义单位级 AI 的输入/输出契约与 0.1s 决策节奏，并把 AI 控制做成可插拔模块 + 一个默认基线实现，使模拟可自主运行。
 **Depends on**: Phase 2
 **Requirements**: CTRL-01, CTRL-02, CTRL-03, CTRL-04
 **Success Criteria** (what must be TRUE):
+
   1. 单位级 AI 输入契约可实现：自身属性、位置、64 条射线距离、射弹距离、16 个最近敌方简讯、16 个最近友方简讯。
   2. 单位级 AI 输出契约可实现：四向力、旋转力、武器技能、单位技能。
   3. 默认基线 AI 驱动下单位自主决策，每 0.1s（6 帧）决策一次。
   4. 控制模块可插拔：换入另一个 AI 实现时无需改动物理/单位系统，模拟仍可持续运行。
   5. 默认基线 AI 使单位能自主完成接近、攻击、脱离等行为，模拟无需人工输入即可持续运行。
+
 **Plans**: TBD
 **Type-first gate**: Wave 1 writes the control folder's `types.ts` + `IUnitAI` (input/output contracts) and the pluggable provider interface; **user reviews and approves before implementation**. The default baseline AI is a separate `implements IUnitAI` class written in Wave 2.
 
 ### Phase 4: 王国系统
+
 **Goal**: 交付地图与势力层——1000×1000 地图、时间系统、行军、视野、军队、城池、驻扎/训练，以及军队/城池战斗的触发与战后结算。
 **Depends on**: Phase 3
 **Requirements**: KING-01, KING-02, KING-03, KING-04, KING-05, KING-06, KING-07, KING-08
 **Success Criteria** (what must be TRUE):
+
   1. 1000×1000 地图上有多个势力，各自拥有军队与城池；军队以固定 10m/h 行军、碰到地图边缘反弹。
   2. 时间系统按规格运行：战斗时 1× 速、无战斗时 24× 速，tick 间隔随速率同比（= 现实 1 秒对应时长的 1/60）。
   3. 行军时单位聚集在军队中心 25m 圆内并由**程序控制**（非 AI），且行军回血 1/h。
   4. 视野生效：军队半径 100m、城池半径 150m，决定势力可获取的信息。
   5. 军队战斗（距离 <80m 触发、80m 加权中心正方形战斗区、离区/结束判定）与城池战斗（同流程 + 战后获胜方接管、可能入驻、败方重组行军）按规格触发与结算。
+
 **Plans**: TBD
 **Type-first gate**: Wave 1 writes the kingdom folder's `types.ts` + `IFaction`/`IArmy`/`ICity`/`IWorld`/`ITimeSystem` interfaces and the numeric enums for faction/state; **user reviews and approves before implementation**.
 
 ### Phase 5: 渲染系统
+
 **Goal**: 用 PixiJS 实现 2D 顶视渲染，使单位/武器/防具/阵营可辨，提供 HP/等级/阵营 HUD 与自动镜头，并在 Chrome 下维持数十单位混战的可交互帧率。
 **Depends on**: Phase 2
 **Requirements**: REND-01, REND-02, REND-03, REND-04, REND-05
 **Success Criteria** (what must be TRUE):
+
   1. 使用 PixiJS 顶视渲染出模拟画面。
   2. 单位、武器、防具、阵营在画面上可辨（无需逐单位 filter/mask）。
   3. HUD 显示每个单位的 HP / 等级 / 阵营。
   4. 镜头自动跟拍激烈战斗区域，无需人工控制。
   5. Chrome-only 下数十单位混战维持可交互帧率。
+
 **Plans**: TBD
 **Type-first gate**: Wave 1 writes the render folder's `types.ts` + `IRenderer`/`IHud`/`ICamera`/`IUnitView` interfaces; **user reviews and approves before implementation**.
 **UI hint**: yes
 
 ### Phase 6: 录制系统
+
 **Goal**: 对模拟全程持续采集帧并用浏览器 WebCodecs（配合 Mediabunny 库）编码导出为视频，录像附带时间戳/索引供后续精彩回放定位。
 **Depends on**: Phase 5
 **Requirements**: REC-01, REC-02, REC-03
 **Success Criteria** (what must be TRUE):
+
   1. 模拟全程以固定步长持续采集帧，不遗漏且不阻塞模拟推进。
   2. 采集的帧经浏览器 WebCodecs（配合 Mediabunny）编码导出为视频文件。
   3. 录像附带时间戳/索引，可按时间定位到片段。
+
 **Plans**: TBD
 **Type-first gate**: Wave 1 writes the recording folder's `types.ts` + `IFrameCapture`/`IVideoEncoder`/`IRecordingIndex` interfaces; **user reviews and approves before implementation**. No determinism/replay semantics — recording is a capture of what was rendered.
 
 ### Phase 7: AI 接入系统
+
 **Goal**: 定义可插拔的 LLM 指挥官 / 导演接入接口与信息申请机制，首期只提供接口与占位模块，不实际接入 LLM。
 **Depends on**: Phase 4
 **Requirements**: AI-01, AI-02, AI-03, AI-04
 **Success Criteria** (what must be TRUE):
+
   1. LLM 指挥官接口可插拔：输入为影响范围/城池/军队/事件簿，输出为军队指令，决策节奏为每 84h 常规 + 重要事件。
   2. LLM 导演接口可插拔：输出视角分配与文字展示。
   3. 信息申请机制可用：可申请模拟现状 / 截图 / 历史事件；指挥官受限视野、导演上帝视角。
   4. 首期仅接口 + 占位实现：不发起任何真实 LLM 调用，占位模块不阻塞模拟独立运行。
+
 **Plans**: TBD
 **Type-first gate**: Wave 1 writes the AI-access folder's `types.ts` + `ILlmCommander`/`ILlmDirector`/`IInfoRequest` interfaces and the pluggable provider contracts; **user reviews and approves before implementation**. Placeholder implementations only — no real LLM calls.
 
 ### Phase 8: 统计与精彩回放系统
+
 **Goal**: 采集战斗与全局统计，并实现「从已有录像中原样截取片段」的精彩回放，不依赖模拟重放。
 **Depends on**: Phase 6
 **Requirements**: STAT-01, STAT-02
 **Success Criteria** (what must be TRUE):
+
   1. 采集战斗与全局统计（伤害、击杀、升级、战局结果等）并可查询。
   2. 精彩回放从已有录像中原样截取片段（不依赖模拟重放），产出片段可播放。
   3. 截取片段与录像时间戳/索引对齐，可定位到对应战局事件。
+
 **Plans**: TBD
 **Type-first gate**: Wave 1 writes the stats folder's `types.ts` + `IStatsCollector`/`IHighlightExtractor` interfaces; **user reviews and approves before implementation**. Highlight extraction operates purely on recorded video + index (slicing, not re-simulation).
 

@@ -337,7 +337,7 @@ export function spawnUnit(cls: ClassKind, rng: IRng): Unit {
   const roll = (mean: number): number => sampleNormal(rng, mean, mean / 8);
   return new Unit(cls, {
     maxHp: roll(def.maxHp),
-    controlLevel: roll(def.controlLevel),
+    controlLevel: sampleNormal(rng, CONTROL_LEVEL_BASE, CONTROL_LEVEL_BASE / 8),
     attack: roll(def.attack),
     defense: roll(def.defense),
     weaponRatio: roll(def.weaponRatio),
@@ -440,31 +440,23 @@ expect(Math.min(...hp)).toBeGreaterThanOrEqual(0);           // non-negative cla
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **UNIT-01 says "17 项属性" but the enumeration has 16. Which is the 17th?**
-   - What we know: the phase goal, PROJECT.md, and REQUIREMENTS all say **17**, yet both the spec `§单位` bullets and the UNIT-01 parenthetical contain exactly **16** items (生命值, 生命上限, 等级, 经验值, 经验比率, 攻击经验比率, 防御经验比率, 控制等级, 基础攻击力, 基础防御力, 加成, 装备, 职业, 武器比率, 防具比率, 质量). `[VERIFIED: .planning/REQUIREMENTS.md:13]` `[VERIFIED: .planning/reference/ai-marble-kingdom.md:105-122]`
-   - What's unclear: the extra attribute (candidates: derived 升级所需经验 `N_E`; 生命上限增加值; or counting 装备 as 武器+防具).
-   - Recommendation: treat the **16 enumerated attributes as canonical**, surface the 17/16 mismatch at the review gate, and do **not** invent a 17th silently. (See OQ-5.)
+> **RESOLVED 2026-10-17 with the user before planning proceeds.** Decisions below are binding for Phase 1.
 
-2. **Growth notation: is `10L` a linear-per-level increment or a level-scaled (quadratic) increment?**
-   - What we know: attack uses `kL`, defense uses a flat constant, both "每级增加".
-   - What's unclear: intent; and whether the table value is the level-1 value.
-   - Recommendation: implement `stat(L) = base + k·(L−1)` with `k` from the table, as a named `data.ts` constant; confirm at the gate (Assumption A1).
+1. **UNIT-01 "17 项属性" vs 16 enumerated — RESOLVED: 16.** The 16 enumerated attributes are canonical. The "17" in the phase goal/SC1 was a counting error; the ROADMAP SC1 and PROJECT.md wording are reconciled to 16. Do **NOT** invent a 17th attribute.
 
-3. **How does 生命上限 grow per level?** The spec only says hp heals by the "生命上限增加值".
-   - Recommendation: add an explicit per-class `maxHp` growth field (value TBD, calibratable), defaulting so hp-restore is nonzero; flag for the user (Assumption A2).
+2. **Growth notation — RESOLVED (user).** Attack-class growth uses the `k·L` form (scales with current level; `10L` = each level adds `10 × current level` points). Defense-class growth uses a **flat coefficient 6 (per level +6), NOT `6L`** — deliberately, because 防御 is a **percentage damage-reduction** stat and a `6L` curve would over-scale late-game mitigation. → In `getAttribute`, attack-class growth terms multiply by level L; defense-class growth terms are constants.
 
-4. **Does xp reset to 0 or subtract the threshold on level-up, and can one gain trigger multiple level-ups?**
-   - Recommendation: reset to 0 (or carry remainder) with a loop for multi-level gains; confirm (Assumption A3).
+3. **生命上限 growth — RESOLVED (user): reasonable default.** Each class gets a reasonable `maxHpGrowth` field (user authorized the agent to choose a sensible default), marked for calibration; on level-up hp += that increment.
 
-5. **Quality gates: how to resolve the `pnpm lint` breakage (Pitfall 1)?**
-   - Options: A) Microsoft side-by-side alias; B) pin TS 6.x; C) drop `typescript-eslint`; D) accept lint red this phase.
-   - Recommendation: A if lint must be green this phase; otherwise D and record the exception. This is a **user-facing toolchain decision**.
+4. **XP overflow / multi-level — RESOLVED: carry the remainder + multi-level loop.** On level-up subtract the threshold, keep the surplus, and loop so a single gain can trigger multiple level-ups. Marked for calibration.
 
-6. **Does equipment mass feed the unit's 质量 attribute?** Recommendation: no (equipment carries its own mass; physics sums later). Confirm (Assumption A5).
+5. **`pnpm lint` breakage — RESOLVED (user): repair this phase.** Wave 0 repairs `pnpm lint` (prefer Microsoft side-by-side alias: `typescript` → `@typescript/typescript6`; fallback pin TS 6.x). `@typescript/native` is a local alias key — do **NOT** `pnpm add` it.
 
-7. **Do the 4 skill-less classes intentionally have no skills, or are defaults missing from the spec?** Recommendation: none for now; note for later phases (Assumption A7).
+6. **Equipment mass in unit `质量` — RESOLVED: no.** Unit `质量` = body mass only; weapons/armors carry their own mass and are summed later in the physics layer.
+
+7. **Skill-less classes — RESOLVED: allowed empty.** Classes with no skill listed in the spec get an empty skill set (equipment unlocks only); later milestones may extend.
 
 ---
 
