@@ -12,9 +12,8 @@
         "moduleDetection": "force",
         "noEmit": true,
 
-        /* TS 7 no longer infers rootDir (Pitfall 7).
-           This base project includes both `src` and `tests` (noEmit), so rootDir
-           must span the repo root; tsconfig.sim.json narrows it to `src` itself. */
+        /* TS 7 no longer infers rootDir. This base config covers both `src` and
+           `tests` with noEmit, so rootDir must span the repo root. */
         "rootDir": ".",
 
         /* Linting */
@@ -25,5 +24,5 @@
             "@/*": ["./src/*"]
         }
     },
-    "include": ["src"]
+    "include": ["src", "tests"]
 }
