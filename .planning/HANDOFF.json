@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-10-17T16:22:32.343Z",
+  "phase": "1",
+  "phase_name": "单位系统",
+  "phase_dir": ".planning/phases/01-unit-system",
+  "plan": 1,
+  "task": 3,
+  "total_tasks": 3,
+  "status": "paused",
+  "completed_tasks": [
+    {"id": "01-01", "name": "Wave 0: harness repair (vitest @alias, tsconfig tests, pnpm lint) + tests/units scaffold", "status": "done", "commit": "3d35d5a"},
+    {"id": "01-02/t1", "name": "Declare src/units/types.ts (revised per review)", "status": "done", "commit": "d61b262"},
+    {"id": "01-02/t2", "name": "tests/units/types.test.ts (revised)", "status": "done", "commit": "df6d570"},
+    {"id": "01-02/t3", "name": "Human type-design review gate", "status": "in_progress", "progress": "revisions applied; awaiting user approve/revise"}
+  ],
+  "remaining_tasks": [
+    {"id": "01-03", "name": "src/units/data.ts — 7 classes / 6 weapons / 2 armors + penetration matrix", "status": "not_started"},
+    {"id": "01-04", "name": "src/units/Unit.ts — getAttribute/getName + exp/level-up/unlock", "status": "not_started"},
+    {"id": "01-05", "name": "src/common/rng.ts (MathRng + sampleNormal) + src/units/spawn.ts", "status": "not_started"}
+  ],
+  "blockers": [
+    {"description": "Awaiting user approval of the unit-system type contract (blocking-human type-first gate). Revisions D-11 (null/undefined), D-12 (getName), and the IRng -> src/common move are already applied.", "type": "human_action", "workaround": "On 'approve': finalize 01-02 (write SUMMARY) then execute 01-03..01-05. On 'revise': apply further type edits and re-present."}
+  ],
+  "async_jobs": [],
+  "human_actions_pending": [
+    {"action": "Review and approve (or revise) the revised src/units/types.ts type contract", "context": "Type-first review gate; IUnit/AttributeKind are the stable contract for phases 2/3/5", "blocking": true}
+  ],
+  "decisions": [
+    {"decision": "16 attributes (not 17)", "rationale": "spec enumerates 16; the '17' was a counting error", "phase": "1"},
+    {"decision": "attack growth k·L; defense growth flat +6 (NOT 6L)", "rationale": "defense is a percentage reduction; a 6L curve over-scales late game", "phase": "1"},
+    {"decision": "absent object -> null; absent literal -> undefined (D-11)", "rationale": "at-a-glance object detection", "phase": "1"},
+    {"decision": "per-unit name via getName(): string (D-12)", "rationale": "on-screen tracking in recordings", "phase": "1"},
+    {"decision": "IRng -> src/common/types.ts; MathRng/sampleNormal -> src/common/rng.ts (D-07/D-09/D-10)", "rationale": "generic reusable abstraction shared across systems", "phase": "1"},
+    {"decision": "planning split into two rounds (types first, then implementation)", "rationale": "avoid plan rework caused by late contract changes; recorded in PROJECT.md + AGENTS.md", "phase": "1"},
+    {"decision": "workflow.use_worktrees=false (sequential on main tree)", "rationale": "opencode orchestrator-worktree exec descriptor unresolvable; matches parallelization=false", "phase": "1"}
+  ],
+  "uncommitted_files": ["M .planning/config.json", "?? .gsd/", "?? .planning/milestone.lock", "?? .planning/state.json"],
+  "next_action": "Present the revised src/units/types.ts to the user for approval; on approve, finalize plan 01-02 then execute 01-03.",
+  "context_notes": "Phase 1 executing sequentially (worktrees disabled). Wave 0 done. Wave 1 (01-02) is types-only and paused at the mandatory human review gate after applying the user's 3 feedback items. No implementation (01-03..05) has begun. Full plan set was re-verified by gsd-plan-checker before execution; type contract also passed the checker after revision."
+}
