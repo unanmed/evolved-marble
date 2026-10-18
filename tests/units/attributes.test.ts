@@ -77,6 +77,41 @@ describe('Unit — damage and death', () => {
     });
 });
 
+describe('Unit — takeDamage input guard (T-01-08)', () => {
+    it('ignores non-finite or non-positive damage without corrupting Health', () => {
+        const unit = new Unit(ClassKind.Swordsman, SWORDSMAN_ROLL);
+
+        for (const invalid of [NaN, Infinity, -Infinity, -100, 0]) {
+            unit.takeDamage(invalid);
+            expect(unit.getAttribute(AttributeKind.Health)).toBe(200);
+            expect(unit.isAlive()).toBe(true);
+        }
+    });
+
+    it('never lets Health exceed MaxHealth when given negative damage', () => {
+        const unit = new Unit(ClassKind.Swordsman, SWORDSMAN_ROLL);
+
+        unit.takeDamage(50);
+        unit.takeDamage(-1000);
+
+        expect(unit.getAttribute(AttributeKind.Health)).toBe(150);
+        expect(unit.getAttribute(AttributeKind.Health)).toBeLessThanOrEqual(
+            unit.getAttribute(AttributeKind.MaxHealth)
+        );
+    });
+
+    it('keeps Health finite and clamped after a non-finite damage attempt', () => {
+        const unit = new Unit(ClassKind.Swordsman, SWORDSMAN_ROLL);
+
+        unit.takeDamage(NaN);
+
+        const health = unit.getAttribute(AttributeKind.Health);
+        expect(Number.isFinite(health)).toBe(true);
+        expect(Number.isNaN(health)).toBe(false);
+        expect(health).toBe(200);
+    });
+});
+
 describe('Unit — non-numeric accessors', () => {
     it('exposes class, initial equipment, modifiers, skills and a non-empty name', () => {
         const unit = new Unit(ClassKind.Swordsman, SWORDSMAN_ROLL);

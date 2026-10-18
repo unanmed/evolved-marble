@@ -173,9 +173,20 @@ export class Unit implements IUnit {
         return [...this.#skills];
     }
 
-    /** 扣减生命值，并将生命值下限钳制为 0。 */
+    /**
+     * 扣减生命值。策略：`amount` 非有限或非正时视为无效伤害并直接忽略（不改变状态、不引入
+     * `NaN`/`Infinity`）；合法伤害将生命值钳制到 `[0, 生命上限]`，其中生命上限取经修正器调整后的
+     * 值，以维持 `getAttribute(Health) <= getAttribute(MaxHealth)` 的公开不变量。
+     */
     takeDamage(amount: number): void {
-        this.#hp = Math.max(0, this.#hp - amount);
+        if (!Number.isFinite(amount) || amount <= 0) {
+            return;
+        }
+        const maxHealth = this.#applyModifiers(
+            AttributeKind.MaxHealth,
+            this.#maxHealth()
+        );
+        this.#hp = Math.max(0, Math.min(this.#hp - amount, maxHealth));
     }
 
     /** 生命值大于 0 时返回 `true`。 */
