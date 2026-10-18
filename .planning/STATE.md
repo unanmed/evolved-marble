@@ -3,17 +3,17 @@ gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: 物理模拟系统
 status: executing
-stopped_at: Phase 2 context gathered
-last_updated: "2026-10-18T09:18:08.155Z"
+stopped_at: Completed 02-01-PLAN.md (Wave 0 harness)
+last_updated: "2026-10-18T10:50:49.175Z"
 last_activity: 2026-10-18
-last_activity_desc: Phase 1 complete, transitioned to Phase 2
-state_head: 270eac19de67273a16b823a8b89af6c19c169e7e
+last_activity_desc: Phase 2 execution started
+state_head: e99a0a60302cfa7fa6c4afc3945457dc5222308e
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 0
   total_plans: 7
-  completed_plans: 5
-  percent: 13
+  completed_plans: 6
+  percent: 0
 ---
 
 # Project State
@@ -23,16 +23,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-17)
 
 **Core value:** 战斗必须激烈好看。
-**Current focus:** Phase 1 — 单位系统
+**Current focus:** Phase 2 — 物理模拟系统
 
 ## Current Position
 
-Phase: 2 (物理模拟系统) — READY TO EXECUTE
-Plan: Not started
+Phase: 2 (物理模拟系统) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-10-18 — Phase 1 complete, transitioned to Phase 2
+Last activity: 2026-10-18 — Phase 2 execution started
 
-Progress: [█░░░░░░░░░] 13%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -63,6 +63,7 @@ Progress: [█░░░░░░░░░] 13%
 | Phase 1 P03 | 8min | 2 tasks | 3 files |
 | Phase 01-unit-system P04 | 6min | 2 tasks | 3 files |
 | Phase 01-unit-system P05 | 3min | 2 tasks | 4 files |
+| Phase 2 P1 | 4 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -88,6 +89,9 @@ Recent decisions affecting current work:
 - [Phase 1]: Phase 1 P04: the constructor seeds #hp from the level-1 MaxHealth so a unit always spawns at full health; #applyModifiers is scoped to MaxHealth/Attack/Defense in Phase 1 and IModifier is unchanged
 - [Phase 1]: Phase 1 P05: spawnUnit rolls the 7 spec attributes as N(class mean, (mean/8)^2) clamped non-negative; control-level mean is the shared CONTROL_LEVEL_BASE (10) for every class
 - [Phase 1]: Phase 1 P05: IRng/MathRng/sampleNormal live in src/common/ as the reusable randomness seam; sampleNormal guards u1<=0 (never Math.log(0)) with a non-negative clamp that is a correctness guard, not shaping
+- [Phase 2]: Phase 2 P01: @dimforge/rapier2d-compat pinned to literal 0.21.0 via pnpm add -E (D-02/D-12); runtime RAPIER.version()===0.21.0 asserted in the harness so the loaded build is pinned too
+- [Phase 2]: Phase 2 P01: default Vitest worker pool kept — full multi-file suite (9 files/82 tests) green with Rapier WASM loaded, so the research Pitfall 7 pool:'forks' fallback was not needed; vitest.config.ts unchanged
+- [Phase 2]: Phase 2 P01: tests/helpers/rng.ts extracts mulberry32 verbatim as the shared deterministic IRng (type-only import from @/common/types, AGENTS §9); tests/units/spawn-normal.test.ts untouched
 
 ### Pending Todos
 
@@ -108,6 +112,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-18T07:15:11.415Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-physics-simulation/02-CONTEXT.md
+Last session: 2026-10-18T10:50:49.115Z
+Stopped at: Completed 02-01-PLAN.md (Wave 0 harness)
+Resume file: .planning/phases/02-physics-simulation/02-02-PLAN.md

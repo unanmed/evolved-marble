@@ -81,12 +81,12 @@ Plans:
   4. 击中防具时按破甲比率应用减伤公式、击中本体时不触发减伤，数值与公式一致。
   5. 模拟以固定步长 tick（tick = 游戏 1 分钟）推进，且推进与渲染解耦。
 
-**Plans:** 2/2 plans complete (round 1 — type declarations)
+**Plans:** 1/2 plans executed (round 1 — type declarations)
 Plans:
 
 **Wave 0** *(prerequisite)*
 
-- [ ] 02-01-PLAN.md — 安装精确钉版 `@dimforge/rapier2d-compat@0.21.0`（`checkpoint:human-verify` 门禁）+ `tests/physics/` 脚手架 + Vitest worker-pool 验证（Pitfall 7）+ 共享确定性 `IRng` 测试辅助
+- [x] 02-01-PLAN.md — 安装精确钉版 `@dimforge/rapier2d-compat@0.21.0`（`checkpoint:human-verify` 门禁）+ `tests/physics/` 脚手架 + Vitest worker-pool 验证（Pitfall 7）+ 共享确定性 `IRng` 测试辅助
 
 **Wave 1** *(blocked on Wave 0)*
 
@@ -194,7 +194,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 单位系统 | 5/5 | Complete    | 2026-10-18 |
-| 2. 物理模拟系统 | 0/2 | Planning (round 1 of 2) | - |
+| 2. 物理模拟系统 | 1/2 | In Progress|  |
 | 3. 操控系统 | 0/0 | Not started | - |
 | 4. 王国系统 | 0/0 | Not started | - |
 | 5. 渲染系统 | 0/0 | Not started | - |
