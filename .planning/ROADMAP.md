@@ -23,7 +23,7 @@ This is a single-milestone project delivered as **8 phases, one per system, in a
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: 单位系统** - 16 项单位属性、7 职业、6 武器、2 防具、等级/经验/升级、正态随机生成
+- [x] **Phase 1: 单位系统** - 16 项单位属性、7 职业、6 武器、2 防具、等级/经验/升级、正态随机生成 (completed 2026-10-18)
 - [ ] **Phase 2: 物理模拟系统** - Rapier2D 复合刚体（部位打标）、类型化接触事件、伤害计算、固定 tick 推进
 - [ ] **Phase 3: 操控系统** - 单位级 AI 输入/输出契约、0.1s 决策节奏、可插拔控制 + 默认基线实现
 - [ ] **Phase 4: 王国系统** - 地图、行军、视野、军队、城池、驻扎/训练、军队/城池战斗触发与战后结算
@@ -47,7 +47,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. 生成同一职业的多个单位时，受随机影响的 7 项属性（生命上限/控制等级/攻击/防御/武器比率/防具比率/质量）呈均值按职业、标准差 = 均值/8 的正态分布，而非固定值。
   5. 按攻击/防御经验公式与击杀经验累积达到阈值时单位升级，基础属性按职业增长、生命值恢复「生命上限增加值」、并按解锁表获得装备/技能。
 
-**Plans:** 5/5 plans executed
+**Plans:** 5/5 plans complete
 Plans:
 **Wave 1**
 
@@ -183,7 +183,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. 单位系统 | 5/5 | In Progress|  |
+| 1. 单位系统 | 5/5 | Complete    | 2026-10-18 |
 | 2. 物理模拟系统 | 0/0 | Not started | - |
 | 3. 操控系统 | 0/0 | Not started | - |
 | 4. 王国系统 | 0/0 | Not started | - |
