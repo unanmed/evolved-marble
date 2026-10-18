@@ -81,7 +81,7 @@ Plans:
   4. 击中防具时按破甲比率应用减伤公式、击中本体时不触发减伤，数值与公式一致。
   5. 模拟以固定步长 tick（tick = 游戏 1 分钟）推进，且推进与渲染解耦。
 
-**Plans:** 1/2 plans executed (round 1 — type declarations)
+**Plans:** 2/2 plans executed (round 1 — type declarations)
 Plans:
 
 **Wave 0** *(prerequisite)*
@@ -90,7 +90,7 @@ Plans:
 
 **Wave 1** *(blocked on Wave 0)*
 
-- [ ] 02-02-PLAN.md — 类型先行：`src/physics/types.ts` 数字枚举 + `I*` 接口（仅声明）→ **用户类型设计审查门禁**
+- [x] 02-02-PLAN.md — 类型先行：`src/physics/types.ts` 数字枚举 + `I*` 接口（仅声明）→ **用户类型设计审查门禁**
 
 **Type-first gate**: Wave 1 (02-02, type declarations only) writes the physics folder's `types.ts` — the numeric `ColliderPart` enum, the compound-body registration spec, the part-tagged `IContactEvent`/`IDamageEvent` shapes, the geometry/config types, and the `IPhysicsWorld` contract; **user must review and approve the interface design before implementation is planned**. Round 1 plans type declarations ONLY; the Wave-2 implementation plans (compound-body registration, event pipeline, damage/armor formulas, tick driver) are authored in round 2 after the gate. OQ-1 is confirmed at the gate: `B_A = 破甲比率` (sign-consistent, D-11).
 
@@ -194,7 +194,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 单位系统 | 5/5 | Complete    | 2026-10-18 |
-| 2. 物理模拟系统 | 1/2 | In Progress|  |
+| 2. 物理模拟系统 | 2/2 | In Progress|  |
 | 3. 操控系统 | 0/0 | Not started | - |
 | 4. 王国系统 | 0/0 | Not started | - |
 | 5. 渲染系统 | 0/0 | Not started | - |

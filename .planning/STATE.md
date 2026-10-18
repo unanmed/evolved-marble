@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: 物理模拟系统
-status: executing
-stopped_at: Completed 02-01-PLAN.md (Wave 0 harness)
-last_updated: "2026-10-18T10:50:49.175Z"
+status: verifying
+stopped_at: Completed 02-02-PLAN.md (type contract; blocking-human design gate APPROVED)
+last_updated: "2026-10-18T15:13:13.069Z"
 last_activity: 2026-10-18
 last_activity_desc: Phase 2 execution started
-state_head: e99a0a60302cfa7fa6c4afc3945457dc5222308e
+state_head: 5e60439b59e63866745abb157a45bfe30e736d64
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 7
-  completed_plans: 6
+  completed_plans: 7
   percent: 0
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-17)
 
 Phase: 2 (物理模拟系统) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-18 — Phase 2 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -64,6 +64,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 01-unit-system P04 | 6min | 2 tasks | 3 files |
 | Phase 01-unit-system P05 | 3min | 2 tasks | 4 files |
 | Phase 2 P1 | 4 min | 3 tasks | 4 files |
+| Phase 2 P02 | 9min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -92,6 +93,9 @@ Recent decisions affecting current work:
 - [Phase 2]: Phase 2 P01: @dimforge/rapier2d-compat pinned to literal 0.21.0 via pnpm add -E (D-02/D-12); runtime RAPIER.version()===0.21.0 asserted in the harness so the loaded build is pinned too
 - [Phase 2]: Phase 2 P01: default Vitest worker pool kept — full multi-file suite (9 files/82 tests) green with Rapier WASM loaded, so the research Pitfall 7 pool:'forks' fallback was not needed; vitest.config.ts unchanged
 - [Phase 2]: Phase 2 P01: tests/helpers/rng.ts extracts mulberry32 verbatim as the shared deterministic IRng (type-only import from @/common/types, AGENTS §9); tests/units/spawn-normal.test.ts untouched
+- [Phase 2]: [Phase 2]: Phase 2 P02: physics type contract approved at the blocking-human gate — numeric ColliderPart enum + 8 I* interfaces declared declarations-only (src/physics/types.ts), no class/const/function/Rapier import
+- [Phase 2]: [Phase 2]: Phase 2 P02: IPhysicsWorld exposes applyForce/applyTorque now (physics is control's only actuator) and tick() returns a structured IPhysicsTickResult{contacts,damages}; scope boundary is IPhysicsWorld only — no IBattleSim (Phase 4)
+- [Phase 2]: [Phase 2]: Phase 2 P02: requirements-completed left empty — round 1 (type declarations only) stops at the review gate, so no PHYS-01..05 behavior is satisfied yet
 
 ### Pending Todos
 
@@ -112,6 +116,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-18T10:50:49.115Z
-Stopped at: Completed 02-01-PLAN.md (Wave 0 harness)
-Resume file: .planning/phases/02-physics-simulation/02-02-PLAN.md
+Last session: 2026-10-18T15:12:47.947Z
+Stopped at: Completed 02-02-PLAN.md (type contract; blocking-human design gate APPROVED)
+Resume file: None
