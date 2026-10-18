@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: 单位系统
-status: executing
-stopped_at: Completed 01-04-PLAN.md
-last_updated: "2026-10-18T05:39:47.355Z"
+status: verifying
+stopped_at: Completed 01-05-PLAN.md
+last_updated: "2026-10-18T05:46:44.428Z"
 last_activity: 2026-10-17
 last_activity_desc: Phase 1 execution started
-state_head: 31383e082861cd5959417952576dcca611cdeb57
+state_head: 36a76c3d0a64db7ba522c883e7190d23cbdc3830
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-17)
 
 Phase: 1 (单位系统) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-17 — Phase 1 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -62,6 +62,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 1 P02 | 50 | 3 tasks | 3 files |
 | Phase 1 P03 | 8min | 2 tasks | 3 files |
 | Phase 01-unit-system P04 | 6min | 2 tasks | 3 files |
+| Phase 01-unit-system P05 | 3min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -85,6 +86,8 @@ Recent decisions affecting current work:
 - [Phase 1]: Phase 1 P04: Unit.getAttribute computes MaxHealth/Attack/Defense/ControlLevel from the rolled spawn bases (#maxHpBase/#attackBase/#defenseBase/#controlLevelBase), not the #def statics, so spawn randomization stays observable (sigma != 0)
 - [Phase 1]: Phase 1 P04: attack growth is level-scaling (base + attackGrowth*L*(L-1)/2; Swordsman L3=90) and defense growth is flat per-level (base + defenseGrowth*(L-1); L3=36); level-derived values are recomputed on every read, never stored (D-04)
 - [Phase 1]: Phase 1 P04: the constructor seeds #hp from the level-1 MaxHealth so a unit always spawns at full health; #applyModifiers is scoped to MaxHealth/Attack/Defense in Phase 1 and IModifier is unchanged
+- [Phase 1]: Phase 1 P05: spawnUnit rolls the 7 spec attributes as N(class mean, (mean/8)^2) clamped non-negative; control-level mean is the shared CONTROL_LEVEL_BASE (10) for every class
+- [Phase 1]: Phase 1 P05: IRng/MathRng/sampleNormal live in src/common/ as the reusable randomness seam; sampleNormal guards u1<=0 (never Math.log(0)) with a non-negative clamp that is a correctness guard, not shaping
 
 ### Pending Todos
 
@@ -105,6 +108,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-18T05:39:47.326Z
-Stopped at: Completed 01-04-PLAN.md
+Last session: 2026-10-18T05:46:44.397Z
+Stopped at: Completed 01-05-PLAN.md
 Resume file: None
