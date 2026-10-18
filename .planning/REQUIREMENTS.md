@@ -11,9 +11,9 @@ Requirements for initial release. Each maps to roadmap phases.
 ### UNIT — 单位系统
 
 - [ ] **UNIT-01**: 单位拥有文档定义的属性集合（生命值、生命上限、等级、经验值、经验比率、攻击经验比率、防御经验比率、控制等级、基础攻击力、基础防御力、加成、装备、职业、武器比率、防具比率、质量）
-- [ ] **UNIT-02**: 定义 7 个职业（剑士、弓箭手、狂战士、锤兵、骑士、剑盾、长矛兵）的初始属性、每级成长与装备/技能解锁表
-- [ ] **UNIT-03**: 定义 6 种武器（长剑、短剑、斧头、锤子、弓箭、长矛）的攻击比率、质量与对各防具的破甲比率
-- [ ] **UNIT-04**: 定义 2 种防具（头盔、盾牌）的防御比率与质量
+- [x] **UNIT-02**: 定义 7 个职业（剑士、弓箭手、狂战士、锤兵、骑士、剑盾、长矛兵）的初始属性、每级成长与装备/技能解锁表
+- [x] **UNIT-03**: 定义 6 种武器（长剑、短剑、斧头、锤子、弓箭、长矛）的攻击比率、质量与对各防具的破甲比率
+- [x] **UNIT-04**: 定义 2 种防具（头盔、盾牌）的防御比率与质量
 - [ ] **UNIT-05**: 单位生成属性按正态分布随机（均值按职业，标准差 = 均值/8），作用于生命上限/控制等级/攻击/防御/武器比率/防具比率/质量
 - [ ] **UNIT-06**: 升级机制——按攻击/防御经验公式与击杀经验累积，达阈值升级并按职业增长属性、恢复生命上限增加值、解锁装备/技能
 
@@ -106,9 +106,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | UNIT-01 | Phase 1 — 单位系统 | Pending |
-| UNIT-02 | Phase 1 — 单位系统 | Pending |
-| UNIT-03 | Phase 1 — 单位系统 | Pending |
-| UNIT-04 | Phase 1 — 单位系统 | Pending |
+| UNIT-02 | Phase 1 — 单位系统 | Complete |
+| UNIT-03 | Phase 1 — 单位系统 | Complete |
+| UNIT-04 | Phase 1 — 单位系统 | Complete |
 | UNIT-05 | Phase 1 — 单位系统 | Pending |
 | UNIT-06 | Phase 1 — 单位系统 | Pending |
 | PHYS-01 | Phase 2 — 物理模拟系统 | Pending |
@@ -144,11 +144,13 @@ Which phases cover which requirements. Updated during roadmap creation.
 | STAT-02 | Phase 8 — 统计与精彩回放系统 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 37 total
 - Mapped to phases: 37
 - Unmapped: 0 ✓
 
 **Phase → Requirements:**
+
 - Phase 1 — 单位系统: UNIT-01..06 (6)
 - Phase 2 — 物理模拟系统: PHYS-01..05 (5)
 - Phase 3 — 操控系统: CTRL-01..04 (4)
