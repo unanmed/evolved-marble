@@ -112,6 +112,28 @@ describe('Unit — takeDamage input guard (T-01-08)', () => {
     });
 });
 
+describe('Unit constructor — classKind validation (WR-03)', () => {
+    it('throws a RangeError for an out-of-range class ordinal', () => {
+        expect(() => new Unit(99 as ClassKind, SWORDSMAN_ROLL)).toThrowError(
+            RangeError
+        );
+    });
+
+    it('names the offending ClassKind in the error message', () => {
+        expect(() => new Unit(-1 as ClassKind, SWORDSMAN_ROLL)).toThrow(
+            'Unknown ClassKind: -1'
+        );
+    });
+
+    it('still constructs successfully for every valid ClassKind', () => {
+        for (const kind of Object.values(ClassKind).filter(
+            (value): value is ClassKind => typeof value === 'number'
+        )) {
+            expect(new Unit(kind, SWORDSMAN_ROLL).getClass()).toBe(kind);
+        }
+    });
+});
+
 describe('Unit — non-numeric accessors', () => {
     it('exposes class, initial equipment, modifiers, skills and a non-empty name', () => {
         const unit = new Unit(ClassKind.Swordsman, SWORDSMAN_ROLL);

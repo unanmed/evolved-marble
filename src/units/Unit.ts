@@ -65,6 +65,7 @@ export class Unit implements IUnit {
      * @param roll 生成时按正态分布抽取的 7 项属性（作为 1 级基础值）。
      * @param modifiers 注入的加成修正器列表，默认空（Phase 1 无自身加成来源）。
      * @param name 单位显示名；省略时回退为职业名（D-12）。
+     * @throws {RangeError} 当 `classKind` 不是有效的 `ClassKind` 枚举序号时（数字枚举在运行时可为任意数）。
      */
     constructor(
         classKind: ClassKind,
@@ -72,9 +73,13 @@ export class Unit implements IUnit {
         modifiers: readonly IModifier[] = [],
         name?: string
     ) {
+        const def: IClassDef | undefined = CLASS_DEFS[classKind];
+        if (def === undefined) {
+            throw new RangeError(`Unknown ClassKind: ${String(classKind)}`);
+        }
         this.#classKind = classKind;
-        this.#def = CLASS_DEFS[classKind];
-        this.#name = name ?? this.#def.name;
+        this.#def = def;
+        this.#name = name ?? def.name;
 
         this.#maxHpBase = roll.maxHp;
         this.#controlLevelBase = roll.controlLevel;
