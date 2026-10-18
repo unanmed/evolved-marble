@@ -20,8 +20,10 @@ export class MathRng implements IRng {
 /**
  * 用 Box–Muller 变换从均匀随机源抽取一个正态分布样本 `N(mean, sd²)`，并截断到非负。
  *
- * 先在 `u1 <= 0` 时反复重抽以规避 `Math.log(0) = -Infinity`，再由两组均匀样本计算标准正态
- * `z = √(-2·ln u1)·cos(2π·u2)`，最后返回 `Math.max(0, mean + z·sd)`。
+ * 先在抽取值不在合法区间 `(0, 1]` 时反复重抽：`u1 <= 0` 会令 `Math.log(0) = -Infinity`，
+ * `u1 > 1` 会令 `-2·ln u1 < 0` 进而 `Math.sqrt(负数) = NaN`——两者都被此护栏拦下（`!(u1 > 0)`
+ * 同时排除 `NaN`）。随后由两组均匀样本计算标准正态 `z = √(-2·ln u1)·cos(2π·u2)`，
+ * 最后返回 `Math.max(0, mean + z·sd)`；若结果仍非有限则以 `mean` 兜底，保证返回值永不为 `NaN`/`Infinity`。
  *
  * 在 σ = 均值/8 的用法下，截断点位于均值以下 8 个标准差，命中概率可忽略，
  * 因此这里的非负截断是**正确性护栏**（保证属性不为负、不为 NaN/Infinity），而非塑形手段（D-08）。
@@ -33,10 +35,11 @@ export class MathRng implements IRng {
  */
 export function sampleNormal(rng: IRng, mean: number, sd: number): number {
     let u1 = rng.next();
-    while (u1 <= 0) {
+    while (!(u1 > 0) || u1 > 1) {
         u1 = rng.next();
     }
     const u2 = rng.next();
     const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-    return Math.max(0, mean + z * sd);
+    const sample = mean + z * sd;
+    return Number.isFinite(sample) ? Math.max(0, sample) : mean;
 }

@@ -45,6 +45,36 @@ describe('sampleNormal — non-negative clamp', () => {
     });
 });
 
+describe('sampleNormal — out-of-range / non-finite draw guard (T-01-11)', () => {
+    it('re-draws a u1 > 1 instead of returning NaN', () => {
+        const rng = scriptedRng([1.5, 0.5, 0.25]);
+        const value = sampleNormal(rng, 100, 10);
+
+        expect(Number.isFinite(value)).toBe(true);
+        expect(Number.isNaN(value)).toBe(false);
+        expect(value).toBeCloseTo(100, 10);
+    });
+
+    it('re-draws a non-finite u1 and still returns a finite sample', () => {
+        for (const bad of [NaN, Infinity, -Infinity]) {
+            const rng = scriptedRng([bad, 0.5, 0.25]);
+            const value = sampleNormal(rng, 100, 10);
+
+            expect(Number.isFinite(value)).toBe(true);
+            expect(Number.isNaN(value)).toBe(false);
+            expect(value).toBeCloseTo(100, 10);
+        }
+    });
+
+    it('returns a finite non-negative value when every earlier draw is invalid', () => {
+        const rng = scriptedRng([2, -1, 0, 0.5, 0.25]);
+        const value = sampleNormal(rng, 100, 10);
+
+        expect(Number.isFinite(value)).toBe(true);
+        expect(value).toBeGreaterThanOrEqual(0);
+    });
+});
+
 describe('MathRng — default non-deterministic source', () => {
     it('always returns a number in [0, 1)', () => {
         const rng = new MathRng();
