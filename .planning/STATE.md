@@ -93,9 +93,9 @@ Recent decisions affecting current work:
 - [Phase 2]: Phase 2 P01: @dimforge/rapier2d-compat pinned to literal 0.21.0 via pnpm add -E (D-02/D-12); runtime RAPIER.version()===0.21.0 asserted in the harness so the loaded build is pinned too
 - [Phase 2]: Phase 2 P01: default Vitest worker pool kept — full multi-file suite (9 files/82 tests) green with Rapier WASM loaded, so the research Pitfall 7 pool:'forks' fallback was not needed; vitest.config.ts unchanged
 - [Phase 2]: Phase 2 P01: tests/helpers/rng.ts extracts mulberry32 verbatim as the shared deterministic IRng (type-only import from @/common/types, AGENTS §9); tests/units/spawn-normal.test.ts untouched
-- [Phase 2]: [Phase 2]: Phase 2 P02: physics type contract approved at the blocking-human gate — numeric ColliderPart enum + 8 I* interfaces declared declarations-only (src/physics/types.ts), no class/const/function/Rapier import
-- [Phase 2]: [Phase 2]: Phase 2 P02: IPhysicsWorld exposes applyForce/applyTorque now (physics is control's only actuator) and tick() returns a structured IPhysicsTickResult{contacts,damages}; scope boundary is IPhysicsWorld only — no IBattleSim (Phase 4)
-- [Phase 2]: [Phase 2]: Phase 2 P02: requirements-completed left empty — round 1 (type declarations only) stops at the review gate, so no PHYS-01..05 behavior is satisfied yet
+- [Phase 2]: Phase 2 P02: physics type contract approved at the blocking-human gate — numeric ColliderPart enum + 8 I* interfaces declared declarations-only (src/physics/types.ts), no class/const/function/Rapier import
+- [Phase 2]: Phase 2 P02: IPhysicsWorld exposes applyForce/applyTorque now (physics is control's only actuator) and tick() returns a structured IPhysicsTickResult{contacts,damages}; scope boundary is IPhysicsWorld only — no IBattleSim (Phase 4)
+- [Phase 2]: Phase 2 P02: requirements-completed left empty — round 1 (type declarations only) stops at the review gate, so no PHYS-01..05 behavior is satisfied yet
 
 ### Pending Todos
 
