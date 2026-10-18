@@ -124,7 +124,7 @@ status: complete
 - **`ARMOR_DEFS: Record<ArmorKind, IArmorDef>`** — 头盔 (8 kg, ratio 1.0) and 盾牌 (15 kg, ratio 1.2).
 - **Calibration constants** — `ATTACK_EXP_DAMAGE_GATE=50`, `DEFENSE_EXP_DAMAGE_GATE=50`, `KILL_EXP_LEVEL_FACTOR=10`, `LEVEL_THRESHOLD_BASE=100`, `CONTROL_LEVEL_BASE=10`, `CONTROL_LEVEL_GROWTH_PER_LEVEL=5`, each JSDoc'd with its spec formula.
 - **Ordered iteration arrays** — `ALL_CLASS_KINDS` (7), `ALL_WEAPON_KINDS` (6), `ALL_ARMOR_KINDS` (2), ordered to side-step numeric-enum reverse mapping.
-- **Spec-exact tests** — 2 new files, 29 assertions, all green; full suite 4 files / 35 tests passing.
+- **Spec-exact tests** — 2 new files, 30 assertions, all green; full suite 4 files / 36 tests passing.
 
 ## Task Commits
 
@@ -148,7 +148,7 @@ Each task was committed atomically:
 |------|---------|--------|
 | Tests (Task 1) | `pnpm test -- tests/units/data-classes.test.ts` | exit 0 — 19 passed |
 | Tests (Task 2) | `pnpm test -- tests/units/data-weapons-armors.test.ts` | exit 0 — 10 passed |
-| Full suite | `pnpm test` | exit 0 — 4 files, 35 tests passed |
+| Full suite | `pnpm test` | exit 0 — 4 files, 36 tests passed |
 | Typecheck | `pnpm typecheck` | exit 0 (tables satisfy their `Record<Enum, IDef>` types) |
 | Lint | `pnpm lint` | exit 0 |
 
@@ -214,4 +214,4 @@ No new security-relevant surface. `data.ts` imports only `@/units/types` (no dep
 - Created files present on disk: `src/units/data.ts`, `tests/units/data-classes.test.ts`, `tests/units/data-weapons-armors.test.ts` ✓
 - Task commits present: `ca485fa`, `7ecece5`, `85e9e0b` ✓
 - Measured commits from ledger base `55d9e71`: 3 ✓
-- Gates green: `pnpm test` (35 passed), `pnpm typecheck` (exit 0), `pnpm lint` (exit 0) ✓
+- Gates green: `pnpm test` (36 passed), `pnpm typecheck` (exit 0), `pnpm lint` (exit 0) ✓
