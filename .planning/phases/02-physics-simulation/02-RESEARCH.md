@@ -507,13 +507,15 @@ tick(): readonly IDamageEvent[] { /* snapshot → step(queue) → drain → comp
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **OQ-1 (blocking for PHYS-04): penetration sign.** What we know: the spec writes `B_A = 1/破甲比率`; the weapon table + flavour text clearly intend higher penetration ⇒ more armor-bypass damage. What's unclear: which the user wants. Recommendation: use `B_A = penetration` (sign-consistent) and state it explicitly; surface at the type-first gate.
-2. **OQ-2: version pin.** `0.21.0` (latest, 2026-09-25) vs `0.20.0` (2026-08-08). Recommendation: `0.21.0` (current stable, API verified here) behind the human-verify checkpoint; fall back to `0.20.0` if the user prefers a more "settled" release.
-3. **OQ-3: damage-event ownership boundary.** Confirm physics computes *and* emits the typed event but the caller applies `takeDamage`/`gain*Experience` (D-09) — i.e., physics returns the final `damage`/`damageReduced` numbers, no `Unit` mutation.
-4. **OQ-4: weapon↔weapon and multi-armor semantics.** Multi-armor (helmet + shield) units: which armor collider is hit determines `armorKind` for the penetration lookup — confirm the plan ties each armor collider to its `ArmorKind`. Weapon↔weapon: no damage (recommended) or symmetric?
-5. **OQ-5: geometry defaults.** Body radius, weapon capsule length/radius/offset, armor radius/offset, and whether armor is a circle vs capsule — agent-discretion defaults, calibratable (D-06). Confirm at the gate.
+> **RESOLVED 2026-10-18 with the user before planning proceeds.** Decisions below are binding for Phase 2.
+
+1. **OQ-1 (PHYS-04) — penetration sign — RESOLVED: `B_A = 破甲比率`** (sign-consistent). Higher penetration ⇒ more armor bypassed. The spec's literal `1/破甲比率` would invert the weapon table (锤子 vs 头盔 = 5 would deal the *least* damage) and contradict the flavour text; the user ruled sign-consistent.
+2. **OQ-2 — version pin — RESOLVED: `0.21.0`** (exact pin, behind the human-verify install checkpoint).
+3. **OQ-3 — damage-event ownership boundary — RESOLVED: physics computes AND emits** the typed event with final `damage`/`damageReduced` numbers; the caller applies `takeDamage`/`gain*Experience`. No `Unit` mutation inside the physics layer.
+4. **OQ-4 — weapon↔weapon & multi-armor — RESOLVED:** weapon↔weapon contact ⇒ **no damage**; multi-armor units: the specific armor collider hit determines `armorKind` for the penetration lookup (each armor collider is tied to its `ArmorKind`).
+5. **OQ-5 — geometry defaults — RESOLVED (agent discretion, D-06):** agent picks reasonable defaults for body radius / weapon capsule / armor geometry; centralized constants, calibratable.
 
 ---
 

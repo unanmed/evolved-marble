@@ -31,6 +31,12 @@
 - **D-09:** 物理层**只计算并发出带部位标记的类型化伤害事件**；把伤害应用回 `Unit`（`takeDamage` / `gainAttackExperience` / `gainDefenseExperience`）由**调用方**（如 sim 胶合层 / 测试）完成。
 - **D-10:** **dt = 1/60 s，一次 tick = 一个物理 step**（战斗 1× 下 60 tick/s；AI 每 6 tick = 0.1s 决策一次）。物理推进**与渲染解耦**，按 tick 计数推进，不用 wall-clock。
 
+### 公式与裁决（research 决议，2026-10-18）
+- **D-11:** 破甲减伤符号采用 **`B_A = 破甲比率`**（符号一致），即 `ΔD = D_R·(1 − 100·pen/(100·pen + A_D·P_D·S_D))`。文档字面的 `1/破甲比率` 会让高破甲武器伤害反而更低、与武器表/风味文本矛盾——用户裁定用符号一致式。击中本体不减伤。
+- **D-12:** Rapier 精确钉 **`@dimforge/rapier2d-compat@0.21.0`**；安装前加 `checkpoint:human-verify`（包合法性 SUS 标记）。
+- **D-13:** **武器↔武器**碰撞**不产生伤害**；多防具单位：被击中的**具体防具 collider** 决定 `armorKind`（每个防具 collider 绑定其 `ArmorKind`）。
+- **D-14:** 伤害事件只携带**最终数值**（`damage` / `damageReduced`），物理层不外泄 `Unit` 变更；`takeDamage`/`gain*Experience` 由调用方应用（呼应 D-09）。
+
 ### the agent's Discretion
 - 碰撞组的具体位分配与应用场景；`part` 枚举的成员命名与取值；`Map` 的具体结构；形状常量（圆半径、武器/防具尺寸）的具体数值。
 - 类型化接触/伤害事件的字段结构；接触法向与 Δv 的精确取法（同一 body 多 collider 的自碰撞处理等）。
