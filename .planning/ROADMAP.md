@@ -81,7 +81,7 @@ Plans:
   4. 击中防具时按破甲比率应用减伤公式、击中本体时不触发减伤，数值与公式一致。
   5. 模拟以固定步长 tick（tick = 游戏 1 分钟）推进，且推进与渲染解耦。
 
-**Plans:** 2/2 plans executed (round 1 — type declarations)
+**Plans:** 6 plans (2 round-1 + 4 round-2 implementation)
 Plans:
 
 **Wave 0** *(prerequisite)*
@@ -91,6 +91,19 @@ Plans:
 **Wave 1** *(blocked on Wave 0)*
 
 - [x] 02-02-PLAN.md — 类型先行：`src/physics/types.ts` 数字枚举 + `I*` 接口（仅声明）→ **用户类型设计审查门禁**
+
+**Wave 2** *(round 2 — implementation; blocked on the Wave-1 gate)*
+
+- [ ] 02-03-PLAN.md — 纯伤害/减伤数学：`src/physics/damage.ts`（`computeDamageMean`/`rollDamage` σ=均值/20/`computeDamageReduction` D-11/D-13 分类）+ `tests/physics/damage.test.ts`（PHYS-03/04）
+- [ ] 02-04-PLAN.md — 物理常量 + 复合刚体：`src/physics/constants.ts` + `PhysicsWorld implements IPhysicsWorld`（本体/武器/防具逐 collider 质量与偏移、handle→部位索引、生命周期、状态读数、力/力矩、固定步 tick）+ `tests/physics/compound.test.ts`（PHYS-01/05）
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 02-05-PLAN.md — 接触→类型化事件：`tick()` 排空 `EventQueue`（仅 started）→ 部位打标 `IContactEvent[]`（无自碰撞）+ `tests/physics/events.test.ts`（PHYS-02）
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 02-06-PLAN.md — Δv（碰撞前速度·接触法向）+ 伤害事件：`tick()` 发出最终数值 `IDamageEvent`（防具减伤/本体不减伤/武器↔武器不伤害）+ `tests/physics/tick.test.ts`（PHYS-03/04）
 
 **Type-first gate**: Wave 1 (02-02, type declarations only) writes the physics folder's `types.ts` — the numeric `ColliderPart` enum, the compound-body registration spec, the part-tagged `IContactEvent`/`IDamageEvent` shapes, the geometry/config types, and the `IPhysicsWorld` contract; **user must review and approve the interface design before implementation is planned**. Round 1 plans type declarations ONLY; the Wave-2 implementation plans (compound-body registration, event pipeline, damage/armor formulas, tick driver) are authored in round 2 after the gate. OQ-1 is confirmed at the gate: `B_A = 破甲比率` (sign-consistent, D-11).
 
