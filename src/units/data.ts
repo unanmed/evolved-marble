@@ -12,7 +12,7 @@ import {
     SkillKind,
     WeaponKind
 } from '@/units/types';
-import type { IClassDef } from '@/units/types';
+import type { IArmorDef, IClassDef, IWeaponDef } from '@/units/types';
 
 /**
  * 攻击经验门槛：单次造成的伤害必须超过此值，才按攻击经验比率获取经验。
@@ -316,4 +316,91 @@ export const ALL_CLASS_KINDS: readonly ClassKind[] = [
     ClassKind.Knight,
     ClassKind.SwordShield,
     ClassKind.Spearman
+];
+
+/**
+ * 6 武器的完整数值定义，按 `WeaponKind` 索引（缺项即编译错误）。
+ * `penetration` 以 `ArmorKind` 为键，保证「武器 × 防具」破甲查表完整。
+ */
+export const WEAPON_DEFS: Record<WeaponKind, IWeaponDef> = {
+    [WeaponKind.Longsword]: {
+        id: WeaponKind.Longsword,
+        name: '长剑',
+        mass: 12,
+        attackRatio: 1.2,
+        penetration: { [ArmorKind.Helmet]: 1.5, [ArmorKind.Shield]: 0.6 }
+    },
+    [WeaponKind.Shortsword]: {
+        id: WeaponKind.Shortsword,
+        name: '短剑',
+        mass: 8,
+        attackRatio: 1.0,
+        penetration: { [ArmorKind.Helmet]: 1, [ArmorKind.Shield]: 1 }
+    },
+    [WeaponKind.Axe]: {
+        id: WeaponKind.Axe,
+        name: '斧头',
+        mass: 16,
+        attackRatio: 0.8,
+        penetration: { [ArmorKind.Helmet]: 2, [ArmorKind.Shield]: 1 }
+    },
+    [WeaponKind.Hammer]: {
+        id: WeaponKind.Hammer,
+        name: '锤子',
+        mass: 25,
+        attackRatio: 1.5,
+        penetration: { [ArmorKind.Helmet]: 5, [ArmorKind.Shield]: 3 }
+    },
+    [WeaponKind.Bow]: {
+        id: WeaponKind.Bow,
+        name: '弓箭',
+        mass: 6,
+        attackRatio: 0.6,
+        penetration: { [ArmorKind.Helmet]: 0.4, [ArmorKind.Shield]: 0.2 }
+    },
+    [WeaponKind.Spear]: {
+        id: WeaponKind.Spear,
+        name: '长矛',
+        mass: 15,
+        attackRatio: 0.8,
+        penetration: { [ArmorKind.Helmet]: 2, [ArmorKind.Shield]: 1.5 }
+    }
+};
+
+/**
+ * 2 防具的完整数值定义，按 `ArmorKind` 索引（缺项即编译错误）。
+ */
+export const ARMOR_DEFS: Record<ArmorKind, IArmorDef> = {
+    [ArmorKind.Helmet]: {
+        id: ArmorKind.Helmet,
+        name: '头盔',
+        mass: 8,
+        defenseRatio: 1.0
+    },
+    [ArmorKind.Shield]: {
+        id: ArmorKind.Shield,
+        name: '盾牌',
+        mass: 15,
+        defenseRatio: 1.2
+    }
+};
+
+/**
+ * 全部武器的固定顺序列表：数字枚举带反向映射，遍历应使用本数组而非 `Object.keys`。
+ */
+export const ALL_WEAPON_KINDS: readonly WeaponKind[] = [
+    WeaponKind.Longsword,
+    WeaponKind.Shortsword,
+    WeaponKind.Axe,
+    WeaponKind.Hammer,
+    WeaponKind.Bow,
+    WeaponKind.Spear
+];
+
+/**
+ * 全部防具的固定顺序列表：数字枚举带反向映射，遍历应使用本数组而非 `Object.keys`。
+ */
+export const ALL_ARMOR_KINDS: readonly ArmorKind[] = [
+    ArmorKind.Helmet,
+    ArmorKind.Shield
 ];
