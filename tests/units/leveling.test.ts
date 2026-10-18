@@ -5,8 +5,10 @@ import {
     ArmorKind,
     AttributeKind,
     ClassKind,
-    EquipmentKind
+    EquipmentKind,
+    ModifierMode
 } from '@/units/types';
+import type { IModifier } from '@/units/types';
 import { Unit } from '@/units/Unit';
 
 /**
@@ -156,6 +158,31 @@ describe('Unit — health restore on level-up', () => {
 
         unit.gainKillExperience(30); // level 2 → +20 MaxHealth
         expect(unit.getAttribute(AttributeKind.Health)).toBe(170);
+        expect(unit.getAttribute(AttributeKind.Health)).toBeLessThanOrEqual(
+            unit.getAttribute(AttributeKind.MaxHealth)
+        );
+    });
+
+    it('restores health by the actual modifier-adjusted MaxHealth increase (WR-02)', () => {
+        const doubleMaxHealth: IModifier = {
+            kind: AttributeKind.MaxHealth,
+            mode: ModifierMode.Multiplicative,
+            value: 1.0
+        };
+        const unit = new Unit(ClassKind.Swordsman, SWORDSMAN_ROLL, [
+            doubleMaxHealth
+        ]);
+
+        /* 乘算 +100%：1 级上限 200→400，满血 400。 */
+        expect(unit.getAttribute(AttributeKind.MaxHealth)).toBe(400);
+        expect(unit.getAttribute(AttributeKind.Health)).toBe(400);
+
+        unit.takeDamage(50); // 350
+        unit.gainKillExperience(30); // level 2：上限 220→440，增量 40
+
+        expect(unit.getAttribute(AttributeKind.Level)).toBe(2);
+        expect(unit.getAttribute(AttributeKind.MaxHealth)).toBe(440);
+        expect(unit.getAttribute(AttributeKind.Health)).toBe(390);
         expect(unit.getAttribute(AttributeKind.Health)).toBeLessThanOrEqual(
             unit.getAttribute(AttributeKind.MaxHealth)
         );

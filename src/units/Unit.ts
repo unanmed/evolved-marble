@@ -287,14 +287,26 @@ export class Unit implements IUnit {
         );
     }
 
-    /** 检查并执行升级：扣除阈值、结转余量，循环处理一次经验可触发的多次升级（OQ-4）。 */
+    /**
+     * 检查并执行升级：扣除阈值、结转余量，循环处理一次经验可触发的多次升级（OQ-4）。
+     * 升级时按**生命上限的实际增量**回复生命，该增量取自经修正器调整后的 MaxHealth（`previous` 到
+     * `current` 之差），从而让注入的乘算 MaxHealth 修正器得到尊重；回复后钳制到当前上限。
+     */
     #checkLevelUp(): void {
         while (this.#xp >= this.#levelThreshold()) {
             this.#xp -= this.#levelThreshold();
+            const previousMaxHealth = this.#applyModifiers(
+                AttributeKind.MaxHealth,
+                this.#maxHealth()
+            );
             this.#level += 1;
+            const currentMaxHealth = this.#applyModifiers(
+                AttributeKind.MaxHealth,
+                this.#maxHealth()
+            );
             this.#hp = Math.min(
-                this.#hp + this.#def.maxHpGrowth,
-                this.#applyModifiers(AttributeKind.MaxHealth, this.#maxHealth())
+                this.#hp + (currentMaxHealth - previousMaxHealth),
+                currentMaxHealth
             );
             this.#applyUnlocks();
         }
