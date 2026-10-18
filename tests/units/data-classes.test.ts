@@ -2,9 +2,13 @@ import { describe, expect, it } from 'vitest';
 
 import {
     ALL_CLASS_KINDS,
+    ATTACK_EXP_DAMAGE_GATE,
     CLASS_DEFS,
     CONTROL_LEVEL_BASE,
-    CONTROL_LEVEL_GROWTH_PER_LEVEL
+    CONTROL_LEVEL_GROWTH_PER_LEVEL,
+    DEFENSE_EXP_DAMAGE_GATE,
+    KILL_EXP_LEVEL_FACTOR,
+    LEVEL_THRESHOLD_BASE
 } from '@/units/data';
 import {
     ArmorKind,
@@ -38,6 +42,13 @@ describe('units/data — CLASS_DEFS completeness', () => {
     it('exposes the shared control-level calibration constants', () => {
         expect(CONTROL_LEVEL_BASE).toBe(10);
         expect(CONTROL_LEVEL_GROWTH_PER_LEVEL).toBe(5);
+    });
+
+    it('pins every level/experience calibration constant to its spec value', () => {
+        expect(ATTACK_EXP_DAMAGE_GATE).toBe(50);
+        expect(DEFENSE_EXP_DAMAGE_GATE).toBe(50);
+        expect(KILL_EXP_LEVEL_FACTOR).toBe(10);
+        expect(LEVEL_THRESHOLD_BASE).toBe(100);
     });
 });
 
