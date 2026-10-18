@@ -14,9 +14,9 @@ import { Unit } from '@/units/Unit';
 /**
  * 全部数值型属性成员的固定列表（取自数字枚举的值侧，剔除反向映射出的字符串键）。
  */
-const ALL_ATTRIBUTE_KINDS: AttributeKind[] = Object.values(AttributeKind).filter(
-    (value): value is AttributeKind => typeof value === 'number'
-);
+const ALL_ATTRIBUTE_KINDS: AttributeKind[] = Object.values(
+    AttributeKind
+).filter((value): value is AttributeKind => typeof value === 'number');
 
 /**
  * 与剑士职业基础值完全一致的生成属性，用于得到确定性的期望值。
@@ -172,7 +172,12 @@ describe('Unit — injected modifiers affect the three combat stats', () => {
 
 describe('Unit.getName — name fixed at construction (D-12)', () => {
     it('returns an explicit name verbatim', () => {
-        const unit = new Unit(ClassKind.Swordsman, SWORDSMAN_ROLL, [], '剑士#7');
+        const unit = new Unit(
+            ClassKind.Swordsman,
+            SWORDSMAN_ROLL,
+            [],
+            '剑士#7'
+        );
 
         expect(unit.getName()).toBe('剑士#7');
     });
