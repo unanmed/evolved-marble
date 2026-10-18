@@ -60,7 +60,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 01-04-PLAN.md — `class Unit implements IUnit`：`getAttribute` + 升级/经验机制（UNIT-01/06）
+- [x] 01-04-PLAN.md — `class Unit implements IUnit`：`getAttribute` + 升级/经验机制（UNIT-01/06）
 
 **Wave 4** *(blocked on Wave 3 completion)*
 

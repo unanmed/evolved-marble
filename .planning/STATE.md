@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 1
 current_phase_name: 单位系统
 status: executing
-stopped_at: Completed 01-03-PLAN.md
-last_updated: "2026-10-18T05:27:27.993Z"
+stopped_at: Completed 01-04-PLAN.md
+last_updated: "2026-10-18T05:39:47.355Z"
 last_activity: 2026-10-17
 last_activity_desc: Phase 1 execution started
-state_head: 85e9e0b5a82c7da57225d6128949a1cdeeac2505
+state_head: 31383e082861cd5959417952576dcca611cdeb57
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 5
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-17)
 ## Current Position
 
 Phase: 1 (单位系统) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-10-17 — Phase 1 execution started
 
@@ -61,6 +61,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 1 P01 | 12 min | 3 tasks | 5 files |
 | Phase 1 P02 | 50 | 3 tasks | 3 files |
 | Phase 1 P03 | 8min | 2 tasks | 3 files |
+| Phase 01-unit-system P04 | 6min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -81,6 +82,9 @@ Recent decisions affecting current work:
 - [Phase 1]: IUnit.getName() carries the spawn-time per-unit name (D-12); no getters/setters anywhere
 - [Phase 1]: Phase 1 P03: data.ts is the single calibration surface — CLASS_DEFS/WEAPON_DEFS/ARMOR_DEFS + 6 named constants, all spec-exact and test-pinned
 - [Phase 1]: Phase 1 P03: attackGrowth is the k.L coefficient, defenseGrowth is a flat per-level increment (OQ-2); maxHpGrowth is ~10% of base maxHp and calibration-pending (OQ-3); class mass is body-only (OQ-6)
+- [Phase 1]: Phase 1 P04: Unit.getAttribute computes MaxHealth/Attack/Defense/ControlLevel from the rolled spawn bases (#maxHpBase/#attackBase/#defenseBase/#controlLevelBase), not the #def statics, so spawn randomization stays observable (sigma != 0)
+- [Phase 1]: Phase 1 P04: attack growth is level-scaling (base + attackGrowth*L*(L-1)/2; Swordsman L3=90) and defense growth is flat per-level (base + defenseGrowth*(L-1); L3=36); level-derived values are recomputed on every read, never stored (D-04)
+- [Phase 1]: Phase 1 P04: the constructor seeds #hp from the level-1 MaxHealth so a unit always spawns at full health; #applyModifiers is scoped to MaxHealth/Attack/Defense in Phase 1 and IModifier is unchanged
 
 ### Pending Todos
 
@@ -101,6 +105,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-18T05:27:27.964Z
-Stopped at: Completed 01-03-PLAN.md
+Last session: 2026-10-18T05:39:47.326Z
+Stopped at: Completed 01-04-PLAN.md
 Resume file: None
