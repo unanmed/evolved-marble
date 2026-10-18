@@ -194,9 +194,15 @@ export class Unit implements IUnit {
         return this.#hp > 0;
     }
 
-    /** 造成伤害时按攻击经验比率累积经验：`R_A·√(D−门槛)`（伤害须超过门槛）。 */
+    /**
+     * 造成伤害时按攻击经验比率累积经验：`R_A·√(D−门槛)`（伤害须超过门槛）。
+     * 仅接受有限且超过门槛的伤害值；非有限输入（`NaN`/`Infinity`）不累加经验，避免污染 `#xp`。
+     */
     gainAttackExperience(damageDealt: number): void {
-        if (damageDealt > ATTACK_EXP_DAMAGE_GATE) {
+        if (
+            Number.isFinite(damageDealt) &&
+            damageDealt > ATTACK_EXP_DAMAGE_GATE
+        ) {
             this.#xp +=
                 this.#def.attackExpRatio *
                 Math.sqrt(damageDealt - ATTACK_EXP_DAMAGE_GATE);
@@ -204,9 +210,15 @@ export class Unit implements IUnit {
         this.#checkLevelUp();
     }
 
-    /** 抵挡伤害时按防御经验比率累积经验：`R_D·√(ΔD−门槛)`（减免值须超过门槛）。 */
+    /**
+     * 抵挡伤害时按防御经验比率累积经验：`R_D·√(ΔD−门槛)`（减免值须超过门槛）。
+     * 仅接受有限且超过门槛的减免值；非有限输入不累加经验。
+     */
     gainDefenseExperience(damageReduced: number): void {
-        if (damageReduced > DEFENSE_EXP_DAMAGE_GATE) {
+        if (
+            Number.isFinite(damageReduced) &&
+            damageReduced > DEFENSE_EXP_DAMAGE_GATE
+        ) {
             this.#xp +=
                 this.#def.defenseExpRatio *
                 Math.sqrt(damageReduced - DEFENSE_EXP_DAMAGE_GATE);
@@ -214,8 +226,15 @@ export class Unit implements IUnit {
         this.#checkLevelUp();
     }
 
-    /** 击杀敌人时按敌人等级额外累积攻击经验：`R_A·KILL_EXP_LEVEL_FACTOR·L`。 */
+    /**
+     * 击杀敌人时按敌人等级额外累积攻击经验：`R_A·KILL_EXP_LEVEL_FACTOR·L`。
+     * 策略：`enemyLevel` 非有限或非正时视为无效击杀并直接忽略——既防止 `NaN`/`Infinity` 污染 `#xp`，
+     * 也防止 `Infinity` 驱动 `#checkLevelUp` 的多级循环无界膨胀。
+     */
     gainKillExperience(enemyLevel: number): void {
+        if (!Number.isFinite(enemyLevel) || enemyLevel <= 0) {
+            return;
+        }
         this.#xp +=
             this.#def.attackExpRatio * KILL_EXP_LEVEL_FACTOR * enemyLevel;
         this.#checkLevelUp();

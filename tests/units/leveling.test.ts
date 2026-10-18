@@ -58,6 +58,44 @@ describe('Unit — attack/defense/kill experience formulas', () => {
     });
 });
 
+describe('Unit — experience mutator input guard (T-01-08)', () => {
+    it('ignores non-finite or non-positive kill experience', () => {
+        const unit = new Unit(ClassKind.Swordsman, SWORDSMAN_ROLL);
+
+        for (const invalid of [NaN, Infinity, -Infinity, -5, 0]) {
+            unit.gainKillExperience(invalid);
+            const xp = unit.getAttribute(AttributeKind.Experience);
+            expect(Number.isFinite(xp)).toBe(true);
+            expect(Number.isNaN(xp)).toBe(false);
+            expect(xp).toBe(0);
+            expect(unit.getAttribute(AttributeKind.Level)).toBe(1);
+        }
+    });
+
+    it('never lets a non-finite kill value inflate the level unbounded', () => {
+        const unit = new Unit(ClassKind.Swordsman, SWORDSMAN_ROLL);
+
+        unit.gainKillExperience(Infinity);
+        unit.gainKillExperience(NaN);
+
+        expect(unit.getAttribute(AttributeKind.Level)).toBe(1);
+        expect(unit.getAttribute(AttributeKind.Experience)).toBe(0);
+    });
+
+    it('ignores non-finite attack/defense experience inputs', () => {
+        const unit = new Unit(ClassKind.Swordsman, SWORDSMAN_ROLL);
+
+        unit.gainAttackExperience(Infinity);
+        unit.gainAttackExperience(NaN);
+        unit.gainDefenseExperience(Infinity);
+        unit.gainDefenseExperience(NaN);
+
+        const xp = unit.getAttribute(AttributeKind.Experience);
+        expect(Number.isFinite(xp)).toBe(true);
+        expect(xp).toBe(0);
+    });
+});
+
 describe('Unit — level-up threshold and level change', () => {
     it('does not level up below 100·(1+R_E)^L', () => {
         const unit = new Unit(ClassKind.Swordsman, SWORDSMAN_ROLL);
