@@ -124,8 +124,14 @@ Plans:
   4. 控制模块可插拔：换入另一个 AI 实现时无需改动物理/单位系统，模拟仍可持续运行。
   5. 默认基线 AI 使单位能自主完成接近、攻击、脱离等行为，模拟无需人工输入即可持续运行。
 
-**Plans**: TBD
-**Type-first gate**: Wave 1 writes the control folder's `types.ts` + `IUnitAI` (input/output contracts) and the pluggable provider interface; **user reviews and approves before implementation**. The default baseline AI is a separate `implements IUnitAI` class written in Wave 2.
+**Plans:** 1 plan (round 1 — type declarations only)
+Plans:
+
+**Wave 1** *(round 1 — the type-first gate)*
+
+- [ ] 03-01-PLAN.md — 类型先行：`src/control/types.ts`（`SkillIntentKind` 数字枚举 + `IUnitObservation`/`IUnitAction`/`IUnitAI`/`IUnitAIProvider`/`ISensor`/`ISensingWorld`/`IDamageSink`/`IControlSystem` 等全部契约，仅声明）+ `tests/control/types.test.ts`（枚举钉版 + 编译期契约断言）→ **用户类型设计审查门禁**
+
+**Type-first gate**: Wave 1 (03-01, type declarations only) writes the control folder's `types.ts` + `IUnitAI` (input/output contracts) and the pluggable provider interface; **user reviews and approves before implementation**. The round-2 implementation plans (Sensor, ControlSystem loop, ArenaSensingWorld, DefaultUnitAI, IDamageSink glue, constants) are authored only after the gate. The default baseline AI is a separate `implements IUnitAI` class written in round 2.
 
 ### Phase 4: 王国系统
 
@@ -212,7 +218,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 |-------|----------------|--------|-----------|
 | 1. 单位系统 | 5/5 | Complete    | 2026-10-18 |
 | 2. 物理模拟系统 | 7/7 | Complete    | 2026-10-19 |
-| 3. 操控系统 | 0/0 | Not started | - |
+| 3. 操控系统 | 0/1 | Planning | - |
 | 4. 王国系统 | 0/0 | Not started | - |
 | 5. 渲染系统 | 0/0 | Not started | - |
 | 6. 录制系统 | 0/0 | Not started | - |
