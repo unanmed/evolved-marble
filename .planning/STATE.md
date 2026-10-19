@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: 物理模拟系统
-status: executing
-stopped_at: Completed 02-05-PLAN.md (contact->typed-event bridge; PHYS-02)
-last_updated: "2026-10-19T06:06:25.708Z"
+status: verifying
+stopped_at: Completed 02-06-PLAN.md (damage pipeline; PHYS-03/PHYS-04)
+last_updated: "2026-10-19T06:26:11.962Z"
 last_activity: 2026-10-18
 last_activity_desc: Phase 2 execution started
-state_head: 7738cd0214132643bf7bd9ff173074e218d3693f
+state_head: 6c5cf553572d7e981c7238b121322e06492b64b9
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 11
-  completed_plans: 10
+  completed_plans: 11
   percent: 0
 ---
 
@@ -29,7 +29,7 @@ See: .planning/PROJECT.md (updated 2026-10-17)
 
 Phase: 2 (物理模拟系统) — READY TO EXECUTE
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-10-18 — Phase 2 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -68,6 +68,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02 P03 | 12min | 2 tasks | 2 files |
 | Phase 2 P04 | 7min | 3 tasks | 3 files |
 | Phase 02-physics-simulation P05 | 7min | 2 tasks | 2 files |
+| Phase 2 P06 | 6min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -107,6 +108,8 @@ Recent decisions affecting current work:
 - [Phase 2]: Phase 2 P04: #rng is not stored yet (constructor param _rng) because no-unused-private-class-members is an error for write-only fields; 02-06 adds the stored field when damage jitter consumes it
 - [Phase 2]: Phase 2 P05: tick() drains the EventQueue after the step and emits a part-tagged IContactEvent only for started, cross-unit collisions; parts come solely from the collider-handle index (D-04/D-08)
 - [Phase 2]: Phase 2 P05: contact events stay unordered (unitAId/partA, unitBId/partB) with a defensive same-unit guard; no contact normal is read in the drain - the normal + dv belong to the 02-06 damage layer
+- [Phase 2]: Phase 2 P06: tick() computes dV from PRE-step velocities + the contactPair normal (copied in-closure) and emits final-number IDamageEvents, deduped once per (attackerId,defenderId) per tick with armor-beats-body precedence; contacts stay complete
+- [Phase 2]: Phase 2 P06: damage dedup applies to damages only; the one-strike window is per tick (cross-tick suppression is neither implemented nor asserted); #preVelocities/#rng placeholders from 02-04/02-05 are now consumed
 
 ### Pending Todos
 
@@ -127,6 +130,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-19T06:06:13.690Z
-Stopped at: Completed 02-05-PLAN.md (contact->typed-event bridge; PHYS-02)
+Last session: 2026-10-19T06:26:11.899Z
+Stopped at: Completed 02-06-PLAN.md (damage pipeline; PHYS-03/PHYS-04)
 Resume file: None
