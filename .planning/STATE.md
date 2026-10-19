@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 03
 current_phase_name: 操控系统
 status: executing
-stopped_at: Phase 3 context gathered
-last_updated: "2026-10-19T13:54:25.616Z"
+stopped_at: Completed 03-01-PLAN.md (round 1 type gate approved) — round 2 implementation planning pending
+last_updated: "2026-10-19T14:26:56.757Z"
 last_activity: 2026-10-19
-last_activity_desc: Phase 2 complete, transitioned to Phase 3
-state_head: 56df98625b2806acdb00a8c7707c8f8667cd934a
+last_activity_desc: Plan 03-01 complete — type gate approved, round 2 pending
+state_head: 1edd5da9a86a5ce11183ff393febf8762e8d1ccf
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 13
-  completed_plans: 12
+  completed_plans: 13
   percent: 0
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-17)
 
 **Core value:** 战斗必须激烈好看。
-**Current focus:** Phase 2 — 物理模拟系统
+**Current focus:** Phase 03 — 操控系统
 
 ## Current Position
 
-Phase: 03 (操控系统) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-10-19 — Phase 2 complete, transitioned to Phase 3
+Phase: 03 (操控系统) — IN PROGRESS (round 1 complete)
+Plan: 1 of 1 (round 1 — type gate approved)
+Status: Round 2 implementation planning pending
+Last activity: 2026-10-19 — Plan 03-01 complete; type design approved at the gate
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -38,7 +38,7 @@ Progress: [░░░░░░░░░░] 0%
 
 **Velocity:**
 
-- Total plans completed: 12
+- Total plans completed: 13
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -48,6 +48,7 @@ Progress: [░░░░░░░░░░] 0%
 |-------|-------|-------|----------|
 | 1 | 5 | - | - |
 | 2 | 7 | - | - |
+| 3 | 1 | - | - |
 
 **Recent Trend:**
 
@@ -71,6 +72,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 02-physics-simulation P05 | 7min | 2 tasks | 2 files |
 | Phase 2 P06 | 6min | 2 tasks | 2 files |
 | Phase 02 P07 | 12min | 2 tasks | 2 files |
+| Phase 03 P01 | 13 min | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -114,6 +116,9 @@ Recent decisions affecting current work:
 - [Phase 2]: Phase 2 P06: damage dedup applies to damages only; the one-strike window is per tick (cross-tick suppression is neither implemented nor asserted); #preVelocities/#rng placeholders from 02-04/02-05 are now consumed
 - [Phase 2]: Phase 2 P07: the omega x r moment arm is measured from body.worldCom() (the COM that linvel() uses), never body.translation(); the 2D cross-product, normal projection, and pre-step velocity source are unchanged (D-08)
 - [Phase 2]: Phase 2 P07: tests/physics/rotation.test.ts is the phase's first applyTorque regression - it pins the emitted deltaV to the COM-based contact-point projection (3 dp), rejects the origin-based value (>0.5 m/s apart), and cross-checks with Rapier velocityAtPoint (6 dp)
+- [Phase 03]: Phase 3 round 1: control-system type contract approved at the type-first gate — 17 I* interfaces + numeric SkillIntentKind, declarations only
+- [Phase 03]: Phase 3 round 2 pending: Sensor, ControlSystem loop, ArenaSensingWorld, DefaultUnitAI, IDamageSink glue and src/control/constants.ts are planned only after the gate; requirements-completed stays empty in round 1
+- [Phase 03]: Gate answers recorded for round 2: ISensingWorld is env-geometry-only; first-equipped weapon wins at registration; decide-then-apply on ticks 0/6/12; cooldown lives on the AI instance with intents leaving via IControlTickResult.skillIntents; ControlSystem owns dead-unit deregistration; IUnitState imported from @/physics/types
 
 ### Pending Todos
 
@@ -134,6 +139,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-19T12:32:22.269Z
-Stopped at: Phase 3 context gathered
-Resume file: .planning/phases/03-control-system/03-CONTEXT.md
+Last session: 2026-10-19T14:26:56.655Z
+Stopped at: Completed 03-01-PLAN.md (round 1 type gate approved) — round 2 implementation planning pending
+Resume file: None
