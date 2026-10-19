@@ -306,8 +306,10 @@ export class PhysicsWorld implements IPhysicsWorld {
             const defenderVelocity = this.#preVelocities.get(
                 defenderTag.unitId
             ) ?? { vx: 0, vy: 0, omega: 0 };
-            // 接触点速度 = 质心速度 + `ω×r`（2D：`(-ω·ry, ω·rx)`）；`r` 为接触点相对
-            // 该刚体质心的位移。无接触点时退化为纯线速度（research A2 的完整式）。
+            // 接触点速度 = 质心速度 + `ω×r`（2D：`(-ω·ry, ω·rx)`）；`r` 必须与 `linvel()`
+            // 同一起点——Rapier 的线速度是**质心**速度且刚体绕**质心**旋转，故 `r` 取自
+            // `worldCom()`，绝不能取刚体原点 `translation()`（复合刚体两者相差 `|com − origin|`，
+            // 会给旋转武器注入 `|ω|·|com − origin|` 的假速度）。无接触点时退化为纯线速度。
             let attackerVx = attackerVelocity.vx;
             let attackerVy = attackerVelocity.vy;
             let defenderVx = defenderVelocity.vx;
@@ -319,8 +321,8 @@ export class PhysicsWorld implements IPhysicsWorld {
                 attackerBody !== undefined &&
                 defenderBody !== undefined
             ) {
-                const attackerCenter = attackerBody.translation();
-                const defenderCenter = defenderBody.translation();
+                const attackerCenter = attackerBody.worldCom();
+                const defenderCenter = defenderBody.worldCom();
                 const attackerRx = contactX - attackerCenter.x;
                 const attackerRy = contactY - attackerCenter.y;
                 const defenderRx = contactX - defenderCenter.x;
