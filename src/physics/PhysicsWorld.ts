@@ -69,8 +69,14 @@ export class PhysicsWorld implements IPhysicsWorld {
             armorKind?: ArmorKind;
         }
     >();
-    /** unitId → 步进**前**线速度快照：Δv 的唯一来源（D-08；绝不用步进后速度，research Pitfall 6）。 */
-    #preVelocities = new Map<number, { vx: number; vy: number }>();
+    /**
+     * unitId → 步进**前**速度快照（线速度 + 角速度）：Δv 的唯一来源
+     * （D-08；绝不用步进后速度，research Pitfall 6）。
+     */
+    #preVelocities = new Map<
+        number,
+        { vx: number; vy: number; omega: number }
+    >();
     /** 是否已释放：`dispose()` 幂等性的唯一标记（第二次调用为安全空操作，绝不二次 free）。 */
     #disposed = false;
 
@@ -205,14 +211,15 @@ export class PhysicsWorld implements IPhysicsWorld {
     }
 
     tick(): IPhysicsTickResult {
-        // 步进前快照线速度：Δv 只能取自碰撞**前**速度（D-08；步进后速度已被求解器
-        // 消耗，会使 Δv 低估至 ≈0 —— research Pitfall 6）。Δv 仅含线速度、不含
-        // `ω×r` 角向项，这是 CONTEXT 授权的校准简化（research A2）。
+        // 步进前快照线速度与角速度：Δv 只能取自碰撞**前**速度（D-08；步进后速度已被
+        // 求解器消耗，会使 Δv 低估至 ≈0 —— research Pitfall 6）。角速度用于在接触点补上
+        // `ω×r` 项（见下方 Δv 计算）——否则旋转武器（Spin/Charge 技能）的撞击速度被漏计。
         for (const [unitId, body] of this.#bodies) {
             const velocity = body.linvel();
             this.#preVelocities.set(unitId, {
                 vx: velocity.x,
-                vy: velocity.y
+                vy: velocity.y,
+                omega: body.angvel()
             });
         }
 
@@ -266,11 +273,14 @@ export class PhysicsWorld implements IPhysicsWorld {
                 return;
             }
 
-            // 世界系接触法向：`drainCollisionEvents` 回调不携带法向，需经
+            // 世界系接触法向与接触点：`drainCollisionEvents` 回调都不携带，需经
             // `world.contactPair` 获取，并在闭包内**复制**分量（manifold 是临时对象，
             // 绝不在闭包外保留 —— research Pitfall 2）。碰撞体已失效时跳过本配对。
             let nx = 0;
             let ny = 0;
+            let contactX = 0;
+            let contactY = 0;
+            let hasContactPoint = false;
             try {
                 this.#world.contactPair(
                     this.#world.getCollider(handle1),
@@ -279,6 +289,14 @@ export class PhysicsWorld implements IPhysicsWorld {
                         const normal = manifold.normal();
                         nx = normal.x;
                         ny = normal.y;
+                        if (manifold.numSolverContacts() > 0) {
+                            const point = manifold.solverContactPoint(0);
+                            if (point !== null) {
+                                contactX = point.x;
+                                contactY = point.y;
+                                hasContactPoint = true;
+                            }
+                        }
                     }
                 );
             } catch {
@@ -287,13 +305,36 @@ export class PhysicsWorld implements IPhysicsWorld {
 
             const attackerVelocity = this.#preVelocities.get(
                 attackerTag.unitId
-            ) ?? { vx: 0, vy: 0 };
+            ) ?? { vx: 0, vy: 0, omega: 0 };
             const defenderVelocity = this.#preVelocities.get(
                 defenderTag.unitId
-            ) ?? { vx: 0, vy: 0 };
+            ) ?? { vx: 0, vy: 0, omega: 0 };
+            // 接触点速度 = 质心速度 + `ω×r`（2D：`(-ω·ry, ω·rx)`）；`r` 为接触点相对
+            // 该刚体质心的位移。无接触点时退化为纯线速度（research A2 的完整式）。
+            let attackerVx = attackerVelocity.vx;
+            let attackerVy = attackerVelocity.vy;
+            let defenderVx = defenderVelocity.vx;
+            let defenderVy = defenderVelocity.vy;
+            const attackerBody = this.#bodies.get(attackerTag.unitId);
+            const defenderBody = this.#bodies.get(defenderTag.unitId);
+            if (
+                hasContactPoint &&
+                attackerBody !== undefined &&
+                defenderBody !== undefined
+            ) {
+                const attackerCenter = attackerBody.translation();
+                const defenderCenter = defenderBody.translation();
+                const attackerRx = contactX - attackerCenter.x;
+                const attackerRy = contactY - attackerCenter.y;
+                const defenderRx = contactX - defenderCenter.x;
+                const defenderRy = contactY - defenderCenter.y;
+                attackerVx += -attackerVelocity.omega * attackerRy;
+                attackerVy += attackerVelocity.omega * attackerRx;
+                defenderVx += -defenderVelocity.omega * defenderRy;
+                defenderVy += defenderVelocity.omega * defenderRx;
+            }
             const projectedDeltaV =
-                (attackerVelocity.vx - defenderVelocity.vx) * nx +
-                (attackerVelocity.vy - defenderVelocity.vy) * ny;
+                (attackerVx - defenderVx) * nx + (attackerVy - defenderVy) * ny;
             // 非有限值时按 0 处理，保证 NaN/Infinity 绝不离开物理层（数据完整性护栏）。
             const deltaV = Number.isFinite(projectedDeltaV)
                 ? Math.abs(projectedDeltaV)
