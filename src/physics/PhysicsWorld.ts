@@ -63,6 +63,8 @@ export class PhysicsWorld implements IPhysicsWorld {
     >();
     /** unitId → 步进**前**线速度快照：Δv 的唯一来源（D-08；绝不用步进后速度，research Pitfall 6）。 */
     #preVelocities = new Map<number, { vx: number; vy: number }>();
+    /** 是否已释放：`dispose()` 幂等性的唯一标记（第二次调用为安全空操作，绝不二次 free）。 */
+    #disposed = false;
 
     /**
      * 构造物理世界。
@@ -382,6 +384,10 @@ export class PhysicsWorld implements IPhysicsWorld {
     }
 
     dispose(): void {
+        if (this.#disposed) {
+            return;
+        }
+        this.#disposed = true;
         this.#world.free();
         this.#eventQueue.free();
         this.#bodies.clear();

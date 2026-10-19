@@ -147,6 +147,17 @@ describe('PhysicsWorld — compound body, lifecycle, state, fixed-step advance',
         expect(state.y).toBeCloseTo(6, 4);
     });
 
+    it('dispose is idempotent: a second dispose is a safe no-op', () => {
+        const w = createWorld();
+        world = w;
+        w.registerUnit(makeSpec(1, 0, 0, null, []));
+
+        // 第二次（及之后）dispose 必须是安全空操作，绝不二次 `free()` 崩溃。
+        w.dispose();
+        expect(() => w.dispose()).not.toThrow();
+        expect(() => w.dispose()).not.toThrow();
+    });
+
     it('tick advances exactly one fixed step: still without force, tiny move with force, then monotonic', () => {
         const w = createWorld();
         world = w;
