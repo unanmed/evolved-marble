@@ -44,7 +44,15 @@ export class PhysicsWorld implements IPhysicsWorld {
     readonly #rng: IRng;
     /** unitId → 该单位的复合刚体。 */
     #bodies = new Map<number, InstanceType<typeof RAPIER.RigidBody>>();
-    /** unitId → 注册时保留的数值（伤害计算所需的攻击/防御/装备数值，plan 02-06）。 */
+    /**
+     * unitId → 注册时保留的数值（伤害计算所需的攻击/防御/装备数值，plan 02-06）。
+     *
+     * **已知局限（WR-01，已接受）**：`spec` 按引用快照，而 `IUnitPhysicsSpec` 全体
+     * 成员为 `readonly`、`IPhysicsWorld` 亦无更新入口，因此注册后 `attack`/`defense`/
+     * 装备等战斗输入**无法刷新**——单位升级或解锁装备不会改变物理层发出的伤害。这是
+     * 本阶段有意接受的契约局限（冻结的类型门不允许扩展 `IPhysicsWorld`）；如需刷新，
+     * 调用方须 `removeUnit` + `registerUnit` 重新注册（会重建刚体、丢失位置/速度）。
+     */
     #specs = new Map<number, IUnitPhysicsSpec>();
     /** unitId → 该单位的全部碰撞体（用于移除时清空 handle 索引）。 */
     #colliders = new Map<number, InstanceType<typeof RAPIER.Collider>[]>();
@@ -138,6 +146,7 @@ export class PhysicsWorld implements IPhysicsWorld {
         }
 
         this.#bodies.set(spec.unitId, body);
+        // 快照注册输入的数值：注册后不再刷新（WR-01 已接受的契约局限，详见 #specs 文档）。
         this.#specs.set(spec.unitId, spec);
         this.#colliders.set(spec.unitId, colliders);
     }
