@@ -81,7 +81,7 @@ Plans:
   4. 击中防具时按破甲比率应用减伤公式、击中本体时不触发减伤，数值与公式一致。
   5. 模拟以固定步长 tick（tick = 游戏 1 分钟）推进，且推进与渲染解耦。
 
-**Plans:** 3/6 plans executed (2 round-1 + 4 round-2 implementation)
+**Plans:** 4/6 plans executed (2 round-1 + 4 round-2 implementation)
 Plans:
 
 **Wave 0** *(prerequisite)*
@@ -95,7 +95,7 @@ Plans:
 **Wave 2** *(round 2 — implementation; blocked on the Wave-1 gate)*
 
 - [x] 02-03-PLAN.md — 纯伤害/减伤数学：`src/physics/damage.ts`（`computeDamageMean`/`rollDamage` σ=均值/20/`computeDamageReduction` D-11/D-13 分类）+ `tests/physics/damage.test.ts`（PHYS-03/04）
-- [ ] 02-04-PLAN.md — 物理常量 + 复合刚体：`src/physics/constants.ts` + `PhysicsWorld implements IPhysicsWorld`（本体/武器/防具逐 collider 质量与偏移、handle→部位索引、生命周期、状态读数、力/力矩、固定步 tick）+ `tests/physics/compound.test.ts`（PHYS-01/05）
+- [x] 02-04-PLAN.md — 物理常量 + 复合刚体：`src/physics/constants.ts` + `PhysicsWorld implements IPhysicsWorld`（本体/武器/防具逐 collider 质量与偏移、handle→部位索引、生命周期、状态读数、力/力矩、固定步 tick）+ `tests/physics/compound.test.ts`（PHYS-01/05）
 
 **Wave 3** *(blocked on Wave 2)*
 
@@ -207,7 +207,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 单位系统 | 5/5 | Complete    | 2026-10-18 |
-| 2. 物理模拟系统 | 3/6 | In Progress|  |
+| 2. 物理模拟系统 | 4/6 | In Progress|  |
 | 3. 操控系统 | 0/0 | Not started | - |
 | 4. 王国系统 | 0/0 | Not started | - |
 | 5. 渲染系统 | 0/0 | Not started | - |

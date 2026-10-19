@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: 物理模拟系统
 status: executing
-stopped_at: Completed 02-03-PLAN.md (pure damage & armor math; PHYS-03/04)
-last_updated: "2026-10-19T05:43:04.755Z"
+stopped_at: Completed 02-04-PLAN.md (PhysicsWorld compound body + fixed-step driver; PHYS-01/PHYS-05)
+last_updated: "2026-10-19T05:58:55.319Z"
 last_activity: 2026-10-18
 last_activity_desc: Phase 2 execution started
-state_head: 1f09816dd71b16afb5789785645e6c0bf00cf118
+state_head: 2489e1b966ff2cc6c48daaa48540e28aaf4dcd56
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 11
-  completed_plans: 8
+  completed_plans: 9
   percent: 0
 ---
 
@@ -66,6 +66,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 2 P1 | 4 min | 3 tasks | 4 files |
 | Phase 2 P02 | 9min | 3 tasks | 2 files |
 | Phase 02 P03 | 12min | 2 tasks | 2 files |
+| Phase 2 P04 | 7min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,9 @@ Recent decisions affecting current work:
 - [Phase 2]: Phase 2 P03: armor reduction uses the D-11 sign-consistent B_A = 破甲比率 (not 1/penetration) — higher penetration bypasses MORE armor; proven by a dedicated test (锤子 pen5 96.30 > 弓箭 pen0.2 51.02 at D_R 100)
 - [Phase 2]: Phase 2 P03: rollDamage reuses the shared sampleNormal (@/common/rng) with σ = mean/20 (DAMAGE_JITTER_SIGMA_DIVISOR = 20) — no physics-local sampler (AGENTS §9)
 - [Phase 2]: Phase 2 P03: damage math lives in a Rapier-free pure module so PHYS-03/04 are unit-testable without the WASM engine; caller skips reduction on a Body hit via isDamageBearingPair + defenderPart
+- [Phase 2]: Phase 2 P04: PhysicsWorld builds one compound RigidBody per unit with body=spec.mass, weapon/armor=def mass (per-collider setMass, Rapier sums); collider handle -> {unitId, part[, weaponKind][, armorKind]} index (D-03/D-04/D-05)
+- [Phase 2]: Phase 2 P04: removeUnit purges handle-index entries BEFORE removeRigidBody (handle reuse, Pitfall 3); getUnitState returns null for unknown id; tick() = exactly one world.step at f32 dt with forces/torques cleared after the step (D-10/PHYS-05)
+- [Phase 2]: Phase 2 P04: #rng is not stored yet (constructor param _rng) because no-unused-private-class-members is an error for write-only fields; 02-06 adds the stored field when damage jitter consumes it
 
 ### Pending Todos
 
@@ -120,6 +124,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-19T05:42:54.029Z
-Stopped at: Completed 02-03-PLAN.md (pure damage & armor math; PHYS-03/04)
+Last session: 2026-10-19T05:58:55.250Z
+Stopped at: Completed 02-04-PLAN.md (PhysicsWorld compound body + fixed-step driver; PHYS-01/PHYS-05)
 Resume file: None

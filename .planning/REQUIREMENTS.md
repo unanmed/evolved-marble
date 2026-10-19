@@ -19,11 +19,11 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### PHYS — 物理模拟系统
 
-- [ ] **PHYS-01**: 单位由 Rapier2D 复合刚体表示，本体/武器/防具为独立碰撞体并按部位打标
+- [x] **PHYS-01**: 单位由 Rapier2D 复合刚体表示，本体/武器/防具为独立碰撞体并按部位打标
 - [ ] **PHYS-02**: 物理接触转换为带部位标记的类型化模拟事件
 - [x] **PHYS-03**: 伤害按文档公式计算，含碰撞法向速度差 Δv 与正态抖动（σ = 均值/20）
 - [x] **PHYS-04**: 防具减伤与破甲按文档公式计算（击中本体不触发减伤）
-- [ ] **PHYS-05**: 模拟以固定步长 tick 推进（tick = 游戏 1 分钟），与渲染解耦
+- [x] **PHYS-05**: 模拟以固定步长 tick 推进（tick = 游戏 1 分钟），与渲染解耦
 
 ### CTRL — 操控系统
 
@@ -111,11 +111,11 @@ Which phases cover which requirements. Updated during roadmap creation.
 | UNIT-04 | Phase 1 — 单位系统 | Complete |
 | UNIT-05 | Phase 1 — 单位系统 | Complete |
 | UNIT-06 | Phase 1 — 单位系统 | Complete |
-| PHYS-01 | Phase 2 — 物理模拟系统 | Pending |
+| PHYS-01 | Phase 2 — 物理模拟系统 | Complete |
 | PHYS-02 | Phase 2 — 物理模拟系统 | Pending |
 | PHYS-03 | Phase 2 — 物理模拟系统 | Complete |
 | PHYS-04 | Phase 2 — 物理模拟系统 | Complete |
-| PHYS-05 | Phase 2 — 物理模拟系统 | Pending |
+| PHYS-05 | Phase 2 — 物理模拟系统 | Complete |
 | CTRL-01 | Phase 3 — 操控系统 | Pending |
 | CTRL-02 | Phase 3 — 操控系统 | Pending |
 | CTRL-03 | Phase 3 — 操控系统 | Pending |
