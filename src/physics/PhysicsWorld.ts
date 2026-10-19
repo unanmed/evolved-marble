@@ -11,6 +11,7 @@
 import RAPIER from '@dimforge/rapier2d-compat';
 import { ColliderPart } from '@/physics/types';
 import type {
+    IContactEvent,
     IPhysicsConfig,
     IPhysicsTickResult,
     IPhysicsWorld,
@@ -182,11 +183,33 @@ export class PhysicsWorld implements IPhysicsWorld {
 
     tick(): IPhysicsTickResult {
         this.#world.step(this.#eventQueue);
+        // 仅把 `started` 碰撞转变转为类型化事件（D-08）；法向/Δv 留给 02-06 的伤害层。
+        const contacts: IContactEvent[] = [];
+        this.#eventQueue.drainCollisionEvents((handle1, handle2, started) => {
+            if (!started) {
+                return;
+            }
+            const tagA = this.#index.get(handle1);
+            const tagB = this.#index.get(handle2);
+            if (tagA === undefined || tagB === undefined) {
+                return;
+            }
+            // 防御性守卫：同一单位的碰撞体不会互相配对（research Pitfall 4），此处兜底。
+            if (tagA.unitId === tagB.unitId) {
+                return;
+            }
+            contacts.push({
+                unitAId: tagA.unitId,
+                partA: tagA.part,
+                unitBId: tagB.unitId,
+                partB: tagB.part
+            });
+        });
         for (const body of this.#bodies.values()) {
             body.resetForces(false);
             body.resetTorques(false);
         }
-        return { contacts: [], damages: [] };
+        return { contacts, damages: [] };
     }
 
     dispose(): void {
