@@ -28,6 +28,22 @@ export enum ColliderPart {
 }
 
 /**
+ * 碰撞体标签（D-04）：`collider handle → 标签` 映射的取值。
+ * 记载该 handle 所属单位、部位，及武器/防具种类（用于破甲查表，D-13/OQ-4）。
+ * 缺失的**字面量**字段（`weaponKind?`/`armorKind?`）用可选 / `undefined`。
+ */
+export interface IColliderTag {
+    /** 该 handle 所属单位 id。 */
+    readonly unitId: number;
+    /** 该 handle 对应的部位。 */
+    readonly part: ColliderPart;
+    /** 武器种类；非武器碰撞体缺失时为 `undefined`。 */
+    readonly weaponKind?: WeaponKind;
+    /** 防具种类；非防具碰撞体缺失时为 `undefined`。 */
+    readonly armorKind?: ArmorKind;
+}
+
+/**
  * 注册一个单位到物理世界的输入：**纯数值**，不含任何 `Unit` 实例（D-07）。
  * 调用方从单位系统读取这些数值后传入；物理层按 `unitId` 管理一切。
  * 缺失的**对象**引用用 `null`（`weapon`），缺失的**集合**用空数组（`armors`）。
@@ -71,6 +87,19 @@ export interface IUnitState {
     readonly vy: number;
     /** 角速度（弧度/秒）。 */
     readonly angularVelocity: number;
+}
+
+/**
+ * 单位在一步进**前**的速度快照：Δv 的唯一来源（D-08；绝不用步进后速度，research Pitfall 6）。
+ * 线速度与角速度同取碰撞前值；角速度用于接触点的 `ω×r` 角向项（research A2）。
+ */
+export interface IVelocitySnapshot {
+    /** 质心线速度的 x 分量（米/秒）。 */
+    readonly vx: number;
+    /** 质心线速度的 y 分量（米/秒）。 */
+    readonly vy: number;
+    /** 角速度（弧度/秒）。 */
+    readonly omega: number;
 }
 
 /**

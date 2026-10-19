@@ -13,13 +13,15 @@
 import RAPIER from '@dimforge/rapier2d-compat';
 import { ColliderPart } from '@/physics/types';
 import type {
+    IColliderTag,
     IContactEvent,
     IDamageEvent,
     IPhysicsConfig,
     IPhysicsTickResult,
     IPhysicsWorld,
     IUnitPhysicsSpec,
-    IUnitState
+    IUnitState,
+    IVelocitySnapshot
 } from '@/physics/types';
 import {
     computeDamageMean,
@@ -27,7 +29,7 @@ import {
     isDamageBearingPair,
     rollDamage
 } from '@/physics/damage';
-import type { ArmorKind, WeaponKind } from '@/units/types';
+import type { ArmorKind } from '@/units/types';
 import type { IRng } from '@/common/types';
 
 /**
@@ -60,23 +62,12 @@ export class PhysicsWorld implements IPhysicsWorld {
      * 碰撞体 handle → 部位标签（D-04）：记载该 handle 所属单位、部位，
      * 及武器/防具种类（用于破甲查表，D-13/OQ-4）。
      */
-    #index = new Map<
-        number,
-        {
-            unitId: number;
-            part: ColliderPart;
-            weaponKind?: WeaponKind;
-            armorKind?: ArmorKind;
-        }
-    >();
+    #index = new Map<number, IColliderTag>();
     /**
      * unitId → 步进**前**速度快照（线速度 + 角速度）：Δv 的唯一来源
      * （D-08；绝不用步进后速度，research Pitfall 6）。
      */
-    #preVelocities = new Map<
-        number,
-        { vx: number; vy: number; omega: number }
-    >();
+    #preVelocities = new Map<number, IVelocitySnapshot>();
     /** 是否已释放：`dispose()` 幂等性的唯一标记（第二次调用为安全空操作，绝不二次 free）。 */
     #disposed = false;
 
