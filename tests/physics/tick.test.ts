@@ -333,6 +333,50 @@ describe('PhysicsWorld — Δv damage events, armor vs body, one-strike exclusiv
         expect(result.damages).toHaveLength(0);
     });
 
+    it('skips the damage event when contactPair yields no manifold (never a zero-damage event)', () => {
+        const w = createWorld();
+        world = w;
+        const attackerId = 1;
+        const defenderId = 2;
+        // 出生即重叠：首步必产生 `started` 碰撞事件，从而进入伤害分支。
+        w.registerUnit(
+            makeSpec(attackerId, 0, 0, WEAPON_DEFS[WeaponKind.Longsword], [])
+        );
+        w.registerUnit(makeSpec(defenderId, 1, 0, null, []));
+
+        // 模拟「配对已不再存在流形」：令 `contactPair` 永不调用其回调。真实的
+        // 「碰撞体解析失败 → 无流形」路径难以确定性构造，故在此直接行使该守卫。
+        const originalContactPair = RAPIER.World.prototype.contactPair;
+        RAPIER.World.prototype.contactPair = () => {
+            // 故意不调用回调：模拟无流形时的 `hasNormal === false`。
+        };
+        try {
+            const result = w.tick();
+            // 接触事件照常发出（在伤害分支之前），说明确实进入了伤害分支。
+            expect(
+                result.contacts.some(contact =>
+                    touchesPair(
+                        contact,
+                        attackerId,
+                        defenderId,
+                        ColliderPart.Weapon,
+                        ColliderPart.Body
+                    )
+                )
+            ).toBe(true);
+            // 无流形 → 跳过该配对：绝不发出 deltaV = 0 的伪伤害事件。
+            expect(
+                result.damages.filter(
+                    damage =>
+                        damage.attackerId === attackerId &&
+                        damage.defenderId === defenderId
+                )
+            ).toHaveLength(0);
+        } finally {
+            RAPIER.World.prototype.contactPair = originalContactPair;
+        }
+    });
+
     it('advances exactly one fixed step: vx ≈ force/mass × DT, then repeated ticks advance the position', () => {
         const w = createWorld();
         world = w;

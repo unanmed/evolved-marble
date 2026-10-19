@@ -275,31 +275,37 @@ export class PhysicsWorld implements IPhysicsWorld {
 
             // 世界系接触法向与接触点：`drainCollisionEvents` 回调都不携带，需经
             // `world.contactPair` 获取，并在闭包内**复制**分量（manifold 是临时对象，
-            // 绝不在闭包外保留 —— research Pitfall 2）。碰撞体已失效时跳过本配对。
+            // 绝不在闭包外保留 —— research Pitfall 2）。碰撞体已不再解析（`getCollider`
+            // 返回 `null`）或该配对已无接触流形（回调未被触发）时，**跳过**本配对——
+            // 绝不发出 `deltaV = 0` 的伪伤害事件。
+            const collider1: InstanceType<typeof RAPIER.Collider> | null =
+                this.#world.getCollider(handle1);
+            const collider2: InstanceType<typeof RAPIER.Collider> | null =
+                this.#world.getCollider(handle2);
+            if (collider1 === null || collider2 === null) {
+                return;
+            }
             let nx = 0;
             let ny = 0;
+            let hasNormal = false;
             let contactX = 0;
             let contactY = 0;
             let hasContactPoint = false;
-            try {
-                this.#world.contactPair(
-                    this.#world.getCollider(handle1),
-                    this.#world.getCollider(handle2),
-                    manifold => {
-                        const normal = manifold.normal();
-                        nx = normal.x;
-                        ny = normal.y;
-                        if (manifold.numSolverContacts() > 0) {
-                            const point = manifold.solverContactPoint(0);
-                            if (point !== null) {
-                                contactX = point.x;
-                                contactY = point.y;
-                                hasContactPoint = true;
-                            }
-                        }
+            this.#world.contactPair(collider1, collider2, manifold => {
+                const normal = manifold.normal();
+                nx = normal.x;
+                ny = normal.y;
+                hasNormal = true;
+                if (manifold.numSolverContacts() > 0) {
+                    const point = manifold.solverContactPoint(0);
+                    if (point !== null) {
+                        contactX = point.x;
+                        contactY = point.y;
+                        hasContactPoint = true;
                     }
-                );
-            } catch {
+                }
+            });
+            if (!hasNormal) {
                 return;
             }
 
