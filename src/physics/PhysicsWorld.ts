@@ -37,15 +37,15 @@ import type { IRng } from '@/common/types';
  */
 export class PhysicsWorld implements IPhysicsWorld {
     /** 构造参数（固定步长与几何尺寸，D-06/D-10）。 */
-    readonly #config: IPhysicsConfig;
+    private readonly config: IPhysicsConfig;
     /** 本世界拥有的 Rapier 世界；`dispose()` 时释放。 */
-    readonly #world: InstanceType<typeof RAPIER.World>;
+    private readonly world: InstanceType<typeof RAPIER.World>;
     /** 本世界拥有的碰撞事件队列；`dispose()` 时释放（research Pitfall 12）。 */
-    readonly #eventQueue: InstanceType<typeof RAPIER.EventQueue>;
+    private readonly eventQueue: InstanceType<typeof RAPIER.EventQueue>;
     /** 注入的随机源：伤害抖动的唯一来源（`rollDamage` 经 `sampleNormal` 消费，D-08/AGENTS §9）。 */
-    readonly #rng: IRng;
+    private readonly rng: IRng;
     /** unitId → 该单位的复合刚体。 */
-    #bodies = new Map<number, InstanceType<typeof RAPIER.RigidBody>>();
+    private bodies = new Map<number, InstanceType<typeof RAPIER.RigidBody>>();
     /**
      * unitId → 注册时保留的数值（伤害计算所需的攻击/防御/装备数值，plan 02-06）。
      *
@@ -55,21 +55,24 @@ export class PhysicsWorld implements IPhysicsWorld {
      * 本阶段有意接受的契约局限（冻结的类型门不允许扩展 `IPhysicsWorld`）；如需刷新，
      * 调用方须 `removeUnit` + `registerUnit` 重新注册（会重建刚体、丢失位置/速度）。
      */
-    #specs = new Map<number, IUnitPhysicsSpec>();
+    private specs = new Map<number, IUnitPhysicsSpec>();
     /** unitId → 该单位的全部碰撞体（用于移除时清空 handle 索引）。 */
-    #colliders = new Map<number, InstanceType<typeof RAPIER.Collider>[]>();
+    private colliders = new Map<
+        number,
+        InstanceType<typeof RAPIER.Collider>[]
+    >();
     /**
      * 碰撞体 handle → 部位标签（D-04）：记载该 handle 所属单位、部位，
      * 及武器/防具种类（用于破甲查表，D-13/OQ-4）。
      */
-    #index = new Map<number, IColliderTag>();
+    private index = new Map<number, IColliderTag>();
     /**
      * unitId → 步进**前**速度快照（线速度 + 角速度）：Δv 的唯一来源
      * （D-08；绝不用步进后速度，research Pitfall 6）。
      */
-    #preVelocities = new Map<number, IVelocitySnapshot>();
+    private preVelocities = new Map<number, IVelocitySnapshot>();
     /** 是否已释放：`dispose()` 幂等性的唯一标记（第二次调用为安全空操作，绝不二次 free）。 */
-    #disposed = false;
+    private disposed = false;
 
     /**
      * 构造物理世界。
@@ -77,39 +80,39 @@ export class PhysicsWorld implements IPhysicsWorld {
      * @param rng 注入的随机源，供伤害抖动管线（`rollDamage`）消费。
      */
     constructor(config: IPhysicsConfig, rng: IRng) {
-        this.#config = config;
-        this.#world = new RAPIER.World({ x: 0, y: 0 });
-        this.#eventQueue = new RAPIER.EventQueue(true);
-        this.#world.timestep = config.dt;
-        this.#rng = rng;
+        this.config = config;
+        this.world = new RAPIER.World({ x: 0, y: 0 });
+        this.eventQueue = new RAPIER.EventQueue(true);
+        this.world.timestep = config.dt;
+        this.rng = rng;
     }
 
     registerUnit(spec: IUnitPhysicsSpec): void {
-        if (this.#bodies.has(spec.unitId)) {
+        if (this.bodies.has(spec.unitId)) {
             throw new Error(
                 `PhysicsWorld.registerUnit: unit ${spec.unitId} is already registered`
             );
         }
-        const geometry = this.#config.geometry;
-        const body = this.#world.createRigidBody(
+        const geometry = this.config.geometry;
+        const body = this.world.createRigidBody(
             RAPIER.RigidBodyDesc.dynamic().setTranslation(spec.x, spec.y)
         );
         const colliders: InstanceType<typeof RAPIER.Collider>[] = [];
 
-        const bodyCollider = this.#world.createCollider(
+        const bodyCollider = this.world.createCollider(
             RAPIER.ColliderDesc.ball(geometry.bodyRadius)
                 .setMass(spec.mass)
                 .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
             body
         );
         colliders.push(bodyCollider);
-        this.#index.set(bodyCollider.handle, {
+        this.index.set(bodyCollider.handle, {
             unitId: spec.unitId,
             part: ColliderPart.Body
         });
 
         if (spec.weapon !== null) {
-            const weaponCollider = this.#world.createCollider(
+            const weaponCollider = this.world.createCollider(
                 RAPIER.ColliderDesc.capsule(
                     geometry.weaponHalfLength,
                     geometry.weaponRadius
@@ -120,7 +123,7 @@ export class PhysicsWorld implements IPhysicsWorld {
                 body
             );
             colliders.push(weaponCollider);
-            this.#index.set(weaponCollider.handle, {
+            this.index.set(weaponCollider.handle, {
                 unitId: spec.unitId,
                 part: ColliderPart.Weapon,
                 weaponKind: spec.weapon.id
@@ -128,48 +131,48 @@ export class PhysicsWorld implements IPhysicsWorld {
         }
 
         for (const armor of spec.armors) {
-            const armorCollider = this.#world.createCollider(
+            const armorCollider = this.world.createCollider(
                 RAPIER.ColliderDesc.ball(geometry.armorRadius)
                     .setMass(armor.mass)
                     .setActiveEvents(RAPIER.ActiveEvents.COLLISION_EVENTS),
                 body
             );
             colliders.push(armorCollider);
-            this.#index.set(armorCollider.handle, {
+            this.index.set(armorCollider.handle, {
                 unitId: spec.unitId,
                 part: ColliderPart.Armor,
                 armorKind: armor.id
             });
         }
 
-        this.#bodies.set(spec.unitId, body);
-        // 快照注册输入的数值：注册后不再刷新（WR-01 已接受的契约局限，详见 #specs 文档）。
-        this.#specs.set(spec.unitId, spec);
-        this.#colliders.set(spec.unitId, colliders);
+        this.bodies.set(spec.unitId, body);
+        // 快照注册输入的数值：注册后不再刷新（WR-01 已接受的契约局限，详见 specs 文档）。
+        this.specs.set(spec.unitId, spec);
+        this.colliders.set(spec.unitId, colliders);
     }
 
     removeUnit(unitId: number): void {
-        const body = this.#bodies.get(unitId);
+        const body = this.bodies.get(unitId);
         if (body === undefined) {
             return;
         }
-        const colliders = this.#colliders.get(unitId) ?? [];
+        const colliders = this.colliders.get(unitId) ?? [];
         for (const collider of colliders) {
-            this.#index.delete(collider.handle);
+            this.index.delete(collider.handle);
         }
-        this.#world.removeRigidBody(body);
-        this.#bodies.delete(unitId);
-        this.#specs.delete(unitId);
-        this.#colliders.delete(unitId);
-        this.#preVelocities.delete(unitId);
+        this.world.removeRigidBody(body);
+        this.bodies.delete(unitId);
+        this.specs.delete(unitId);
+        this.colliders.delete(unitId);
+        this.preVelocities.delete(unitId);
     }
 
     hasUnit(unitId: number): boolean {
-        return this.#bodies.has(unitId);
+        return this.bodies.has(unitId);
     }
 
     applyForce(unitId: number, forceX: number, forceY: number): void {
-        const body = this.#bodies.get(unitId);
+        const body = this.bodies.get(unitId);
         if (body === undefined) {
             return;
         }
@@ -177,7 +180,7 @@ export class PhysicsWorld implements IPhysicsWorld {
     }
 
     applyTorque(unitId: number, torque: number): void {
-        const body = this.#bodies.get(unitId);
+        const body = this.bodies.get(unitId);
         if (body === undefined) {
             return;
         }
@@ -185,7 +188,7 @@ export class PhysicsWorld implements IPhysicsWorld {
     }
 
     getUnitState(unitId: number): IUnitState | null {
-        const body = this.#bodies.get(unitId);
+        const body = this.bodies.get(unitId);
         if (body === undefined) {
             return null;
         }
@@ -205,16 +208,16 @@ export class PhysicsWorld implements IPhysicsWorld {
         // 步进前快照线速度与角速度：Δv 只能取自碰撞**前**速度（D-08；步进后速度已被
         // 求解器消耗，会使 Δv 低估至 ≈0 —— research Pitfall 6）。角速度用于在接触点补上
         // `ω×r` 项（见下方 Δv 计算）——否则旋转武器（Spin/Charge 技能）的撞击速度被漏计。
-        for (const [unitId, body] of this.#bodies) {
+        for (const [unitId, body] of this.bodies) {
             const velocity = body.linvel();
-            this.#preVelocities.set(unitId, {
+            this.preVelocities.set(unitId, {
                 vx: velocity.x,
                 vy: velocity.y,
                 omega: body.angvel()
             });
         }
 
-        this.#world.step(this.#eventQueue);
+        this.world.step(this.eventQueue);
         // 仅把 `started` 碰撞转变转为类型化事件（D-08）；同时对本步可产生伤害的
         // 配对计算最终伤害数值（PHYS-03/PHYS-04）。
         const contacts: IContactEvent[] = [];
@@ -223,12 +226,12 @@ export class PhysicsWorld implements IPhysicsWorld {
         // 仅本步有效——`damages` 去重，`contacts` 保持完整（见下方守卫）。
         const damageCandidates = new Map<string, IDamageEvent>();
 
-        this.#eventQueue.drainCollisionEvents((handle1, handle2, started) => {
+        this.eventQueue.drainCollisionEvents((handle1, handle2, started) => {
             if (!started) {
                 return;
             }
-            const tagA = this.#index.get(handle1);
-            const tagB = this.#index.get(handle2);
+            const tagA = this.index.get(handle1);
+            const tagB = this.index.get(handle2);
             if (tagA === undefined || tagB === undefined) {
                 return;
             }
@@ -253,8 +256,8 @@ export class PhysicsWorld implements IPhysicsWorld {
             const attackerTag = weaponOnA ? tagA : tagB;
             const defenderTag = weaponOnA ? tagB : tagA;
 
-            const attackerSpec = this.#specs.get(attackerTag.unitId);
-            const defenderSpec = this.#specs.get(defenderTag.unitId);
+            const attackerSpec = this.specs.get(attackerTag.unitId);
+            const defenderSpec = this.specs.get(defenderTag.unitId);
             const attackerWeapon = attackerSpec?.weapon ?? null;
             if (
                 attackerSpec === undefined ||
@@ -270,9 +273,9 @@ export class PhysicsWorld implements IPhysicsWorld {
             // 返回 `null`）或该配对已无接触流形（回调未被触发）时，**跳过**本配对——
             // 绝不发出 `deltaV = 0` 的伪伤害事件。
             const collider1: InstanceType<typeof RAPIER.Collider> | null =
-                this.#world.getCollider(handle1);
+                this.world.getCollider(handle1);
             const collider2: InstanceType<typeof RAPIER.Collider> | null =
-                this.#world.getCollider(handle2);
+                this.world.getCollider(handle2);
             if (collider1 === null || collider2 === null) {
                 return;
             }
@@ -282,7 +285,7 @@ export class PhysicsWorld implements IPhysicsWorld {
             let contactX = 0;
             let contactY = 0;
             let hasContactPoint = false;
-            this.#world.contactPair(collider1, collider2, manifold => {
+            this.world.contactPair(collider1, collider2, manifold => {
                 const normal = manifold.normal();
                 nx = normal.x;
                 ny = normal.y;
@@ -300,10 +303,10 @@ export class PhysicsWorld implements IPhysicsWorld {
                 return;
             }
 
-            const attackerVelocity = this.#preVelocities.get(
+            const attackerVelocity = this.preVelocities.get(
                 attackerTag.unitId
             ) ?? { vx: 0, vy: 0, omega: 0 };
-            const defenderVelocity = this.#preVelocities.get(
+            const defenderVelocity = this.preVelocities.get(
                 defenderTag.unitId
             ) ?? { vx: 0, vy: 0, omega: 0 };
             // 接触点速度 = 质心速度 + `ω×r`（2D：`(-ω·ry, ω·rx)`）；`r` 必须与 `linvel()`
@@ -314,8 +317,8 @@ export class PhysicsWorld implements IPhysicsWorld {
             let attackerVy = attackerVelocity.vy;
             let defenderVx = defenderVelocity.vx;
             let defenderVy = defenderVelocity.vy;
-            const attackerBody = this.#bodies.get(attackerTag.unitId);
-            const defenderBody = this.#bodies.get(defenderTag.unitId);
+            const attackerBody = this.bodies.get(attackerTag.unitId);
+            const defenderBody = this.bodies.get(defenderTag.unitId);
             if (
                 hasContactPoint &&
                 attackerBody !== undefined &&
@@ -345,7 +348,7 @@ export class PhysicsWorld implements IPhysicsWorld {
                 attackerWeapon.attackRatio,
                 deltaV
             );
-            const rolled = rollDamage(this.#rng, damageMean);
+            const rolled = rollDamage(this.rng, damageMean);
 
             let armorKind: ArmorKind | undefined;
             let damage = rolled;
@@ -425,7 +428,7 @@ export class PhysicsWorld implements IPhysicsWorld {
             damages.push(candidate);
         }
 
-        for (const body of this.#bodies.values()) {
+        for (const body of this.bodies.values()) {
             body.resetForces(false);
             body.resetTorques(false);
         }
@@ -433,16 +436,16 @@ export class PhysicsWorld implements IPhysicsWorld {
     }
 
     dispose(): void {
-        if (this.#disposed) {
+        if (this.disposed) {
             return;
         }
-        this.#disposed = true;
-        this.#world.free();
-        this.#eventQueue.free();
-        this.#bodies.clear();
-        this.#specs.clear();
-        this.#colliders.clear();
-        this.#index.clear();
-        this.#preVelocities.clear();
+        this.disposed = true;
+        this.world.free();
+        this.eventQueue.free();
+        this.bodies.clear();
+        this.specs.clear();
+        this.colliders.clear();
+        this.index.clear();
+        this.preVelocities.clear();
     }
 }
