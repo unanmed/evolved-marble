@@ -124,14 +124,22 @@ Plans:
   4. 控制模块可插拔：换入另一个 AI 实现时无需改动物理/单位系统，模拟仍可持续运行。
   5. 默认基线 AI 使单位能自主完成接近、攻击、脱离等行为，模拟无需人工输入即可持续运行。
 
-**Plans:** 1/1 plans executed (round 1 — type declarations only)
+**Plans:** 1/3 plans executed (round 1 complete; round 2 implementation planned)
 Plans:
 
 **Wave 1** *(round 1 — the type-first gate)*
 
-- [x] 03-01-PLAN.md — 类型先行：`src/control/types.ts`（`SkillIntentKind` 数字枚举 + `IUnitObservation`/`IUnitAction`/`IUnitAI`/`IUnitAIProvider`/`ISensor`/`ISensingWorld`/`IDamageSink`/`IControlSystem` 等全部契约，仅声明）+ `tests/control/types.test.ts`（枚举钉版 + 编译期契约断言）→ **用户类型设计审查门禁**
+- [x] 03-01-PLAN.md — 类型先行：`src/control/types.ts`（`SkillIntentKind` 数字枚举 + `IUnitObservation`/`IUnitAction`/`IUnitAI`/`IUnitAIProvider`/`ISensor`/`ISensingWorld`/`IDamageSink`/`IControlSystem` 等全部契约，仅声明）+ `tests/control/types.test.ts`（枚举钉版 + 编译期契约断言）→ **用户类型设计审查门禁（已批准）**
 
-**Type-first gate**: Wave 1 (03-01, type declarations only) writes the control folder's `types.ts` + `IUnitAI` (input/output contracts) and the pluggable provider interface; **user reviews and approves before implementation**. The round-2 implementation plans (Sensor, ControlSystem loop, ArenaSensingWorld, DefaultUnitAI, IDamageSink glue, constants) are authored only after the gate. The default baseline AI is a separate `implements IUnitAI` class written in round 2.
+**Wave 2** *(round 2 — implementation; blocked on the approved type gate)*
+
+- [ ] 03-02-PLAN.md — 感知 + 控制循环：`src/control/constants.ts`、`Sensor implements ISensor`（64 射线解析几何、16 敌/16 友）、`ControlSystem implements IControlSystem`（注册/6-tick 决策/动作保持重施加/钳制/伤害路由/死亡注销）、`DefaultUnitAI implements IUnitAI` 基线 + `tests/control/{arena,damage-sink,loop,sensing}`（CTRL-01/02/03/04；首个 tracer 端到端切片）
+
+**Wave 3** *(blocked on Wave 2)*
+
+- [ ] 03-03-PLAN.md — 默认 AI 完整行为树（追击/攻击/脱离 + 速度误差/PD 转向 + 技能意图/冷却）+ `tests/control/{default-ai,pluggable}`（CTRL-02/04；Provider 热插拔验收）
+
+**Type-first gate**: Wave 1 (03-01, type declarations only) wrote the control folder's `types.ts` + `IUnitAI` (input/output contracts) and the pluggable provider interface; **the user approved the contract on 2026-10-19**. Wave 2/3 implement against the frozen contract. The default baseline AI is a separate `implements IUnitAI` class written in round 2.
 
 ### Phase 4: 王国系统
 
@@ -218,7 +226,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 |-------|----------------|--------|-----------|
 | 1. 单位系统 | 5/5 | Complete    | 2026-10-18 |
 | 2. 物理模拟系统 | 7/7 | Complete    | 2026-10-19 |
-| 3. 操控系统 | 1/1 | In Progress|  |
+| 3. 操控系统 | 1/3 | In Progress|  |
 | 4. 王国系统 | 0/0 | Not started | - |
 | 5. 渲染系统 | 0/0 | Not started | - |
 | 6. 录制系统 | 0/0 | Not started | - |
