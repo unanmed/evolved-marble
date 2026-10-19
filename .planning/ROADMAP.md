@@ -99,7 +99,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 02-05-PLAN.md — 接触→类型化事件：`tick()` 排空 `EventQueue`（仅 started）→ 部位打标 `IContactEvent[]`（无自碰撞）+ `tests/physics/events.test.ts`（PHYS-02）
+- [x] 02-05-PLAN.md — 接触→类型化事件：`tick()` 排空 `EventQueue`（仅 started）→ 部位打标 `IContactEvent[]`（无自碰撞）+ `tests/physics/events.test.ts`（PHYS-02）
 
 **Wave 4** *(blocked on Wave 3)*
 

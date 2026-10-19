@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: 物理模拟系统
 status: executing
-stopped_at: Completed 02-04-PLAN.md (PhysicsWorld compound body + fixed-step driver; PHYS-01/PHYS-05)
-last_updated: "2026-10-19T05:58:55.319Z"
+stopped_at: Completed 02-05-PLAN.md (contact->typed-event bridge; PHYS-02)
+last_updated: "2026-10-19T06:06:25.708Z"
 last_activity: 2026-10-18
 last_activity_desc: Phase 2 execution started
-state_head: 2489e1b966ff2cc6c48daaa48540e28aaf4dcd56
+state_head: 7738cd0214132643bf7bd9ff173074e218d3693f
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 11
-  completed_plans: 9
+  completed_plans: 10
   percent: 0
 ---
 
@@ -67,6 +67,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 2 P02 | 9min | 3 tasks | 2 files |
 | Phase 02 P03 | 12min | 2 tasks | 2 files |
 | Phase 2 P04 | 7min | 3 tasks | 3 files |
+| Phase 02-physics-simulation P05 | 7min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -104,6 +105,8 @@ Recent decisions affecting current work:
 - [Phase 2]: Phase 2 P04: PhysicsWorld builds one compound RigidBody per unit with body=spec.mass, weapon/armor=def mass (per-collider setMass, Rapier sums); collider handle -> {unitId, part[, weaponKind][, armorKind]} index (D-03/D-04/D-05)
 - [Phase 2]: Phase 2 P04: removeUnit purges handle-index entries BEFORE removeRigidBody (handle reuse, Pitfall 3); getUnitState returns null for unknown id; tick() = exactly one world.step at f32 dt with forces/torques cleared after the step (D-10/PHYS-05)
 - [Phase 2]: Phase 2 P04: #rng is not stored yet (constructor param _rng) because no-unused-private-class-members is an error for write-only fields; 02-06 adds the stored field when damage jitter consumes it
+- [Phase 2]: Phase 2 P05: tick() drains the EventQueue after the step and emits a part-tagged IContactEvent only for started, cross-unit collisions; parts come solely from the collider-handle index (D-04/D-08)
+- [Phase 2]: Phase 2 P05: contact events stay unordered (unitAId/partA, unitBId/partB) with a defensive same-unit guard; no contact normal is read in the drain - the normal + dv belong to the 02-06 damage layer
 
 ### Pending Todos
 
@@ -124,6 +127,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-19T05:58:55.250Z
-Stopped at: Completed 02-04-PLAN.md (PhysicsWorld compound body + fixed-step driver; PHYS-01/PHYS-05)
+Last session: 2026-10-19T06:06:13.690Z
+Stopped at: Completed 02-05-PLAN.md (contact->typed-event bridge; PHYS-02)
 Resume file: None
