@@ -24,7 +24,7 @@ This is a single-milestone project delivered as **8 phases, one per system, in a
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: 单位系统** - 16 项单位属性、7 职业、6 武器、2 防具、等级/经验/升级、正态随机生成 (completed 2026-10-18)
-- [ ] **Phase 2: 物理模拟系统** - Rapier2D 复合刚体（部位打标）、类型化接触事件、伤害计算、固定 tick 推进
+- [x] **Phase 2: 物理模拟系统** - Rapier2D 复合刚体（部位打标）、类型化接触事件、伤害计算、固定 tick 推进 (completed 2026-10-19)
 - [ ] **Phase 3: 操控系统** - 单位级 AI 输入/输出契约、0.1s 决策节奏、可插拔控制 + 默认基线实现
 - [ ] **Phase 4: 王国系统** - 地图、行军、视野、军队、城池、驻扎/训练、军队/城池战斗触发与战后结算
 - [ ] **Phase 5: 渲染系统** - PixiJS 顶视渲染、可辨单位/装备/阵营、HUD、自动镜头、Chrome 帧率
@@ -81,7 +81,7 @@ Plans:
   4. 击中防具时按破甲比率应用减伤公式、击中本体时不触发减伤，数值与公式一致。
   5. 模拟以固定步长 tick（tick = 游戏 1 分钟）推进，且推进与渲染解耦。
 
-**Plans:** 7/7 plans executed (2 round-1 + 4 round-2 implementation) + 1 gap-closure plan
+**Plans:** 7/7 plans complete
 Plans:
 
 **Wave 0** *(prerequisite)*
@@ -211,7 +211,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. 单位系统 | 5/5 | Complete    | 2026-10-18 |
-| 2. 物理模拟系统 | 7/7 | In Progress|  |
+| 2. 物理模拟系统 | 7/7 | Complete    | 2026-10-19 |
 | 3. 操控系统 | 0/0 | Not started | - |
 | 4. 王国系统 | 0/0 | Not started | - |
 | 5. 渲染系统 | 0/0 | Not started | - |
