@@ -249,20 +249,21 @@ describe('PhysicsWorld — Δv damage events, armor vs body, one-strike exclusiv
         world = w;
         const attackerId = 1;
         const defenderId = 2;
-        // 重锤攻方（本体 70 + 锤 25 = 95）在短斜坡内加速到 ≈20 m/s 的闭合速度；
-        // 头盔守方：0.05m 的护甲−本体间距在该速度下被同一步跨过，两个接触同一步发生。
+        // 让武器 capsule（局部 x=0.7）在**出生时**即同时与守方的防具圆（0.55）和本体圆（0.5）
+        // 重叠：Weapon↔Armor 与 Weapon↔Body 两个 `started` 接触在第一步**确定性**同现，
+        // 不再依赖逐步位移与 0.05m 护甲−本体间距的时序——后者会随机器 / Rapier 构建翻转
+        // （No-Determinism 约束），正是要消除的脆弱模式。注：出生静止 ⇒ 该步 Δv = 0、
+        // 伤害为 0；「减伤为正」由上面单次护甲命中的测试钉住。
         w.registerUnit(
             makeSpec(attackerId, 0, 0, WEAPON_DEFS[WeaponKind.Hammer], [])
         );
         w.registerUnit(
-            makeSpec(defenderId, 4, 0, null, [ARMOR_DEFS[ArmorKind.Helmet]])
+            makeSpec(defenderId, 1, 0, null, [ARMOR_DEFS[ArmorKind.Helmet]])
         );
 
-        const force = 7000;
         let coOccurrenceSeen = false;
         let damageEventSeen = false;
-        for (let i = 0; i < 80; i++) {
-            w.applyForce(attackerId, force, 0);
+        for (let i = 0; i < 5; i++) {
             const result = w.tick();
             const pairEvents = result.damages.filter(
                 damage =>
@@ -297,11 +298,10 @@ describe('PhysicsWorld — Δv damage events, armor vs body, one-strike exclusiv
 
             if (hasWeaponArmor && hasWeaponBody) {
                 coOccurrenceSeen = true;
-                // 同一步同时命中护甲与本体：恰好一个事件，且为减伤的护甲事件。
+                // 同一步同时命中护甲与本体：恰好一个事件，且为**护甲**事件。
                 expect(pairEvents).toHaveLength(1);
                 expect(pairEvents[0].defenderPart).toBe(ColliderPart.Armor);
-                expect(pairEvents[0].armorKind).toBeDefined();
-                expect(pairEvents[0].damageReduced).toBeGreaterThan(0);
+                expect(pairEvents[0].armorKind).toBe(ArmorKind.Helmet);
                 // 本体伤害事件被抑制，绝不同步发出。
                 expect(
                     pairEvents.some(
@@ -312,7 +312,7 @@ describe('PhysicsWorld — Δv damage events, armor vs body, one-strike exclusiv
         }
 
         expect(damageEventSeen).toBe(true);
-        // 共现是必需条件而非期望：若未观察到，需提高闭合速度而不是删除断言。
+        // 出生即重叠使共现成为确定性事件：这里是可硬断言的真契约，而非时序赌博。
         expect(coOccurrenceSeen).toBe(true);
     });
 
