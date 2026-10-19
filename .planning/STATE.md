@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 2
 current_phase_name: 物理模拟系统
 status: verifying
-stopped_at: Completed 02-06-PLAN.md (damage pipeline; PHYS-03/PHYS-04)
-last_updated: "2026-10-19T06:26:11.962Z"
+stopped_at: Completed 02-07-PLAN.md (rotating-body deltaV rotation centre; gap G1 closed)
+last_updated: "2026-10-19T10:27:19.214Z"
 last_activity: 2026-10-18
 last_activity_desc: Phase 2 execution started
-state_head: 6c5cf553572d7e981c7238b121322e06492b64b9
+state_head: b1d213b8708a6187c81db5c0c5e47233d0177bba
 progress:
   total_phases: 8
   completed_phases: 0
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 12
+  completed_plans: 12
   percent: 0
 ---
 
@@ -69,6 +69,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 2 P04 | 7min | 3 tasks | 3 files |
 | Phase 02-physics-simulation P05 | 7min | 2 tasks | 2 files |
 | Phase 2 P06 | 6min | 2 tasks | 2 files |
+| Phase 02 P07 | 12min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -110,6 +111,8 @@ Recent decisions affecting current work:
 - [Phase 2]: Phase 2 P05: contact events stay unordered (unitAId/partA, unitBId/partB) with a defensive same-unit guard; no contact normal is read in the drain - the normal + dv belong to the 02-06 damage layer
 - [Phase 2]: Phase 2 P06: tick() computes dV from PRE-step velocities + the contactPair normal (copied in-closure) and emits final-number IDamageEvents, deduped once per (attackerId,defenderId) per tick with armor-beats-body precedence; contacts stay complete
 - [Phase 2]: Phase 2 P06: damage dedup applies to damages only; the one-strike window is per tick (cross-tick suppression is neither implemented nor asserted); #preVelocities/#rng placeholders from 02-04/02-05 are now consumed
+- [Phase 2]: Phase 2 P07: the omega x r moment arm is measured from body.worldCom() (the COM that linvel() uses), never body.translation(); the 2D cross-product, normal projection, and pre-step velocity source are unchanged (D-08)
+- [Phase 2]: Phase 2 P07: tests/physics/rotation.test.ts is the phase's first applyTorque regression - it pins the emitted deltaV to the COM-based contact-point projection (3 dp), rejects the origin-based value (>0.5 m/s apart), and cross-checks with Rapier velocityAtPoint (6 dp)
 
 ### Pending Todos
 
@@ -130,6 +133,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-19T06:26:11.899Z
-Stopped at: Completed 02-06-PLAN.md (damage pipeline; PHYS-03/PHYS-04)
+Last session: 2026-10-19T10:27:19.154Z
+Stopped at: Completed 02-07-PLAN.md (rotating-body deltaV rotation centre; gap G1 closed)
 Resume file: None
