@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 03
 current_phase_name: 操控系统
 status: executing
-stopped_at: Completed 03-01-PLAN.md (round 1 type gate approved) — round 2 implementation planning pending
-last_updated: "2026-10-19T15:27:33.059Z"
-last_activity: 2026-10-19
-last_activity_desc: Plan 03-01 complete — type gate approved, round 2 pending
-state_head: 07400647a12b6899e2924feb24e65b1e0017f7ca
+stopped_at: "Completed 03-02-PLAN.md (round 2: sensing + control loop + default AI)"
+last_updated: "2026-10-20T04:35:21.844Z"
+last_activity: 2026-10-20
+last_activity_desc: Phase 03 execution started
+state_head: e42e4066896e1a98e15d34f7b27541fc671a03bb
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 15
-  completed_plans: 13
+  completed_plans: 14
   percent: 0
 ---
 
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-10-17)
 
 ## Current Position
 
-Phase: 03 (操控系统) — READY TO EXECUTE
-Plan: 1 of 1 (round 1 — type gate approved)
-Status: Round 2 implementation planning pending
-Last activity: 2026-10-19 — Plan 03-01 complete; type design approved at the gate
+Phase: 03 (操控系统) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-10-20 — Phase 03 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -73,6 +73,8 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 2 P06 | 6min | 2 tasks | 2 files |
 | Phase 02 P07 | 12min | 2 tasks | 2 files |
 | Phase 03 P01 | 13 min | 3 tasks | 2 files |
+| Phase 03 P02 | 14 min | 3 tasks | 8 files |
+| Phase 03 P02 | 14 min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -119,6 +121,10 @@ Recent decisions affecting current work:
 - [Phase 03]: Phase 3 round 1: control-system type contract approved at the type-first gate — 17 I* interfaces + numeric SkillIntentKind, declarations only
 - [Phase 03]: Phase 3 round 2 pending: Sensor, ControlSystem loop, ArenaSensingWorld, DefaultUnitAI, IDamageSink glue and src/control/constants.ts are planned only after the gate; requirements-completed stays empty in round 1
 - [Phase 03]: Gate answers recorded for round 2: ISensingWorld is env-geometry-only; first-equipped weapon wins at registration; decide-then-apply on ticks 0/6/12; cooldown lives on the AI instance with intents leaving via IControlTickResult.skillIntents; ControlSystem owns dead-unit deregistration; IUnitState imported from @/physics/types
+- [Phase 03]: Phase 03 P02: decisions fire at tickIndex % 6 === 0 before application, so the first decision takes effect on tick 0 (A5)
+- [Phase 03]: Phase 03 P02: the held action is re-applied every physics tick; zero net force/torque skips application to avoid waking sleeping bodies
+- [Phase 03]: Phase 03 P02: ai.decide and sanitizeAction share one try/catch; throwing/malformed plugin output falls back to a zero action without aborting the tick
+- [Phase 03]: Phase 03 P02: deregistration order is provider.destroy -> catalog delete -> physics.removeUnit; physics registration failure destroys the AI and leaves no partial state
 
 ### Pending Todos
 
@@ -139,6 +145,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-19T14:26:56.655Z
-Stopped at: Completed 03-01-PLAN.md (round 1 type gate approved) — round 2 implementation planning pending
+Last session: 2026-10-20T04:34:09.092Z
+Stopped at: Completed 03-02-PLAN.md (round 2: sensing + control loop + default AI)
 Resume file: None

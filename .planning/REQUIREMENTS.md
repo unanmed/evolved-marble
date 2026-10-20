@@ -27,10 +27,10 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### CTRL — 操控系统
 
-- [ ] **CTRL-01**: 定义单位级 AI 的输入接口（自身属性、位置、64 条射线距离、射弹距离、16 个最近敌方简讯、16 个最近友方简讯）
-- [ ] **CTRL-02**: 定义单位级 AI 的输出接口（四向力、旋转力、武器技能、单位技能）
-- [ ] **CTRL-03**: AI 每 0.1s（6 帧）决策一次
-- [ ] **CTRL-04**: AI 控制实现为**可插拔**模块（可替换不同 AI 实现）；提供一个默认基线实现，使模拟可独立自主运行
+- [x] **CTRL-01**: 定义单位级 AI 的输入接口（自身属性、位置、64 条射线距离、射弹距离、16 个最近敌方简讯、16 个最近友方简讯）
+- [x] **CTRL-02**: 定义单位级 AI 的输出接口（四向力、旋转力、武器技能、单位技能）
+- [x] **CTRL-03**: AI 每 0.1s（6 帧）决策一次
+- [x] **CTRL-04**: AI 控制实现为**可插拔**模块（可替换不同 AI 实现）；提供一个默认基线实现，使模拟可独立自主运行
 
 ### KING — 王国系统
 
@@ -116,10 +116,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PHYS-03 | Phase 2 — 物理模拟系统 | Complete |
 | PHYS-04 | Phase 2 — 物理模拟系统 | Complete |
 | PHYS-05 | Phase 2 — 物理模拟系统 | Complete |
-| CTRL-01 | Phase 3 — 操控系统 | Pending |
-| CTRL-02 | Phase 3 — 操控系统 | Pending |
-| CTRL-03 | Phase 3 — 操控系统 | Pending |
-| CTRL-04 | Phase 3 — 操控系统 | Pending |
+| CTRL-01 | Phase 3 — 操控系统 | Complete |
+| CTRL-02 | Phase 3 — 操控系统 | Complete |
+| CTRL-03 | Phase 3 — 操控系统 | Complete |
+| CTRL-04 | Phase 3 — 操控系统 | Complete |
 | KING-01 | Phase 4 — 王国系统 | Pending |
 | KING-02 | Phase 4 — 王国系统 | Pending |
 | KING-03 | Phase 4 — 王国系统 | Pending |
