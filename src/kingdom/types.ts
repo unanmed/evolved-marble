@@ -43,16 +43,14 @@ export enum UnitControlMode {
     Idle = 3
 }
 
-/** 指挥官下达给军队的宏观指令种类（D-29）。 */
+/** 指挥官下达给军队的宏观指令种类（D-29）：只保留三种，攻击由进入战斗范围自动触发。 */
 export enum ArmyOrderKind {
-    /** 沿目标点行军；未给目标时保持当前朝向（D-12）。 */
-    March = 0,
-    /** 向目标城池行军，抵达触发距离后发动城池战斗（D-16/D-21）。 */
-    AttackCity = 1,
-    /** 返回己方城池并驻扎（D-26）。 */
-    Garrison = 2,
+    /** 移动到指定点；进入敌方战斗范围后自动触发战斗（D-12/D-16）。 */
+    MoveTo = 0,
+    /** 前往指定城池并驻扎；若已在触发范围内则直接驻扎（D-21/D-26）。 */
+    Garrison = 1,
     /** 原地待命，中心不再移动（D-29）。 */
-    Hold = 3
+    Hold = 2
 }
 
 /** 战场生命周期（D-03）。 */
@@ -307,7 +305,7 @@ export interface IBattleSystem {
 
 /**
  * 一条军队宏观指令（D-29）。
- * 缺失的字面量一律用可选字段表达；省略 `startAtMinutes` 表示“立即生效”。
+ * 缺失的字面量一律用可选字段表达；省略 `afterMinutes` 表示“立即生效”。
  */
 export interface IArmyOrder {
     /** 目标军队 id。 */
@@ -318,10 +316,10 @@ export interface IArmyOrder {
     readonly targetX?: number;
     /** 目标点 y 坐标（米）；仅需要目标点的指令使用。 */
     readonly targetY?: number;
-    /** 目标城池 id；`AttackCity` / `Garrison` 使用。 */
+    /** 目标城池 id；仅 `Garrison` 使用。 */
     readonly cityId?: number;
-    /** 开始生效的游戏分钟；省略表示立即。 */
-    readonly startAtMinutes?: number;
+    /** 指令下达后经过的游戏分钟数；省略表示立即生效（相对时间，不是绝对时间）。 */
+    readonly afterMinutes?: number;
 }
 
 /**

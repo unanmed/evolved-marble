@@ -1,4 +1,4 @@
-import { describe, expect, expectTypeOf, it } from 'vitest';
+﻿import { describe, expect, expectTypeOf, it } from 'vitest';
 
 // 从 `@/kingdom/types` 导入枚举值：该导入本身就是别名解析的证明，
 // 并会传递性解析 `@/control/types` 与 `@/units/types`。
@@ -137,25 +137,23 @@ describe('kingdom types — numeric UnitControlMode enum', () => {
 });
 
 describe('kingdom types — numeric ArmyOrderKind enum', () => {
-    it('pins all four order kinds', () => {
-        expect(ArmyOrderKind.March).toBe(0);
-        expect(ArmyOrderKind.AttackCity).toBe(1);
-        expect(ArmyOrderKind.Garrison).toBe(2);
-        expect(ArmyOrderKind.Hold).toBe(3);
+    it('pins all three order kinds', () => {
+        expect(ArmyOrderKind.MoveTo).toBe(0);
+        expect(ArmyOrderKind.Garrison).toBe(1);
+        expect(ArmyOrderKind.Hold).toBe(2);
     });
 
     it('all members are integers and distinct', () => {
         const members: readonly number[] = [
-            ArmyOrderKind.March,
-            ArmyOrderKind.AttackCity,
+            ArmyOrderKind.MoveTo,
             ArmyOrderKind.Garrison,
             ArmyOrderKind.Hold
         ];
-        expect(members).toHaveLength(4);
+        expect(members).toHaveLength(3);
         for (const member of members) {
             expect(Number.isInteger(member)).toBe(true);
         }
-        expect(new Set<number>(members).size).toBe(4);
+        expect(new Set<number>(members).size).toBe(3);
     });
 });
 
@@ -232,21 +230,21 @@ describe('kingdom types — read surfaces compile as complete literals', () => {
         expect(mergedEvent.mergedIntoBattleId).toBe(7);
     });
 
-    it('accepts a fully populated march order and a minimal hold order', () => {
-        const marchOrder: IArmyOrder = {
+    it('accepts a fully populated move order and a minimal hold order', () => {
+        const moveOrder: IArmyOrder = {
             armyId: 20,
-            kind: ArmyOrderKind.March,
+            kind: ArmyOrderKind.MoveTo,
             targetX: 500,
             targetY: 500,
-            startAtMinutes: 0
+            afterMinutes: 0
         };
         const holdOrder: IArmyOrder = {
             armyId: 20,
             kind: ArmyOrderKind.Hold
         };
 
-        expect(marchOrder.kind).toBe(ArmyOrderKind.March);
-        expect(holdOrder.startAtMinutes).toBeUndefined();
+        expect(moveOrder.kind).toBe(ArmyOrderKind.MoveTo);
+        expect(holdOrder.afterMinutes).toBeUndefined();
     });
 
     it('accepts a complete IScenario literal with an ownerless city', () => {
