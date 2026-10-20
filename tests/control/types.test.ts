@@ -4,6 +4,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 // 并会传递性地解析 `@/physics/types` 与 `@/units/types`。
 import { SkillIntentKind } from '@/control/types';
 import type {
+    IControlSystem,
     IUnitAction,
     IUnitAI,
     IUnitAIProvider,
@@ -110,6 +111,20 @@ describe('control-system types — AI and sensing signatures', () => {
         expectTypeOf<
             ISensor['sense']
         >().returns.toEqualTypeOf<IUnitObservation | null>();
+    });
+});
+
+describe('control-system types — G-5 AI installation seam', () => {
+    it('IControlSystem.setUnitAI takes (number, IUnitAI) and returns void', () => {
+        expectTypeOf<IControlSystem['setUnitAI']>()
+            .parameter(0)
+            .toEqualTypeOf<number>();
+        expectTypeOf<IControlSystem['setUnitAI']>()
+            .parameter(1)
+            .toEqualTypeOf<IUnitAI>();
+        expectTypeOf<
+            IControlSystem['setUnitAI']
+        >().returns.toEqualTypeOf<void>();
     });
 });
 

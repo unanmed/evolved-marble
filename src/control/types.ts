@@ -307,6 +307,20 @@ export interface IControlSystem extends IUnitCatalog {
     /** 预留的运行时阵营更新入口（Phase 4 城池易手/转阵营）；Phase 3 不调用。 */
     updateTeam(unitId: number, teamId: number): void;
     /**
+     * 替换某单位决策所用的 `IUnitAI` 实例（G-5，D-11/D-14）。
+     *
+     * 语义：
+     * - 只是**替换** `unitId` 的 AI 实例；控制层会先释放旧实例
+     *   （经 provider 的 `destroy(unitId)` 路径，清理其目标/冷却等内部状态），
+     *   再**接管**传入的 `ai`，并在 `unregisterUnit`/`dispose` 时释放该引用。
+     * - 未注册的 `unitId` **抛错**（与 `registerUnit` 一致，绝不静默空操作）。
+     * - 调用是 **O(1)**，不触碰物理刚体、阵营、注册信息或已保持的动作；
+     *   旧动作会继续施加，直到下一个决策 tick 被新实例的结果替换。
+     * - 由王国层 World 在**子步之间**调用，绝不在 `IUnitAI.decide` 内部调用；
+     *   `IWorld` 不暴露控制系统，组合根负责接线。
+     */
+    setUnitAI(unitId: number, ai: IUnitAI): void;
+    /**
      * 推进一个控制 tick，按 **6-tick (0.1 s) cadence** 决策：
      * 决策发生在绝对 tick **0/6/12**…（以 tick 计数，不用 wall-clock）；
      * 决策先于执行——决策 tick 上先取得新动作，再从该 tick 起持续施加，

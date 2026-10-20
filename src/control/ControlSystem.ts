@@ -173,6 +173,31 @@ export class ControlSystem implements IControlSystem {
     }
 
     /**
+     * 替换某单位决策所用的 AI 实例（G-5）：先经 provider 释放旧实例（清理其内部状态），
+     * 再接管传入实例；未注册或正在注销的 id 抛错（与 `registerUnit` 一致）。
+     * 调用是 O(1)，不触碰物理刚体、阵营、注册信息或已保持的动作。
+     * @param unitId 单位 id。
+     * @param ai 新的 AI 实例（控制层接管其释放责任）。
+     * @throws {Error} 当单位未注册或正在注销时。
+     */
+    setUnitAI(unitId: number, ai: IUnitAI): void {
+        if (this.removing.has(unitId) || !this.units.has(unitId)) {
+            throw new Error(
+                `ControlSystem.setUnitAI: unit ${unitId} is not registered`
+            );
+        }
+        const hadAi = this.ais.delete(unitId);
+        if (hadAi) {
+            try {
+                this.provider.destroy(unitId);
+            } catch {
+                // 旧实例释放失败不应阻止安装新实例。
+            }
+        }
+        this.ais.set(unitId, ai);
+    }
+
+    /**
      * 推进一个控制 tick。
      *
      * 顺序（A5 决策先于执行）：
