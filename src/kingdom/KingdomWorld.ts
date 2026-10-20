@@ -1,0 +1,887 @@
+/**
+ * 王国世界：`class KingdomWorld implements IWorld`（D-01/D-09/D-28/KING-01..03/06/08）。
+ * 唯一的编排器与组合根：从场景表构建势力/城池/军队、把单位注册进注入的
+ * `IControlSystem`、按 1 或 24 个一游戏分钟子步推进、在子步之间切换单位 AI。
+ *
+ * 外部所有权：`physics` 与 `control` 由组合根创建并持有，本类**不**释放它们
+ * （`dispose()` 只清理内部引用；A18/C-19：`IWorld` 不暴露 `getControl`/`getPhysics`）。
+ *
+ * `DT` 永不改动：24× 通过 24 个一游戏分钟子步实现，每个子步恰好一次 `control.tick()`
+ * （research Pitfalls 4/5）；本文件不读 wall-clock（Pitfall 18）。
+ */
+
+import { advanceArmyCenter, Army, computeFormationSlots } from '@/kingdom/Army';
+import { BattleAI } from '@/kingdom/BattleAI';
+import { BattleSystem } from '@/kingdom/BattleSystem';
+import { BrakeAI } from '@/kingdom/BrakeAI';
+import { City } from '@/kingdom/City';
+import {
+    ARMY_FORMATION_RADIUS,
+    BATTLE_AREA_HALF_EXTENT,
+    BATTLE_AREA_HYSTERESIS,
+    BATTLE_TICK_MINUTES,
+    BATTLE_TRIGGER_DISTANCE,
+    BRAKE_MIN_MINUTES,
+    PEACE_TICK_MINUTES
+} from '@/kingdom/constants';
+import { Faction } from '@/kingdom/Faction';
+import { IdleAI } from '@/kingdom/IdleAI';
+import { MarchAI } from '@/kingdom/MarchAI';
+import { TimeSystem } from '@/kingdom/TimeSystem';
+import { ArmyOrderKind, ArmyState, UnitControlMode } from '@/kingdom/types';
+import type {
+    IArmy,
+    IArmyOrder,
+    IArmySpawnSpec,
+    IBattle,
+    IBattleSystem,
+    ICity,
+    IFaction,
+    IKingdomConfig,
+    IMapBounds,
+    IMutableArmy,
+    IMutableCity,
+    IMutableFaction,
+    IScenario,
+    ITerrainRect,
+    ITimeSystem,
+    IVec2,
+    IVisibleArmyBrief,
+    IVisibleCityBrief,
+    IWorld,
+    IWorldTickResult
+} from '@/kingdom/types';
+import type { IControlSystem, IUnitAI } from '@/control/types';
+import type { IPhysicsWorld } from '@/physics/types';
+import type { IRng } from '@/common/types';
+import { spawnUnit } from '@/units/spawn';
+import type { IUnit } from '@/units/types';
+
+/**
+ * 单位初始聚集环半径（米）：让同军单位出生时不重叠；远小于阵型半径。
+ */
+const SPAWN_RING_RADIUS = 4;
+
+/**
+ * 王国世界：场景构建、子步循环、军队/战斗/AI 模式编排与读取面。
+ */
+export class KingdomWorld implements IWorld {
+    /** 外部持有的物理世界（不在 `dispose` 中释放）。 */
+    private readonly physics: IPhysicsWorld;
+    /** 外部持有的控制系统（AI 切换的唯一通道，不在 `dispose` 中释放）。 */
+    private readonly control: IControlSystem;
+    /** 注入的随机源（单位生成）。 */
+    private readonly rng: IRng;
+    /** 构造本世界的只读场景表。 */
+    private readonly scenario: IScenario;
+    /** 注入的可替换策略。 */
+    private readonly config: IKingdomConfig;
+    /** 时间系统（唯一的游戏时钟）。 */
+    private readonly time: TimeSystem;
+    /** 地图尺寸。 */
+    private readonly bounds: IMapBounds;
+    /** 场景地形矩形（构造时复制）。 */
+    private readonly terrain: readonly ITerrainRect[];
+    /** 战斗容器。 */
+    private readonly battles: BattleSystem;
+
+    /** 势力 id → 势力。 */
+    private readonly factions = new Map<number, IMutableFaction>();
+    /** 军队 id → 军队。 */
+    private readonly armies = new Map<number, IMutableArmy>();
+    /** 城池 id → 城池。 */
+    private readonly cities = new Map<number, IMutableCity>();
+    /** 单位 id → 单位实例。 */
+    private readonly units = new Map<number, IUnit>();
+    /** 单位 id → 所属军队/势力。 */
+    private readonly unitArmy = new Map<
+        number,
+        { armyId: number; factionId: number }
+    >();
+    /** 单位 id → 当前安装的王国 AI 模式（只有 World 写）。 */
+    private readonly modes = new Map<number, UnitControlMode>();
+    /** 单位 id → 当前阵型槽位。 */
+    private slots = new Map<number, IVec2>();
+    /** 军队 id → 正在增援的活跃战斗 id（`getEngagedBattleId` 的数据源）。 */
+    private readonly armyBattle = new Map<number, number>();
+    /** 单位 id → 最近一次所属的活跃战斗 id（离区刹车判定）。 */
+    private readonly lastBattleOfUnit = new Map<number, number>();
+    /** 单位 id → 刹车窗口结束的游戏分钟。 */
+    private readonly brakeUntilMinutes = new Map<number, number>();
+    /** 刚结束战斗、需要在本子步显示 `Reorganizing` 的军队 id。 */
+    private readonly reorganizingArmies = new Set<number>();
+    /** 军队 id → 指令被接受时的游戏分钟（`afterMinutes` 是相对时间）。 */
+    private readonly orderAcceptedAt = new Map<number, number>();
+    /** 下一个单位 id（单调递增，永不重用，T-04-07）。 */
+    private nextUnitId = 1;
+    /** 是否已释放（`dispose` 幂等）。 */
+    private disposed = false;
+
+    /**
+     * 构造王国世界：先建模型、再建战斗容器、最后物化单位。
+     * 物理与控制实例由调用方持有，本类不释放它们。
+     * @param physics 物理世界。
+     * @param control 控制系统（单位注册与 AI 切换的唯一入口）。
+     * @param rng 随机源（单位生成）。
+     * @param scenario 只读场景表。
+     * @param config 可替换策略（权重/入驻/指挥官）。
+     */
+    constructor(
+        physics: IPhysicsWorld,
+        control: IControlSystem,
+        rng: IRng,
+        scenario: IScenario,
+        config: IKingdomConfig
+    ) {
+        this.physics = physics;
+        this.control = control;
+        this.rng = rng;
+        this.scenario = scenario;
+        this.config = config;
+        this.time = new TimeSystem();
+        this.bounds = { width: scenario.width, height: scenario.height };
+        this.terrain = scenario.terrain.map(rect => ({ ...rect }));
+
+        for (const spec of scenario.factions) {
+            this.factions.set(spec.id, new Faction(spec.id, spec.name));
+        }
+        for (const spec of scenario.cities) {
+            this.cities.set(
+                spec.id,
+                new City(
+                    spec.id,
+                    spec.factionId,
+                    spec.x,
+                    spec.y,
+                    spec.kind,
+                    spec.garrisonCap,
+                    spec.trainingClass
+                )
+            );
+        }
+        for (const spec of scenario.armies) {
+            const armyId = spec.id;
+            this.armies.set(
+                armyId,
+                new Army(
+                    armyId,
+                    spec.factionId,
+                    spec.x,
+                    spec.y,
+                    spec.heading,
+                    () => this.armyBattle.get(armyId)
+                )
+            );
+        }
+
+        this.fillFactionRosters();
+
+        this.battles = new BattleSystem(
+            this.physics,
+            unitId => this.unitArmy.get(unitId)?.factionId,
+            unitId => this.units.get(unitId) ?? null,
+            () => [...this.armies.values()],
+            () => this.time.getGameMinutes(),
+            this.config.unitWeight,
+            BATTLE_AREA_HALF_EXTENT,
+            BATTLE_TRIGGER_DISTANCE,
+            BATTLE_AREA_HYSTERESIS,
+            battle => this.handleBattleEnded(battle)
+        );
+
+        for (const spec of scenario.armies) {
+            this.spawnArmyUnits(spec);
+        }
+    }
+
+    /**
+     * 推进一个外层 tick：和平 24 个子步、战斗 1 个子步；若和平 tick 中途开战则提前结束。
+     * 子步循环**之后**重新决策速率，因此「本 tick 开战」返回 `minutesPerTick: 1`
+     * （KING-02/D-09）。`DT` 从不修改。
+     * @returns 本 tick 实际推进的游戏分钟与结束时的每 tick 分钟数。
+     */
+    tick(): IWorldTickResult {
+        const rate = this.battles.hasActiveBattle()
+            ? BATTLE_TICK_MINUTES
+            : PEACE_TICK_MINUTES;
+        this.time.setMinutesPerTick(rate);
+
+        let advanced = 0;
+        for (let step = 0; step < rate; step += 1) {
+            this.stepSubstep();
+            advanced += 1;
+            if (rate > 1 && this.battles.hasActiveBattle()) {
+                break;
+            }
+        }
+
+        const finalRate = this.battles.hasActiveBattle()
+            ? BATTLE_TICK_MINUTES
+            : PEACE_TICK_MINUTES;
+        this.time.setMinutesPerTick(finalRate);
+        this.time.advanceTick();
+
+        return {
+            gameMinutes: advanced,
+            minutesPerTick: this.time.getMinutesPerTick()
+        };
+    }
+
+    /**
+     * 时间系统读取面。
+     * @returns 时间系统。
+     */
+    getTime(): ITimeSystem {
+        return this.time;
+    }
+
+    /**
+     * 地图尺寸。
+     * @returns 地图尺寸（新对象）。
+     */
+    getBounds(): IMapBounds {
+        return { ...this.bounds };
+    }
+
+    /**
+     * 场景地形矩形（新数组与新对象，调用方无法改写内部表）。
+     * @returns 地形矩形列表。
+     */
+    getTerrain(): readonly ITerrainRect[] {
+        return this.terrain.map(rect => ({ ...rect }));
+    }
+
+    /**
+     * 构造本世界的只读场景表。
+     * @returns 场景表。
+     */
+    getScenario(): IScenario {
+        return this.scenario;
+    }
+
+    /**
+     * 全部势力（上帝视角）。
+     * @returns 势力列表（新数组）。
+     */
+    getFactions(): readonly IFaction[] {
+        return [...this.factions.values()];
+    }
+
+    /**
+     * 按 id 读取势力。
+     * @param factionId 势力 id。
+     * @returns 势力或 `null`。
+     */
+    getFaction(factionId: number): IFaction | null {
+        return this.factions.get(factionId) ?? null;
+    }
+
+    /**
+     * 按 id 读取军队。
+     * @param armyId 军队 id。
+     * @returns 军队或 `null`。
+     */
+    getArmy(armyId: number): IArmy | null {
+        return this.armies.get(armyId) ?? null;
+    }
+
+    /**
+     * 按 id 读取城池。
+     * @param cityId 城池 id。
+     * @returns 城池或 `null`。
+     */
+    getCity(cityId: number): ICity | null {
+        return this.cities.get(cityId) ?? null;
+    }
+
+    /**
+     * 该势力当前可见的军队简讯。**本计划是 stub**：只返回本势力自己的军队；
+     * plan 04-04 替换为 100 m / 150 m 视野并集（D-25/A21）。
+     * @param factionId 势力 id。
+     * @returns 军队简讯列表。
+     */
+    getVisibleArmies(factionId: number): readonly IVisibleArmyBrief[] {
+        const faction = this.factions.get(factionId);
+        if (faction === undefined) {
+            return [];
+        }
+        const briefs: IVisibleArmyBrief[] = [];
+        for (const armyId of faction.getArmyIds()) {
+            const army = this.armies.get(armyId);
+            if (army === undefined) {
+                continue;
+            }
+            briefs.push({
+                id: army.getId(),
+                factionId: army.getFactionId(),
+                center: army.getCenter(),
+                heading: army.getHeading(),
+                state: army.getState()
+            });
+        }
+        return briefs;
+    }
+
+    /**
+     * 该势力当前可见的城池简讯。**本计划是 stub**：只返回本势力自己的城池；
+     * plan 04-04 替换为视野并集（D-25/A21）。
+     * @param factionId 势力 id。
+     * @returns 城池简讯列表。
+     */
+    getVisibleCities(factionId: number): readonly IVisibleCityBrief[] {
+        const faction = this.factions.get(factionId);
+        if (faction === undefined) {
+            return [];
+        }
+        const briefs: IVisibleCityBrief[] = [];
+        for (const cityId of faction.getCityIds()) {
+            const city = this.cities.get(cityId);
+            if (city === undefined) {
+                continue;
+            }
+            briefs.push({
+                id: city.getId(),
+                factionId: city.getFactionId(),
+                position: city.getPosition(),
+                kind: city.getKind()
+            });
+        }
+        return briefs;
+    }
+
+    /**
+     * 该势力当前可见的单位 id。**本计划是 stub**：只返回本势力自己的单位；
+     * plan 04-04 替换为视野并集。
+     * @param factionId 势力 id。
+     * @returns 单位 id 列表。
+     */
+    getVisibleUnitIds(factionId: number): readonly number[] {
+        const ids: number[] = [];
+        for (const [unitId, owner] of this.unitArmy) {
+            if (owner.factionId === factionId) {
+                ids.push(unitId);
+            }
+        }
+        return ids;
+    }
+
+    /**
+     * 战斗系统读取面。
+     * @returns 战斗容器。
+     */
+    getBattleSystem(): IBattleSystem {
+        return this.battles;
+    }
+
+    /**
+     * 下达或覆盖一条军队指令：无效指令被静默丢弃（T-04-04）。
+     * 校验：军队存在、枚举合法、`afterMinutes` 有限且非负、目标点有限且在界内、
+     * `cityId` 指向已知城池；`MoveTo` 需要目标点，`Garrison` 需要城池。
+     * @param order 指令。
+     */
+    issueOrder(order: IArmyOrder): void {
+        if (!this.armies.has(order.armyId)) {
+            return;
+        }
+        if (ArmyOrderKind[order.kind] === undefined) {
+            return;
+        }
+        if (
+            order.afterMinutes !== undefined &&
+            (!Number.isFinite(order.afterMinutes) || order.afterMinutes < 0)
+        ) {
+            return;
+        }
+        if (order.targetX !== undefined && !this.insideMapX(order.targetX)) {
+            return;
+        }
+        if (order.targetY !== undefined && !this.insideMapY(order.targetY)) {
+            return;
+        }
+        if (order.cityId !== undefined && !this.cities.has(order.cityId)) {
+            return;
+        }
+        if (
+            order.kind === ArmyOrderKind.MoveTo &&
+            (order.targetX === undefined || order.targetY === undefined)
+        ) {
+            return;
+        }
+        if (
+            order.kind === ArmyOrderKind.Garrison &&
+            order.cityId === undefined
+        ) {
+            return;
+        }
+
+        const army = this.armies.get(order.armyId);
+        if (army === undefined) {
+            return;
+        }
+        army.setOrder({ ...order });
+        this.orderAcceptedAt.set(order.armyId, this.time.getGameMinutes());
+    }
+
+    /**
+     * 释放内部引用；幂等。**不**释放外部持有的物理/控制实例。
+     */
+    dispose(): void {
+        if (this.disposed) {
+            return;
+        }
+        this.disposed = true;
+        this.factions.clear();
+        this.armies.clear();
+        this.cities.clear();
+        this.units.clear();
+        this.unitArmy.clear();
+        this.modes.clear();
+        this.slots.clear();
+        this.armyBattle.clear();
+        this.lastBattleOfUnit.clear();
+        this.brakeUntilMinutes.clear();
+        this.reorganizingArmies.clear();
+        this.orderAcceptedAt.clear();
+    }
+
+    /**
+     * 推进一个一游戏分钟子步：时钟 → 军队中心 → 槽位 → 战斗判定 → 状态 → 刹车 → AI → 控制。
+     */
+    private stepSubstep(): void {
+        this.time.advance(1);
+        this.advanceArmies();
+        this.rebuildSlots();
+        this.battles.tick();
+        this.rebuildArmyStates();
+        this.updateBrakeWindows();
+        this.updateUnitModes();
+        this.control.tick();
+        this.pruneDeadUnits();
+    }
+
+    /**
+     * 推进每支有单位的军队中心：优先朝正在增援的战场中心，其次朝指令目标，
+     * 无目标则原地不动。空名册军队保留身份但保持惰性（D-05）。
+     */
+    private advanceArmies(): void {
+        for (const army of this.armies.values()) {
+            if (army.getUnitIds().length === 0) {
+                continue;
+            }
+            const engaged = this.findEngagedBattle(army.getId());
+            const target =
+                engaged !== null
+                    ? engaged.getCenter()
+                    : this.resolveOrderTarget(army);
+            const center = army.getCenter();
+            const next = advanceArmyCenter(
+                center.x,
+                center.y,
+                army.getHeading(),
+                target === null ? null : target.x,
+                target === null ? null : target.y,
+                1,
+                this.bounds.width,
+                this.bounds.height
+            );
+            army.setCenter(next.x, next.y);
+            army.setHeading(next.heading);
+        }
+    }
+
+    /**
+     * 重算全部阵型槽位（新映射；`MarchAI` 经闭包读取最新值）。
+     */
+    private rebuildSlots(): void {
+        const slots = new Map<number, IVec2>();
+        for (const army of this.armies.values()) {
+            const center = army.getCenter();
+            const armySlots = computeFormationSlots(
+                center.x,
+                center.y,
+                army.getHeading(),
+                army.getUnitIds(),
+                ARMY_FORMATION_RADIUS
+            );
+            for (const [unitId, slot] of armySlots) {
+                slots.set(unitId, slot);
+            }
+        }
+        this.slots = slots;
+    }
+
+    /**
+     * 重算每支军队的宏观状态：任一单位在战斗 → `Engaging`；否则刚结束 →
+     * `Reorganizing` 一个子步；有驻扎城 → `Garrisoned`；否则 `Marching`。
+     * `ArmyState.InBattle` 是**保留值**：本计划从不赋值，也不做任何分支（04-04 同样不得添加）。
+     */
+    private rebuildArmyStates(): void {
+        this.armyBattle.clear();
+        for (const army of this.armies.values()) {
+            if (army.getUnitIds().length === 0) {
+                continue;
+            }
+
+            let engagedBattleId: number | undefined;
+            for (const unitId of army.getUnitIds()) {
+                const battle = this.battles.getBattleForUnit(unitId);
+                if (battle !== null) {
+                    engagedBattleId = battle.getId();
+                    break;
+                }
+            }
+
+            if (engagedBattleId !== undefined) {
+                this.armyBattle.set(army.getId(), engagedBattleId);
+                army.setState(ArmyState.Engaging);
+                continue;
+            }
+
+            if (this.reorganizingArmies.delete(army.getId())) {
+                army.setState(ArmyState.Reorganizing);
+                continue;
+            }
+
+            army.setState(
+                army.getGarrisonedCityId() !== undefined
+                    ? ArmyState.Garrisoned
+                    : ArmyState.Marching
+            );
+        }
+    }
+
+    /**
+     * 离区刹车记账（D-14）：在战斗中 → 记录战斗并清除窗口；刚离区且战斗仍活跃 →
+     * 开启至少 `BRAKE_MIN_MINUTES` 的窗口；战斗已结束 → 立即清除，不刹车。
+     */
+    private updateBrakeWindows(): void {
+        const activeIds = new Set(
+            this.battles.listActiveBattles().map(battle => battle.getId())
+        );
+        const now = this.time.getGameMinutes();
+
+        for (const unitId of this.units.keys()) {
+            const battle = this.battles.getBattleForUnit(unitId);
+            if (battle !== null) {
+                this.lastBattleOfUnit.set(unitId, battle.getId());
+                this.brakeUntilMinutes.delete(unitId);
+                continue;
+            }
+
+            const recorded = this.lastBattleOfUnit.get(unitId);
+            if (recorded === undefined) {
+                continue;
+            }
+            if (activeIds.has(recorded)) {
+                if (!this.brakeUntilMinutes.has(unitId)) {
+                    this.brakeUntilMinutes.set(unitId, now + BRAKE_MIN_MINUTES);
+                }
+                continue;
+            }
+            this.lastBattleOfUnit.delete(unitId);
+            this.brakeUntilMinutes.delete(unitId);
+        }
+    }
+
+    /**
+     * 计算每单位的目标模式；仅当模式变化时创建并安装新的 AI 实例（D-11/D-14）。
+     */
+    private updateUnitModes(): void {
+        for (const unitId of this.units.keys()) {
+            const desired = this.desiredMode(unitId);
+            if (this.modes.get(unitId) === desired) {
+                continue;
+            }
+            this.modes.set(unitId, desired);
+            this.control.setUnitAI(unitId, this.createAi(desired, unitId));
+        }
+    }
+
+    /**
+     * 目标模式：在战斗中 → `Battle`；刚离区且战斗仍活跃或刹车窗口未过期 → `Brake`；
+     * 驻扎 → `Idle`；否则 `March`。窗口过期时清理两处记录。
+     * @param unitId 单位 id。
+     * @returns 目标模式。
+     */
+    private desiredMode(unitId: number): UnitControlMode {
+        if (this.battles.getBattleForUnit(unitId) !== null) {
+            return UnitControlMode.Battle;
+        }
+
+        const recorded = this.lastBattleOfUnit.get(unitId);
+        if (recorded !== undefined) {
+            const stillActive = this.battles
+                .listActiveBattles()
+                .some(battle => battle.getId() === recorded);
+            if (stillActive) {
+                return UnitControlMode.Brake;
+            }
+            this.lastBattleOfUnit.delete(unitId);
+            this.brakeUntilMinutes.delete(unitId);
+        }
+
+        const until = this.brakeUntilMinutes.get(unitId);
+        if (until !== undefined) {
+            if (this.time.getGameMinutes() < until) {
+                return UnitControlMode.Brake;
+            }
+            this.brakeUntilMinutes.delete(unitId);
+        }
+
+        const owner = this.unitArmy.get(unitId);
+        if (owner !== undefined) {
+            const army = this.armies.get(owner.armyId);
+            if (
+                army !== undefined &&
+                army.getState() === ArmyState.Garrisoned
+            ) {
+                return UnitControlMode.Idle;
+            }
+        }
+        return UnitControlMode.March;
+    }
+
+    /**
+     * 按模式创建 AI 实例；非法运行期值回退 `IdleAI`（数字枚举可被任意数污染）。
+     * @param mode 目标模式。
+     * @param unitId 单位 id。
+     * @returns 新的 AI 实例。
+     */
+    private createAi(mode: UnitControlMode, unitId: number): IUnitAI {
+        switch (mode) {
+            case UnitControlMode.March:
+                return new MarchAI(unitId, id => this.slots.get(id) ?? null);
+            case UnitControlMode.Battle:
+                return new BattleAI(unitId, id =>
+                    this.battles.getBattleForUnit(id)
+                );
+            case UnitControlMode.Brake:
+                return new BrakeAI();
+            default:
+                return new IdleAI();
+        }
+    }
+
+    /**
+     * 解析当前应朝哪个点前进：指令尚未到期、`Hold` 或缺目标时返回 `null`。
+     * `MoveTo` 取显式目标点，`Garrison` 取城池点（相对 `afterMinutes` 计时）。
+     * @param army 军队。
+     * @returns 目标点或 `null`。
+     */
+    private resolveOrderTarget(army: IMutableArmy): IVec2 | null {
+        const order = army.getOrder();
+        if (order === null) {
+            return null;
+        }
+        const accepted = this.orderAcceptedAt.get(army.getId()) ?? 0;
+        const delay = order.afterMinutes ?? 0;
+        if (this.time.getGameMinutes() < accepted + delay) {
+            return null;
+        }
+
+        switch (order.kind) {
+            case ArmyOrderKind.MoveTo:
+                if (
+                    order.targetX === undefined ||
+                    order.targetY === undefined
+                ) {
+                    return null;
+                }
+                return { x: order.targetX, y: order.targetY };
+            case ArmyOrderKind.Garrison:
+                if (order.cityId === undefined) {
+                    return null;
+                }
+                return this.cities.get(order.cityId)?.getPosition() ?? null;
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * 读取军队当前增援的活跃战场；无记录或战斗已结束时返回 `null`。
+     * @param armyId 军队 id。
+     * @returns 活跃战斗或 `null`。
+     */
+    private findEngagedBattle(armyId: number): IBattle | null {
+        const battleId = this.armyBattle.get(armyId);
+        if (battleId === undefined) {
+            return null;
+        }
+        for (const battle of this.battles.listActiveBattles()) {
+            if (battle.getId() === battleId) {
+                return battle;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * 战斗结束回调（D-20/Pitfall 11）：对每个有幸存成员的军队，把中心重算为这些
+     * 幸存成员的均值、状态设为 `Reorganizing`、清空增援记录；**不**改军队 id、
+     * 势力、名册或指令（指令保持不变，军队随后恢复行军）。
+     * @param battle 已结束的战斗。
+     */
+    private handleBattleEnded(battle: IBattle): void {
+        const survivorsByArmy = new Map<number, number[]>();
+        for (const unitId of battle.getMemberUnitIds()) {
+            const unit = this.units.get(unitId);
+            if (unit === undefined || !unit.isAlive()) {
+                continue;
+            }
+            const owner = this.unitArmy.get(unitId);
+            if (owner === undefined) {
+                continue;
+            }
+            const list = survivorsByArmy.get(owner.armyId) ?? [];
+            list.push(unitId);
+            survivorsByArmy.set(owner.armyId, list);
+        }
+
+        for (const [armyId, unitIds] of survivorsByArmy) {
+            const army = this.armies.get(armyId);
+            if (army === undefined) {
+                continue;
+            }
+            let sumX = 0;
+            let sumY = 0;
+            let count = 0;
+            for (const unitId of unitIds) {
+                const state = this.physics.getUnitState(unitId);
+                if (state === null) {
+                    continue;
+                }
+                sumX += state.x;
+                sumY += state.y;
+                count += 1;
+            }
+            if (count > 0) {
+                army.setCenter(sumX / count, sumY / count);
+            }
+            army.setState(ArmyState.Reorganizing);
+            this.reorganizingArmies.add(armyId);
+            this.armyBattle.delete(armyId);
+        }
+    }
+
+    /**
+     * 剪枝死亡单位：从单位表、单位→军队表、模式表、槽位表与两处刹车表移除，
+     * 并从军队名册删除其 id（Pitfall 8）。
+     */
+    private pruneDeadUnits(): void {
+        const dead: number[] = [];
+        for (const [unitId, unit] of this.units) {
+            if (!unit.isAlive()) {
+                dead.push(unitId);
+            }
+        }
+        if (dead.length === 0) {
+            return;
+        }
+
+        const deadSet = new Set(dead);
+        for (const unitId of dead) {
+            const owner = this.unitArmy.get(unitId);
+            this.units.delete(unitId);
+            this.unitArmy.delete(unitId);
+            this.modes.delete(unitId);
+            this.slots.delete(unitId);
+            this.lastBattleOfUnit.delete(unitId);
+            this.brakeUntilMinutes.delete(unitId);
+
+            if (owner !== undefined) {
+                const army = this.armies.get(owner.armyId);
+                if (army !== undefined) {
+                    army.setUnitIds(
+                        army
+                            .getUnitIds()
+                            .filter(memberId => !deadSet.has(memberId))
+                    );
+                }
+            }
+        }
+    }
+
+    /**
+     * 把每个势力在场景中拥有的军队/城池 id 填入势力模型（防御性副本）。
+     */
+    private fillFactionRosters(): void {
+        for (const faction of this.factions.values()) {
+            const armyIds: number[] = [];
+            for (const army of this.armies.values()) {
+                if (army.getFactionId() === faction.getId()) {
+                    armyIds.push(army.getId());
+                }
+            }
+            const cityIds: number[] = [];
+            for (const city of this.cities.values()) {
+                if (city.getFactionId() === faction.getId()) {
+                    cityIds.push(city.getId());
+                }
+            }
+            faction.setArmyIds(armyIds);
+            faction.setCityIds(cityIds);
+        }
+    }
+
+    /**
+     * 物化一支场景军队：以 `spawnUnit` 生成单位、分配单调 id、注册进控制系统，
+     * 再写入名册。注册失败会直接抛出（名册在全部成功后才最终确定）。
+     * @param spec 军队场景配置。
+     */
+    private spawnArmyUnits(spec: IArmySpawnSpec): void {
+        const army = this.armies.get(spec.id);
+        if (army === undefined) {
+            return;
+        }
+
+        const total = spec.units.reduce((sum, entry) => sum + entry.count, 0);
+        const roster: number[] = [];
+        let index = 0;
+
+        for (const entry of spec.units) {
+            for (let count = 0; count < entry.count; count += 1) {
+                const unit = spawnUnit(entry.classKind, this.rng);
+                const unitId = this.nextUnitId;
+                this.nextUnitId += 1;
+
+                const angle = total > 0 ? (Math.PI * 2 * index) / total : 0;
+                this.control.registerUnit({
+                    unitId,
+                    unit,
+                    teamId: army.getFactionId(),
+                    x: spec.x + Math.cos(angle) * SPAWN_RING_RADIUS,
+                    y: spec.y + Math.sin(angle) * SPAWN_RING_RADIUS
+                });
+
+                this.units.set(unitId, unit);
+                this.unitArmy.set(unitId, {
+                    armyId: army.getId(),
+                    factionId: army.getFactionId()
+                });
+                roster.push(unitId);
+                index += 1;
+            }
+        }
+
+        army.setUnitIds(roster);
+    }
+
+    /**
+     * 判断 x 是否位于地图水平范围内。
+     * @param x 坐标。
+     * @returns 是否在界内。
+     */
+    private insideMapX(x: number): boolean {
+        return Number.isFinite(x) && x >= 0 && x <= this.bounds.width;
+    }
+
+    /**
+     * 判断 y 是否位于地图垂直范围内。
+     * @param y 坐标。
+     * @returns 是否在界内。
+     */
+    private insideMapY(y: number): boolean {
+        return Number.isFinite(y) && y >= 0 && y <= this.bounds.height;
+    }
+}
