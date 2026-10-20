@@ -106,12 +106,17 @@ export class ControlSystem implements IControlSystem {
      * - 物理规格只支持**单件武器**，故取装备列表中第一件武器；
      * - 规格是注册时的冻结快照，升级/换装不会刷新物理伤害输入。
      * @param request 注册请求。
-     * @throws {Error} 当控制系统已释放、unitId 已注册，或物理注册失败时。
+     * @throws {Error} 当控制系统已释放、`teamId` 非有限数、unitId 已注册，或物理注册失败时。
      */
     registerUnit(request: IControlUnitRegistration): void {
         if (this.disposed) {
             throw new Error(
                 'ControlSystem.registerUnit: control system is disposed'
+            );
+        }
+        if (!Number.isFinite(request.teamId)) {
+            throw new Error(
+                'ControlSystem.registerUnit: teamId must be finite'
             );
         }
         if (this.units.has(request.unitId)) {
@@ -152,10 +157,15 @@ export class ControlSystem implements IControlSystem {
 
     /**
      * 运行时更新阵营（Phase 4 城池易手/转阵营预留）；未注册的 id 为空操作（D-07）。
+     * `teamId` 必须是有限数：`NaN` 会让相等比较永远失败，静默破坏敌我分类与同队免伤。
      * @param unitId 单位 id。
      * @param teamId 新阵营 id。
+     * @throws {Error} 当 `teamId` 非有限数时。
      */
     updateTeam(unitId: number, teamId: number): void {
+        if (!Number.isFinite(teamId)) {
+            throw new Error('ControlSystem.updateTeam: teamId must be finite');
+        }
         if (!this.units.has(unitId)) {
             return;
         }

@@ -1435,6 +1435,50 @@ describe('ControlSystem — execution semantics', () => {
         expect(controller.listUnitIds()).toHaveLength(0);
     });
 
+    it('rejects non-finite team ids at registration and updateTeam', () => {
+        const created: number[] = [];
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            () => {},
+            () => {},
+            emptyTick
+        );
+        const provider = new RecordingProvider(
+            () => new RecordingAI(() => zeroAction()),
+            unitId => created.push(unitId)
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+
+        expect(() =>
+            controller.registerUnit({
+                unitId: 1,
+                unit: makeUnit(42),
+                teamId: Number.NaN,
+                x: 0,
+                y: 0
+            })
+        ).toThrow(/teamId must be finite/);
+        expect(created).toHaveLength(0);
+        expect(fake.hasUnit(1)).toBe(false);
+
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(43),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+        expect(() =>
+            controller.updateTeam(1, Number.POSITIVE_INFINITY)
+        ).toThrow(/teamId must be finite/);
+        expect(controller.getTeam(1)).toBe(1);
+    });
+
     it('falls back to a zero action for null, undefined, partial, and undefined skillIntent returns', () => {
         const malformedCases: (() => IUnitAction)[] = [
             () => null as unknown as IUnitAction,
