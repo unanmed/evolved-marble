@@ -37,8 +37,8 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **KING-01**: 1000×1000 地图；军队行军速度固定 10m/h，碰到地图边缘反弹
 - [x] **KING-02**: 时间系统——战斗时 1× 速、无战斗时 24× 速；散文义见参考文档
 - [x] **KING-03**: 军队由单位组成；行军时单位聚集于军队中心 25m 圆内并由程序控制（非 AI），行军回血 1/h
-- [ ] **KING-04**: 视野——军队半径 100m、城池半径 150m，决定势力可获取的信息
-- [ ] **KING-05**: 城池——驻扎上限、训练单位（普通 96h/1、主城 72h）、驻扎回血 2/h
+- [x] **KING-04**: 视野——军队半径 100m、城池半径 150m，决定势力可获取的信息
+- [x] **KING-05**: 城池——驻扎上限、训练单位（普通 96h/1、主城 72h）、驻扎回血 2/h
 - [x] **KING-06**: 军队战斗——距离 <80m 触发，战斗区为 80m 正方形加权中心，离区/结束判定
 - [ ] **KING-07**: 城池战斗——触发条件与战后结算（获胜方接管、可能入驻；败方重组行军）
 - [x] **KING-08**: 势力/阵营概念——多个势力，各拥有军队与城池
@@ -123,8 +123,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | KING-01 | Phase 4 — 王国系统 | Complete |
 | KING-02 | Phase 4 — 王国系统 | Complete |
 | KING-03 | Phase 4 — 王国系统 | Complete |
-| KING-04 | Phase 4 — 王国系统 | Pending |
-| KING-05 | Phase 4 — 王国系统 | Pending |
+| KING-04 | Phase 4 — 王国系统 | Complete |
+| KING-05 | Phase 4 — 王国系统 | Complete |
 | KING-06 | Phase 4 — 王国系统 | Complete |
 | KING-07 | Phase 4 — 王国系统 | Pending |
 | KING-08 | Phase 4 — 王国系统 | Complete |

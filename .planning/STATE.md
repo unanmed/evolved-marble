@@ -3,17 +3,17 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: 王国系统
 status: executing
-stopped_at: Completed 04-03-PLAN.md (G-1/G-2/G-5 seams; 04-04..05 pending)
-last_updated: "2026-10-20T22:21:00.000Z"
+stopped_at: Completed 04-04-PLAN.md (garrison/training/vision/terrain; 04-05 pending)
+last_updated: "2026-10-20T14:43:27.842Z"
 last_activity: 2026-10-20
-last_activity_desc: Phase 04 round 2 — three frozen-folder seams implemented
-state_head: c98143411024257c1271f724b81dc56f1dfbbffd
+last_activity_desc: Phase 04 round 3 — garrison, training, vision and terrain implemented
+state_head: 84f4eb27d7405dc80511b58ff1ac388e55125577
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 20
-  completed_plans: 18
-  percent: 90
+  completed_plans: 19
+  percent: 95
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-10-20)
 ## Current Position
 
 Phase: 04 (王国系统) — EXECUTING
-Plan: 3 of 5
+Plan: 4 of 5
 Status: Ready to execute
-Last activity: 2026-10-20 — 04-03 seams complete
+Last activity: 2026-10-20 — 04-04 garrison, training, vision and terrain complete
 
-Progress: [█████████░] 90%
+Progress: [█████████░] 95%
 
 ## Performance Metrics
 
@@ -79,6 +79,7 @@ Progress: [█████████░] 90%
 | Phase 04 P01 | 159 min | 4 tasks | 7 files |
 | Phase 04 P02 | 33 min | 3 tasks | 19 files |
 | Phase 04 P03 | 12 min | 3 tasks | 7 files |
+| Phase 04 P04 | ~35min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -144,6 +145,9 @@ Recent decisions affecting current work:
 - [Phase 04]: 04-03: static obstacles are fixed cuboids without active events and never enter the collider tag index; invalid specs are rejected before any Rapier object or id is created
 - [Phase 04]: 04-03: setUnitAI ownership follows creation — a providerOwned set decides every provider.destroy call; injected instances are only dropped
 - [Phase 04]: 04-03: KING-05 stays pending even though its static-obstacle seam shipped; city training/garrison behaviour belongs to 04-04/04-05
+- [Phase 04]: Garrison resolution keeps a satisfied order as a standing state and refuses a different live holder without touching the city link
+- [Phase 04]: Training pauses by cap/Engaging/MAX_SCENARIO_UNITS, produces at most one unit per substep and keeps the threshold remainder
+- [Phase 04]: Vision and healing stay stateless/per-unit; terrain and boundary walls are separate obstacle id sets removed only by World.dispose
 
 ### Pending Todos
 
@@ -168,6 +172,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-20T22:21:00.000Z
-Stopped at: Completed 04-03-PLAN.md (G-1/G-2/G-5 seams; 04-04..05 pending)
+Last session: 2026-10-20T14:43:27.726Z
+Stopped at: Completed 04-04-PLAN.md (garrison/training/vision/terrain; 04-05 pending)
 Resume file: None
