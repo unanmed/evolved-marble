@@ -65,6 +65,8 @@ export class ControlSystem implements IControlSystem {
     private ais = new Map<number, IUnitAI>();
     /** unitId → 保持中的动作（物理每 tick 清空力/力矩，故需留存）。 */
     private actions = new Map<number, IUnitAction>();
+    /** 正在注销中的单位 id：防止 provider.destroy 重入导致重复销毁。 */
+    private readonly removing = new Set<number>();
     /** 下一个控制 tick 的绝对序号：决策节奏的唯一依据。 */
     private tickIndex = 0;
     /** 是否已释放：`dispose()` 幂等性的唯一标记。 */
@@ -244,11 +246,14 @@ export class ControlSystem implements IControlSystem {
         }
         this.disposed = true;
         for (const unitId of [...this.ais.keys()]) {
+            this.removing.add(unitId);
+            this.ais.delete(unitId);
             try {
                 this.provider.destroy(unitId);
             } catch {
                 // 单个 AI 的清理失败不应阻断其余清理。
             }
+            this.removing.delete(unitId);
         }
         this.ais.clear();
         this.actions.clear();
@@ -501,24 +506,30 @@ export class ControlSystem implements IControlSystem {
     }
 
     /**
-     * 单点注销路径（A8）：先销毁 AI（守卫），再删除目录/阵营/动作，最后删除物理刚体。
-     * `physics.removeUnit` 是最后一步，使 sink/回调期间目录仍可读取到删除前的状态；
-     * 目录删除发生在物理删除之前，因此 `removeUnit` 时 `getUnit` 已为 `null`。
+     * 单点注销路径（A8）：先移出 AI 表并销毁（重入守卫），再删除目录/阵营/动作，
+     * 最后删除物理刚体。`units`/`teams` 在 `provider.destroy` 期间保持可读，
+     * 因此 sink/回调仍能读到删除前的状态；目录删除发生在物理删除之前，
+     * 故 `removeUnit` 时 `getUnit` 已为 `null`。
      * @param unitId 单位 id。
      */
     private removeRegisteredUnit(unitId: number): void {
-        if (this.ais.has(unitId)) {
+        if (this.removing.has(unitId)) {
+            return;
+        }
+        this.removing.add(unitId);
+        const hadAi = this.ais.delete(unitId);
+        this.actions.delete(unitId);
+        if (hadAi) {
             try {
                 this.provider.destroy(unitId);
             } catch {
                 // 清理失败不阻断目录与物理的去注册。
             }
         }
-        this.ais.delete(unitId);
-        this.actions.delete(unitId);
         this.units.delete(unitId);
         this.teams.delete(unitId);
         this.physics.removeUnit(unitId);
+        this.removing.delete(unitId);
     }
 
     /**

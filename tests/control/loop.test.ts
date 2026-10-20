@@ -1079,6 +1079,44 @@ describe('ControlSystem — execution semantics', () => {
         expect(destroyed).toEqual([1]);
     });
 
+    it('does not double-destroy or recurse when provider.destroy re-enters unregisterUnit', () => {
+        const destroyed: number[] = [];
+        let controller: ControlSystem | null = null;
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            () => {},
+            () => {},
+            emptyTick
+        );
+        const provider = new RecordingProvider(
+            () => new RecordingAI(() => zeroAction()),
+            undefined,
+            unitId => {
+                destroyed.push(unitId);
+                controller?.unregisterUnit(unitId);
+            }
+        );
+        controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(28),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+
+        expect(() => controller?.unregisterUnit(1)).not.toThrow();
+
+        expect(destroyed).toEqual([1]);
+        expect(controller.getUnit(1)).toBeNull();
+        expect(fake.hasUnit(1)).toBe(false);
+    });
+
     it('dispose is idempotent, destroys remaining AIs, and does not dispose physics', () => {
         const destroyed: number[] = [];
         let physicsDisposeCalls = 0;
