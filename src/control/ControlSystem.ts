@@ -103,9 +103,14 @@ export class ControlSystem implements IControlSystem {
      * - 物理规格只支持**单件武器**，故取装备列表中第一件武器；
      * - 规格是注册时的冻结快照，升级/换装不会刷新物理伤害输入。
      * @param request 注册请求。
-     * @throws {Error} 当 unitId 已注册，或物理注册失败时。
+     * @throws {Error} 当控制系统已释放、unitId 已注册，或物理注册失败时。
      */
     registerUnit(request: IControlUnitRegistration): void {
+        if (this.disposed) {
+            throw new Error(
+                'ControlSystem.registerUnit: control system is disposed'
+            );
+        }
         if (this.units.has(request.unitId)) {
             throw new Error(
                 `ControlSystem.registerUnit: unit ${request.unitId} is already registered`

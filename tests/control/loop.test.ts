@@ -1133,6 +1133,44 @@ describe('ControlSystem — execution semantics', () => {
         expect(controller.tick().skillIntents).toHaveLength(0);
     });
 
+    it('rejects registration after dispose instead of leaking an AI', () => {
+        const created: number[] = [];
+        const destroyed: number[] = [];
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            () => {},
+            () => {},
+            emptyTick
+        );
+        const provider = new RecordingProvider(
+            () => new RecordingAI(() => zeroAction()),
+            unitId => created.push(unitId),
+            unitId => destroyed.push(unitId)
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        controller.dispose();
+
+        expect(() =>
+            controller.registerUnit({
+                unitId: 1,
+                unit: makeUnit(27),
+                teamId: 1,
+                x: 0,
+                y: 0
+            })
+        ).toThrow(/disposed/);
+
+        expect(created).toHaveLength(0);
+        expect(destroyed).toHaveLength(0);
+        expect(fake.hasUnit(1)).toBe(false);
+        expect(controller.listUnitIds()).toHaveLength(0);
+    });
+
     it('falls back to a zero action for null, undefined, partial, and undefined skillIntent returns', () => {
         const malformedCases: (() => IUnitAction)[] = [
             () => null as unknown as IUnitAction,
