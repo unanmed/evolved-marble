@@ -560,6 +560,108 @@ describe('ControlSystem — execution semantics', () => {
         );
     });
 
+    it('drops skill intents whose payload is invalid for the selected kind', () => {
+        const malformedIntents: unknown[] = [
+            { kind: SkillIntentKind.Weapon, unitId: 1, weapon: 999 },
+            { kind: SkillIntentKind.Weapon, unitId: 1 },
+            { kind: SkillIntentKind.Weapon, unitId: 1, weapon: undefined },
+            { kind: SkillIntentKind.Unit, unitId: 1, skill: 999 },
+            { kind: SkillIntentKind.Unit, unitId: 1 },
+            { kind: SkillIntentKind.Unit, unitId: 1, skill: undefined }
+        ];
+
+        for (const intent of malformedIntents) {
+            const action = {
+                ...zeroAction(),
+                skillIntent: intent
+            } as unknown as IUnitAction;
+            const fake = new RecordingPhysicsWorld(
+                new Map([[1, stateAt(0, 0)]]),
+                () => {},
+                () => {},
+                emptyTick
+            );
+            const provider = new RecordingProvider(
+                () => new RecordingAI(() => action)
+            );
+            const controller = new ControlSystem(
+                fake,
+                new ArenaSensingWorld(50),
+                provider,
+                new TestDamageSink()
+            );
+            controller.registerUnit({
+                unitId: 1,
+                unit: makeUnit(25),
+                teamId: 1,
+                x: 0,
+                y: 0
+            });
+
+            const results: IControlTickResult[] = [];
+            for (let tick = 0; tick < 13; tick += 1) {
+                results.push(controller.tick());
+            }
+
+            expect(
+                results.reduce(
+                    (sum, result) => sum + result.skillIntents.length,
+                    0
+                )
+            ).toBe(0);
+            controller.dispose();
+        }
+    });
+
+    it('emits a rebuilt skill intent that plugin mutation cannot change', () => {
+        const pluginIntent: {
+            kind: SkillIntentKind.Unit;
+            unitId: number;
+            skill: SkillKind;
+        } = {
+            kind: SkillIntentKind.Unit,
+            unitId: 1,
+            skill: SkillKind.Charge
+        };
+        const action: IUnitAction = {
+            ...zeroAction(),
+            skillIntent: pluginIntent
+        };
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            () => {},
+            () => {},
+            emptyTick
+        );
+        const provider = new RecordingProvider(
+            () => new RecordingAI(() => action)
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(26),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+
+        const result = controller.tick();
+        const emitted = result.skillIntents[0];
+
+        expect(emitted).not.toBe(pluginIntent);
+        pluginIntent.skill = SkillKind.Spin;
+        expect(emitted).toEqual({
+            kind: SkillIntentKind.Unit,
+            unitId: 1,
+            skill: SkillKind.Charge
+        });
+    });
+
     it('isolates a throwing decide, falls back to a zero action, and keeps deciding', () => {
         const forceCalls: [number, number, number][] = [];
         const decided: number[] = [];

@@ -10,7 +10,12 @@
  */
 
 import { ARMOR_DEFS, WEAPON_DEFS } from '@/units/data';
-import { AttributeKind, EquipmentKind } from '@/units/types';
+import {
+    AttributeKind,
+    EquipmentKind,
+    SkillKind,
+    WeaponKind
+} from '@/units/types';
 import type { IArmorDef, IUnit, IWeaponDef } from '@/units/types';
 import type {
     IDamageEvent,
@@ -315,7 +320,7 @@ export class ControlSystem implements IControlSystem {
     /**
      * 把插件返回的动作校验/钳制为可信动作（T-03-04/T-03-06）。
      * 非对象/缺失 → 零动作；每个幅值非数值/非有限/负数 → 0，并截到上限；
-     * 技能意图仅在 `kind` 是数字枚举成员且 `unitId` 等于决策单位时保留。
+     * 技能意图仅在判别式、单位 id 与对应载荷成员都合法时保留（T-03-13）。
      * @param action 插件返回的动作（可能是任意畸形值）。
      * @param unitId 决策单位 id。
      * @returns 可信、已钳制的动作。
@@ -355,20 +360,7 @@ export class ControlSystem implements IControlSystem {
             MAX_TORQUE_MAGNITUDE
         );
 
-        let skillIntent: SkillIntent | null = null;
-        const rawIntent = record.skillIntent;
-        if (rawIntent !== null && typeof rawIntent === 'object') {
-            const intent = rawIntent as Record<string, unknown>;
-            const kind = intent.kind;
-            if (
-                typeof kind === 'number' &&
-                (kind === SkillIntentKind.Weapon ||
-                    kind === SkillIntentKind.Unit) &&
-                intent.unitId === unitId
-            ) {
-                skillIntent = rawIntent as SkillIntent;
-            }
-        }
+        const skillIntent = this.readSkillIntent(record.skillIntent, unitId);
 
         return {
             forceUp,
@@ -379,6 +371,52 @@ export class ControlSystem implements IControlSystem {
             torqueCounterClockwise,
             skillIntent
         };
+    }
+
+    /**
+     * 读取并重建一个可信的技能意图：校验判别式、单位 id 与该分支的载荷成员，
+     * 并返回**深拷贝**的新对象，绝不转发插件引用（T-03-13）。
+     * 载荷非法（如 `weapon: 999`、缺失 `skill`）时整条意图丢弃。
+     * @param rawIntent 插件返回的未信任值。
+     * @param unitId 决策单位 id。
+     * @returns 可信的技能意图，或 `null`。
+     */
+    private readSkillIntent(
+        rawIntent: unknown,
+        unitId: number
+    ): SkillIntent | null {
+        if (rawIntent === null || typeof rawIntent !== 'object') {
+            return null;
+        }
+        const intent = rawIntent as Record<string, unknown>;
+        if (intent.unitId !== unitId) {
+            return null;
+        }
+        if (intent.kind === SkillIntentKind.Unit) {
+            const skill = intent.skill;
+            if (typeof skill === 'number' && SkillKind[skill] !== undefined) {
+                return {
+                    kind: SkillIntentKind.Unit,
+                    unitId,
+                    skill: skill as SkillKind
+                };
+            }
+            return null;
+        }
+        if (intent.kind === SkillIntentKind.Weapon) {
+            const weapon = intent.weapon;
+            if (
+                typeof weapon === 'number' &&
+                WeaponKind[weapon] !== undefined
+            ) {
+                return {
+                    kind: SkillIntentKind.Weapon,
+                    unitId,
+                    weapon: weapon as WeaponKind
+                };
+            }
+        }
+        return null;
     }
 
     /**
