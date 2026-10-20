@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 03
 current_phase_name: 操控系统
 status: executing
-stopped_at: "Completed 03-02-PLAN.md (round 2: sensing + control loop + default AI)"
-last_updated: "2026-10-20T04:35:21.844Z"
+stopped_at: "Completed 03-03-PLAN.md (round 3: default AI behaviour tree + pluggability)"
+last_updated: "2026-10-20T04:47:56.360Z"
 last_activity: 2026-10-20
 last_activity_desc: Phase 03 execution started
-state_head: e42e4066896e1a98e15d34f7b27541fc671a03bb
+state_head: dd447cef8b6940a341c44a6f51d10742b5115f0d
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 15
-  completed_plans: 14
+  completed_plans: 15
   percent: 0
 ---
 
@@ -28,8 +28,8 @@ See: .planning/PROJECT.md (updated 2026-10-17)
 ## Current Position
 
 Phase: 03 (操控系统) — EXECUTING
-Plan: 2 of 3
-Status: Ready to execute
+Plan: 3 of 3 (all plans complete)
+Status: Ready for /gsd-verify-work
 Last activity: 2026-10-20 — Phase 03 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -75,6 +75,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03 P01 | 13 min | 3 tasks | 2 files |
 | Phase 03 P02 | 14 min | 3 tasks | 8 files |
 | Phase 03 P02 | 14 min | 3 tasks | 8 files |
+| Phase 03 P03 | 8min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -125,6 +126,9 @@ Recent decisions affecting current work:
 - [Phase 03]: Phase 03 P02: the held action is re-applied every physics tick; zero net force/torque skips application to avoid waking sleeping bodies
 - [Phase 03]: Phase 03 P02: ai.decide and sanitizeAction share one try/catch; throwing/malformed plugin output falls back to a zero action without aborting the tick
 - [Phase 03]: Phase 03 P02: deregistration order is provider.destroy -> catalog delete -> physics.removeUnit; physics registration failure destroys the AI and leaves no partial state
+- [Phase 03]: Phase 03 P03: DefaultUnitAI priority is idle -> retreat -> ram -> approach; retreat never emits a skill intent (D-14/D-16)
+- [Phase 03]: Phase 03 P03: skill intents are one-shot per decision (Charge -> Spin close-range, then ArrowStorm, then bow) armed as observation.tick + cooldown ticks (D-17)
+- [Phase 03]: Phase 03 P03: pluggability is proven by swapping providers across identical real Rapier setups; a throwing provider falls back to zero action without poisoning the loop
 
 ### Pending Todos
 
@@ -145,6 +149,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-20T04:34:09.092Z
-Stopped at: Completed 03-02-PLAN.md (round 2: sensing + control loop + default AI)
+Last session: 2026-10-20T04:47:56.275Z
+Stopped at: Completed 03-03-PLAN.md (round 3: default AI behaviour tree + pluggability)
 Resume file: None
