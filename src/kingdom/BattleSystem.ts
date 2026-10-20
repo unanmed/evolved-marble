@@ -5,8 +5,10 @@
  * 注入的 `onEnded` 回调里完成（D-21）。
  *
  * 每个子步的固定顺序（research Pitfall 6）：
- * 剪枝 → 离区 → 加入 → 释放已分离的 pair 锁 → 触发 → 合并 → 重算加权中心 → 结束。
- * 「释放锁」先于「触发」，使真正分离的一对能在同一 tick 重新触发。
+ * 剪枝 → 离区 → 加入 → 释放已分离的 pair 锁 → 城池触发 → 军队触发 → 合并 →
+ * 重算加权中心 → 结束。城池触发先于军队触发，且被驻军守卫的军队对不再触发军队战，
+ * 因此被守城池只会产生一场携带 `cityId` 的城池战。「释放锁」先于「触发」，
+ * 使真正分离的一对能在同一 tick 重新触发。
  */
 
 import type {
@@ -14,6 +16,7 @@ import type {
     IBattle,
     IBattleLifecycleEvent,
     IBattleSystem,
+    ICity,
     IMutableBattle,
     UnitWeight
 } from '@/kingdom/types';
@@ -211,6 +214,10 @@ export class BattleSystem implements IBattleSystem {
     private readonly hysteresis: number;
     /** 战斗结束回调（World 负责重组/结算）。 */
     private readonly onEnded: (battle: IBattle) => void;
+    /** 全部城池（城池触发与军队对抑制）；默认空表。 */
+    private readonly citiesOf: () => readonly ICity[];
+    /** armyId → 军队（解析城池驻军）；默认恒为 `null`。 */
+    private readonly armyOf: (armyId: number) => IArmy | null;
 
     /** 活跃战斗，按开始顺序。 */
     private active: Battle[] = [];
@@ -251,6 +258,8 @@ export class BattleSystem implements IBattleSystem {
      * @param triggerDistance 军队对触发距离（米）。
      * @param hysteresis 离区迟滞（米）。
      * @param onEnded 战斗结束回调（合并时不调用）。
+     * @param citiesOf 全部城池的只读快照来源（城池触发与军队对抑制）；省略时无城池。
+     * @param armyOf 按 id 读取军队（解析城池驻军）；省略时恒为 `null`。
      */
     constructor(
         physics: IPhysicsWorld,
@@ -262,7 +271,9 @@ export class BattleSystem implements IBattleSystem {
         halfExtent: number,
         triggerDistance: number,
         hysteresis: number,
-        onEnded: (battle: IBattle) => void
+        onEnded: (battle: IBattle) => void,
+        citiesOf: () => readonly ICity[] = () => [],
+        armyOf: (armyId: number) => IArmy | null = () => null
     ) {
         this.physics = physics;
         this.teamOf = teamOf;
@@ -274,6 +285,8 @@ export class BattleSystem implements IBattleSystem {
         this.triggerDistance = triggerDistance;
         this.hysteresis = hysteresis;
         this.onEnded = onEnded;
+        this.citiesOf = citiesOf;
+        this.armyOf = armyOf;
     }
 
     /**
@@ -284,6 +297,7 @@ export class BattleSystem implements IBattleSystem {
         this.removeUnitsOutside();
         this.addUnitsInside();
         this.releaseSeparatedPairs();
+        this.triggerCityBattles();
         this.triggerArmyBattles();
         this.mergeOverlapping();
         this.recomputeWeightedCenters();
@@ -445,39 +459,176 @@ export class BattleSystem implements IBattleSystem {
 
     /**
      * 释放已分离的 pair 锁：**唯一**的解锁路径，距离严格大于 `triggerDistance`。
-     * 实体已不存在时作为清理删除锁。军队—城池锁由 plan 04-05 的城池触发通道接管
-     * （本计划不创建任何城池锁）。
+     * 军队对通过两个中心测量，军队—城池对通过军队中心到城池点测量；
+     * 实体已不存在时作为清理删除锁。活跃战斗守卫会阻止解锁后立刻重复创建战斗。
      */
     private releaseSeparatedPairs(): void {
         const armies = new Map<number, IArmy>();
         for (const army of this.armiesOf()) {
             armies.set(army.getId(), army);
         }
+        const cities = new Map<number, ICity>();
+        for (const city of this.citiesOf()) {
+            cities.set(city.getId(), city);
+        }
 
         for (const [key, identity] of [...this.pairLocks]) {
-            if (identity.otherArmyId === undefined) {
-                continue;
-            }
             const first = armies.get(identity.armyId);
-            const second = armies.get(identity.otherArmyId);
-            if (first === undefined || second === undefined) {
+            if (first === undefined) {
                 this.pairLocks.delete(key);
                 continue;
             }
-            const firstCenter = first.getCenter();
-            const secondCenter = second.getCenter();
-            const distance = Math.hypot(
-                firstCenter.x - secondCenter.x,
-                firstCenter.y - secondCenter.y
-            );
-            if (Number.isFinite(distance) && distance > this.triggerDistance) {
-                this.pairLocks.delete(key);
+
+            if (identity.otherArmyId !== undefined) {
+                const second = armies.get(identity.otherArmyId);
+                if (second === undefined) {
+                    this.pairLocks.delete(key);
+                    continue;
+                }
+                const firstCenter = first.getCenter();
+                const secondCenter = second.getCenter();
+                const distance = Math.hypot(
+                    firstCenter.x - secondCenter.x,
+                    firstCenter.y - secondCenter.y
+                );
+                if (
+                    Number.isFinite(distance) &&
+                    distance > this.triggerDistance
+                ) {
+                    this.pairLocks.delete(key);
+                }
+                continue;
+            }
+
+            if (identity.cityId !== undefined) {
+                const city = cities.get(identity.cityId);
+                if (city === undefined) {
+                    this.pairLocks.delete(key);
+                    continue;
+                }
+                const center = first.getCenter();
+                const point = city.getPosition();
+                const distance = Math.hypot(
+                    center.x - point.x,
+                    center.y - point.y
+                );
+                if (
+                    Number.isFinite(distance) &&
+                    distance > this.triggerDistance
+                ) {
+                    this.pairLocks.delete(key);
+                }
+                continue;
+            }
+
+            this.pairLocks.delete(key);
+        }
+    }
+
+    /**
+     * 城池触发（D-16/D-21）：一支军队的中心进入敌方城池点的 `triggerDistance` 内，
+     * 且该城存在真实的驻军军队（军队存在且名册非空）时，经共享 gate 创建一场
+     * `BattleTriggerKind.City` 战斗并携带 `cityId`。空城或名册为空的“幽灵驻军”
+     * 不触发战斗——无防守城池由 `Garrison` 抵达直接接管。
+     * 键格式 `army:<armyId>:city:<cityId>`；初始中心取军队中心与城池点的中点。
+     */
+    private triggerCityBattles(): void {
+        const cities = this.citiesOf();
+        for (const army of this.armiesOf()) {
+            if (army.getUnitIds().length === 0) {
+                continue;
+            }
+            const factionId = army.getFactionId();
+            const center = army.getCenter();
+
+            for (const city of cities) {
+                const ownerFactionId = city.getFactionId();
+                if (
+                    ownerFactionId === undefined ||
+                    ownerFactionId === factionId
+                ) {
+                    continue;
+                }
+                const point = city.getPosition();
+                const distance = Math.hypot(
+                    center.x - point.x,
+                    center.y - point.y
+                );
+                if (
+                    !Number.isFinite(distance) ||
+                    distance >= this.triggerDistance
+                ) {
+                    continue;
+                }
+
+                const garrisonArmyId = city.getGarrisonArmyId();
+                if (garrisonArmyId === undefined) {
+                    continue;
+                }
+                const garrison = this.armyOf(garrisonArmyId);
+                if (garrison === null || garrison.getUnitIds().length === 0) {
+                    continue;
+                }
+
+                const key = `army:${army.getId()}:city:${city.getId()}`;
+                const centerX = (center.x + point.x) / 2;
+                const centerY = (center.y + point.y) / 2;
+                const cityId = city.getId();
+
+                this.createBattle(
+                    key,
+                    {
+                        armyId: army.getId(),
+                        otherArmyId: undefined,
+                        cityId
+                    },
+                    () =>
+                        new Battle(
+                            this.nextBattleId++,
+                            BattleTriggerKind.City,
+                            cityId,
+                            centerX,
+                            centerY,
+                            this.halfExtent,
+                            this.gameMinutes()
+                        )
+                );
             }
         }
     }
 
     /**
+     * 判断一支军队是否是“敌方城池的驻军”：其 `getGarrisonedCityId()` 能解析到一座
+     * 归属势力不等于 `otherFactionId` 的城池。这样的驻军中心就是城池点，
+     * 军队—军队触发必须让位给城池触发，保证被守城池只产生一场携带 `cityId` 的战斗。
+     * @param army 候选军队。
+     * @param otherFactionId 与之配对的另一支军队的势力 id。
+     * @returns 是否应抑制该军队对。
+     */
+    private isGarrisonOfEnemyCity(
+        army: IArmy,
+        otherFactionId: number
+    ): boolean {
+        const cityId = army.getGarrisonedCityId();
+        if (cityId === undefined) {
+            return false;
+        }
+        for (const city of this.citiesOf()) {
+            if (city.getId() !== cityId) {
+                continue;
+            }
+            const ownerFactionId = city.getFactionId();
+            return (
+                ownerFactionId !== undefined &&
+                ownerFactionId !== otherFactionId
+            );
+        }
+        return false;
+    }
+
+    /**
      * 军队对触发：不同势力且中心距离小于 `triggerDistance` 的一对，经共享 gate 创建战斗。
+     * 若其中一方是敌方城池的驻军，则该军队对让位给城池触发（其中心即城池点）。
      * 键格式 `army:<lowId>:<highId>`；重复创建在源头被阻止。
      */
     private triggerArmyBattles(): void {
@@ -490,7 +641,19 @@ export class BattleSystem implements IBattleSystem {
             ) {
                 const first = armies[firstIndex];
                 const second = armies[secondIndex];
+                if (
+                    first.getUnitIds().length === 0 ||
+                    second.getUnitIds().length === 0
+                ) {
+                    continue;
+                }
                 if (first.getFactionId() === second.getFactionId()) {
+                    continue;
+                }
+                if (
+                    this.isGarrisonOfEnemyCity(first, second.getFactionId()) ||
+                    this.isGarrisonOfEnemyCity(second, first.getFactionId())
+                ) {
                     continue;
                 }
                 const firstCenter = first.getCenter();

@@ -137,8 +137,12 @@ export class KingdomWorld implements IWorld {
     private readonly reorganizingArmies = new Set<number>();
     /** 军队 id → 指令被接受时的游戏分钟（`afterMinutes` 是相对时间）。 */
     private readonly orderAcceptedAt = new Map<number, number>();
+    /** battleId → 曾加入过该战斗的全部单位 id（城池战败方重组的数据源）。 */
+    private readonly battleParticipants = new Map<number, Set<number>>();
     /** 下一个单位 id（单调递增，永不重用，T-04-07）。 */
     private nextUnitId = 1;
+    /** 下一个军队 id（单调递增，永不重用；初值高于全部场景军队 id）。 */
+    private nextArmyId = 1;
     /** 是否已释放（`dispose` 幂等）。 */
     private disposed = false;
 
@@ -201,6 +205,10 @@ export class KingdomWorld implements IWorld {
         }
 
         this.fillFactionRosters();
+        this.nextArmyId = scenario.armies.reduce(
+            (next, spec) => Math.max(next, spec.id + 1),
+            1
+        );
 
         this.battles = new BattleSystem(
             this.physics,
@@ -212,7 +220,9 @@ export class KingdomWorld implements IWorld {
             BATTLE_AREA_HALF_EXTENT,
             BATTLE_TRIGGER_DISTANCE,
             BATTLE_AREA_HYSTERESIS,
-            battle => this.handleBattleEnded(battle)
+            battle => this.handleBattleEnded(battle),
+            () => [...this.cities.values()],
+            armyId => this.armies.get(armyId) ?? null
         );
 
         this.addStaticGeometry();
@@ -601,6 +611,7 @@ export class KingdomWorld implements IWorld {
         this.brakeUntilMinutes.clear();
         this.reorganizingArmies.clear();
         this.orderAcceptedAt.clear();
+        this.battleParticipants.clear();
     }
 
     /**
@@ -613,6 +624,7 @@ export class KingdomWorld implements IWorld {
         this.advanceArmies();
         this.rebuildSlots();
         this.battles.tick();
+        this.recordBattleParticipants();
         this.rebuildArmyStates();
         this.updateBrakeWindows();
         this.updateUnitModes();
@@ -630,6 +642,10 @@ export class KingdomWorld implements IWorld {
      */
     private resolveOrders(): void {
         for (const army of this.armies.values()) {
+            if (army.getUnitIds().length === 0) {
+                army.setOrder(null);
+                continue;
+            }
             const order = army.getOrder();
             if (order === null) {
                 continue;
@@ -665,8 +681,10 @@ export class KingdomWorld implements IWorld {
     /**
      * 结算一条抵达城池点的 `Garrison` 指令（D-21/D-26/KING-05）：
      * 已由本军驻扎时幂等返回；城池已有**另一支仍真实驻扎**的军队时拒绝抵达方
-     * （清空其指令、保持 `Marching`、不触碰城池链接）；城池无驻军或链接悬空时
-     * 清掉陈旧链接并双向建立链接，同时保留指令（驻扎是持续状态）。
+     * （清空其指令、保持 `Marching`、不触碰城池链接）；抵达敌方城池且该城没有
+     * 真实驻军（无驻军军队或名册为空）时**直接接管**（无战斗、无入驻拆分），
+     * 随后由抵达军队整体驻扎；其余情况清掉陈旧链接并双向建立链接，同时保留指令
+     * （驻扎是持续状态）。
      * @param army 抵达的军队。
      * @param order 其 `Garrison` 指令。
      */
@@ -696,10 +714,15 @@ export class KingdomWorld implements IWorld {
         if (holder === army) {
             return;
         }
-        if (
+        const liveHolder =
             holder !== undefined &&
-            holder.getGarrisonedCityId() === city.getId()
-        ) {
+            holder.getGarrisonedCityId() === city.getId() &&
+            holder.getUnitIds().length > 0;
+        const ownerFactionId = city.getFactionId();
+        if (ownerFactionId !== army.getFactionId() && !liveHolder) {
+            this.transferCityOwnership(city, army.getFactionId());
+        }
+        if (liveHolder) {
             army.setOrder(null);
             army.setGarrisonedCityId(undefined);
             return;
@@ -1087,13 +1110,80 @@ export class KingdomWorld implements IWorld {
     }
 
     /**
-     * 战斗结束回调（D-20/Pitfall 11）：对每个有幸存成员的军队，把中心重算为这些
-     * 幸存成员的均值、状态设为 `Reorganizing`、清空增援记录；**不**改军队 id、
-     * 势力、名册或指令（指令保持不变，军队随后恢复行军）。
+     * 记录每场活跃战斗曾加入过的单位 id：`BattleSystem` 的成员集合会在单位离区时
+     * 立即删除该 id，但城池战结算仍需知道败方哪些军队参战过，才能让离区幸存者
+     * 一起重组。每个子步在战斗判定后刷新；战斗结束时与当前成员取并集后消费。
+     */
+    private recordBattleParticipants(): void {
+        for (const army of this.armies.values()) {
+            for (const unitId of army.getUnitIds()) {
+                const battle = this.battles.getBattleForUnit(unitId);
+                if (battle === null) {
+                    continue;
+                }
+                const battleId = battle.getId();
+                let participants = this.battleParticipants.get(battleId);
+                if (participants === undefined) {
+                    participants = new Set<number>();
+                    this.battleParticipants.set(battleId, participants);
+                }
+                participants.add(unitId);
+            }
+        }
+    }
+
+    /**
+     * 一组单位的平均物理位置；没有任何可读位置时返回 `null`。
+     * @param unitIds 单位 id 列表。
+     * @returns 平均位置或 `null`。
+     */
+    private meanPosition(unitIds: readonly number[]): IVec2 | null {
+        let sumX = 0;
+        let sumY = 0;
+        let count = 0;
+        for (const unitId of unitIds) {
+            const state = this.physics.getUnitState(unitId);
+            if (state === null) {
+                continue;
+            }
+            sumX += state.x;
+            sumY += state.y;
+            count += 1;
+        }
+        if (count === 0) {
+            return null;
+        }
+        return { x: sumX / count, y: sumY / count };
+    }
+
+    /**
+     * 战斗结束结算（D-05/D-20/D-21/D-22/KING-07）：
+     * 1) 先对**所有**受影响军队做通用清理：删除指向该战斗的增援记录，
+     *    用幸存成员重算中心并给出确定状态（仍驻守 → `Garrisoned`，否则 `Reorganizing`）。
+     * 2) 军队战到此结束。
+     * 3) 城池战：存活方接管城池（共享转移 helper 清空败方驻军链接、更新双方城池列表，
+     *    从不调用 `updateTeam`），按净化后的 `GarrisonSelector` 结果新建一支 World 分配的
+     *    驻军军队并清空获胜野战军对该城的 `Garrison` 指令；最后让败方幸存军队重组。
+     *    防守方获胜时只做通用清理，不转移、不新建驻军、不改动既有链接。
      * @param battle 已结束的战斗。
      */
     private handleBattleEnded(battle: IBattle): void {
+        const battleId = battle.getId();
+        for (const [armyId, engagedBattleId] of [...this.armyBattle]) {
+            if (engagedBattleId === battleId) {
+                this.armyBattle.delete(armyId);
+            }
+        }
+
+        const participants =
+            this.battleParticipants.get(battleId) ?? new Set<number>();
+        for (const unitId of battle.getMemberUnitIds()) {
+            participants.add(unitId);
+        }
+        this.battleParticipants.delete(battleId);
+
         const survivorsByArmy = new Map<number, number[]>();
+        const survivingIds: number[] = [];
         for (const unitId of battle.getMemberUnitIds()) {
             const unit = this.units.get(unitId);
             if (unit === undefined || !unit.isAlive()) {
@@ -1103,6 +1193,7 @@ export class KingdomWorld implements IWorld {
             if (owner === undefined) {
                 continue;
             }
+            survivingIds.push(unitId);
             const list = survivorsByArmy.get(owner.armyId) ?? [];
             list.push(unitId);
             survivorsByArmy.set(owner.armyId, list);
@@ -1113,25 +1204,336 @@ export class KingdomWorld implements IWorld {
             if (army === undefined) {
                 continue;
             }
-            let sumX = 0;
-            let sumY = 0;
-            let count = 0;
-            for (const unitId of unitIds) {
-                const state = this.physics.getUnitState(unitId);
-                if (state === null) {
-                    continue;
-                }
-                sumX += state.x;
-                sumY += state.y;
-                count += 1;
+            const center = this.meanPosition(unitIds);
+            if (center !== null) {
+                army.setCenter(center.x, center.y);
             }
-            if (count > 0) {
-                army.setCenter(sumX / count, sumY / count);
+            if (army.getGarrisonedCityId() !== undefined) {
+                army.setState(ArmyState.Garrisoned);
+            } else {
+                army.setState(ArmyState.Reorganizing);
+                this.reorganizingArmies.add(armyId);
             }
-            army.setState(ArmyState.Reorganizing);
-            this.reorganizingArmies.add(armyId);
-            this.armyBattle.delete(armyId);
         }
+
+        const cityId = battle.getCityId();
+        if (cityId === undefined) {
+            return;
+        }
+        const city = this.cities.get(cityId);
+        if (city === undefined || survivingIds.length === 0) {
+            return;
+        }
+
+        survivingIds.sort((first, second) => first - second);
+        const winnerOwner = this.unitArmy.get(survivingIds[0]);
+        if (winnerOwner === undefined) {
+            return;
+        }
+        const winnerFactionId = winnerOwner.factionId;
+        if (city.getFactionId() === winnerFactionId) {
+            return;
+        }
+
+        const garrisonHeading = this.garrisonHeading(city);
+        this.transferCityOwnership(city, winnerFactionId);
+
+        for (const armyId of survivorsByArmy.keys()) {
+            const army = this.armies.get(armyId);
+            if (army === undefined || army.getFactionId() !== winnerFactionId) {
+                continue;
+            }
+            const order = army.getOrder();
+            if (
+                order !== null &&
+                order.kind === ArmyOrderKind.Garrison &&
+                order.cityId === cityId
+            ) {
+                army.setOrder(null);
+            }
+            if (army.getGarrisonedCityId() === cityId) {
+                army.setGarrisonedCityId(undefined);
+            }
+        }
+
+        const selected = this.selectGarrison(city, survivingIds);
+        if (selected.length > 0) {
+            this.createGarrisonArmy(
+                city,
+                winnerFactionId,
+                selected,
+                garrisonHeading
+            );
+        }
+
+        const regrouped = new Set<number>();
+        for (const unitId of participants) {
+            const owner = this.unitArmy.get(unitId);
+            if (owner === undefined || owner.factionId === winnerFactionId) {
+                continue;
+            }
+            if (regrouped.has(owner.armyId)) {
+                continue;
+            }
+            regrouped.add(owner.armyId);
+            this.regroupLosingArmy(owner.armyId);
+        }
+
+        for (const army of this.armies.values()) {
+            if (army.getUnitIds().length === 0) {
+                army.setOrder(null);
+            }
+        }
+    }
+
+    /**
+     * 读取城池当前驻军的朝向（新驻军继承它）；无驻军时为 0。
+     * @param city 城池。
+     * @returns 朝向角（弧度）。
+     */
+    private garrisonHeading(city: ICity): number {
+        const garrisonArmyId = city.getGarrisonArmyId();
+        if (garrisonArmyId === undefined) {
+            return 0;
+        }
+        return this.armies.get(garrisonArmyId)?.getHeading() ?? 0;
+    }
+
+    /**
+     * 调用注入的 `GarrisonSelector` 并净化结果：只保留候选人中的有限整数 id，
+     * 去重并截断到 `city.getGarrisonCap()`；抛出、非数组或非法值一律按空选择处理
+     * （T-04-02：绝不信任注入代码）。
+     * @param city 被攻占的城池。
+     * @param survivingIds 存活获胜单位 id（升序）。
+     * @returns 净化后的入驻单位 id。
+     */
+    private selectGarrison(
+        city: ICity,
+        survivingIds: readonly number[]
+    ): readonly number[] {
+        const cap = city.getGarrisonCap();
+        if (!Number.isFinite(cap) || cap <= 0) {
+            return [];
+        }
+
+        const candidates: IHealableUnit[] = [];
+        const candidateIds = new Set<number>();
+        for (const unitId of survivingIds) {
+            const unit = this.units.get(unitId);
+            if (unit === undefined || !unit.isAlive()) {
+                continue;
+            }
+            candidates.push(unit);
+            candidateIds.add(unitId);
+        }
+        if (candidates.length === 0) {
+            return [];
+        }
+
+        let returned: unknown;
+        try {
+            returned = this.config.garrisonSelector(city, candidates);
+        } catch {
+            returned = [];
+        }
+        const values = Array.isArray(returned) ? returned : [];
+        const selected: number[] = [];
+        const seen = new Set<number>();
+        for (const value of values) {
+            if (
+                typeof value !== 'number' ||
+                !Number.isFinite(value) ||
+                !Number.isInteger(value) ||
+                !candidateIds.has(value) ||
+                seen.has(value)
+            ) {
+                continue;
+            }
+            seen.add(value);
+            selected.push(value);
+            if (selected.length >= cap) {
+                break;
+            }
+        }
+        return selected;
+    }
+
+    /**
+     * 新建一支 World 分配的驻军军队：id 来自单调计数器（永不重用），中心为城池点，
+     * 名册恰为选中的单位 id，状态 `Garrisoned`，并保留一条针对该城的 `Garrison` 指令
+     * （满足的驻扎由“指令 + 城池链接”共同表达，因此指挥官与到期清理都不会动它）。
+     * 选中的单位从原军队名册移除，原军队 id/指令保持不变；链接双向建立。
+     * @param city 被攻占的城池。
+     * @param factionId 获胜势力 id。
+     * @param unitIds 入驻单位 id。
+     * @param heading 初始朝向（继承旧驻军或 0）。
+     */
+    private createGarrisonArmy(
+        city: IMutableCity,
+        factionId: number,
+        unitIds: readonly number[],
+        heading: number
+    ): void {
+        const cityId = city.getId();
+        const position = city.getPosition();
+        const armyId = this.nextArmyId;
+        this.nextArmyId += 1;
+
+        const army = new Army(
+            armyId,
+            factionId,
+            position.x,
+            position.y,
+            heading,
+            () => this.armyBattle.get(armyId)
+        );
+        army.setUnitIds(unitIds);
+        army.setState(ArmyState.Garrisoned);
+        army.setGarrisonedCityId(cityId);
+        army.setOrder({ armyId, kind: ArmyOrderKind.Garrison, cityId });
+        this.armies.set(armyId, army);
+
+        const faction = this.factions.get(factionId);
+        if (faction !== undefined && !faction.getArmyIds().includes(armyId)) {
+            faction.setArmyIds([...faction.getArmyIds(), armyId]);
+        }
+
+        const selected = new Set(unitIds);
+        for (const other of this.armies.values()) {
+            if (other.getId() === armyId) {
+                continue;
+            }
+            const roster = other.getUnitIds();
+            if (!roster.some(unitId => selected.has(unitId))) {
+                continue;
+            }
+            other.setUnitIds(roster.filter(unitId => !selected.has(unitId)));
+        }
+        for (const unitId of unitIds) {
+            this.unitArmy.set(unitId, { armyId, factionId });
+        }
+
+        city.setGarrisonArmyId(armyId);
+        army.setGarrisonedCityId(cityId);
+    }
+
+    /**
+     * 共享城池所有权转移 helper（结算与空城抵达共用）：先读取并清空败方驻军军队的
+     * `garrisonedCityId`（被打败的驻军不得继续挂在已失去的城池上），再改写归属、
+     * 同步双方势力的城池 id 列表，最后清空驻军链接。它**从不**调用
+     * `control.updateTeam`，也从不改动任何单位的阵营或 team id（D-05/D-21）。
+     * @param city 易手城池。
+     * @param winnerFactionId 新归属势力 id。
+     */
+    private transferCityOwnership(
+        city: IMutableCity,
+        winnerFactionId: number
+    ): void {
+        const previousFactionId = city.getFactionId();
+        const outgoingGarrisonArmyId = city.getGarrisonArmyId();
+        if (outgoingGarrisonArmyId !== undefined) {
+            const outgoing = this.armies.get(outgoingGarrisonArmyId);
+            if (outgoing !== undefined) {
+                outgoing.setGarrisonedCityId(undefined);
+                outgoing.setState(ArmyState.Reorganizing);
+                this.reorganizingArmies.add(outgoingGarrisonArmyId);
+            }
+        }
+
+        city.setFactionId(winnerFactionId);
+        if (previousFactionId !== undefined) {
+            const previous = this.factions.get(previousFactionId);
+            if (previous !== undefined) {
+                previous.setCityIds(
+                    previous.getCityIds().filter(id => id !== city.getId())
+                );
+            }
+        }
+        const winner = this.factions.get(winnerFactionId);
+        if (
+            winner !== undefined &&
+            !winner.getCityIds().includes(city.getId())
+        ) {
+            winner.setCityIds([...winner.getCityIds(), city.getId()]);
+        }
+        city.setGarrisonArmyId(undefined);
+    }
+
+    /**
+     * 败方军队重组：中心重算为存活名册的均值、状态 `Reorganizing`，并向该势力仍拥有的
+     * 最近城池行军；一座城都没有时按军队 id 的确定性角度（黄金角）取 400 m 外的点，
+     * 再钳制进地图。被打败的驻军链接已由转移 helper 清空，这里绝不重新链接。
+     * @param armyId 败方军队 id。
+     */
+    private regroupLosingArmy(armyId: number): void {
+        const army = this.armies.get(armyId);
+        if (army === undefined) {
+            return;
+        }
+        const livingIds = army
+            .getUnitIds()
+            .filter(unitId => this.units.get(unitId)?.isAlive() === true);
+        if (livingIds.length === 0) {
+            army.setOrder(null);
+            return;
+        }
+
+        const center = this.meanPosition(livingIds);
+        if (center !== null) {
+            army.setCenter(center.x, center.y);
+        }
+        army.setGarrisonedCityId(undefined);
+        army.setState(ArmyState.Reorganizing);
+        this.reorganizingArmies.add(armyId);
+
+        const target = this.regroupTarget(army);
+        this.issueOrder({
+            armyId,
+            kind: ArmyOrderKind.MoveTo,
+            targetX: target.x,
+            targetY: target.y
+        });
+    }
+
+    /**
+     * 败方军队的重组目标：最近的自有城池点；没有自有城池时用
+     * `heading = (armyId * 2.399963229728653) % (2π)` 从当前中心推进 400 m 并钳制进地图。
+     * @param army 败方军队。
+     * @returns 目标点（新对象）。
+     */
+    private regroupTarget(army: IMutableArmy): IVec2 {
+        const center = army.getCenter();
+        const factionId = army.getFactionId();
+        let nearest: IVec2 | null = null;
+        let bestDistance = Number.POSITIVE_INFINITY;
+        for (const city of this.cities.values()) {
+            if (city.getFactionId() !== factionId) {
+                continue;
+            }
+            const point = city.getPosition();
+            const dx = point.x - center.x;
+            const dy = point.y - center.y;
+            const distance = dx * dx + dy * dy;
+            if (distance < bestDistance) {
+                bestDistance = distance;
+                nearest = point;
+            }
+        }
+        if (nearest !== null) {
+            return nearest;
+        }
+
+        const angle = (army.getId() * 2.399963229728653) % (Math.PI * 2);
+        return {
+            x: Math.min(
+                Math.max(center.x + Math.cos(angle) * 400, 0),
+                this.bounds.width
+            ),
+            y: Math.min(
+                Math.max(center.y + Math.sin(angle) * 400, 0),
+                this.bounds.height
+            )
+        };
     }
 
     /**
