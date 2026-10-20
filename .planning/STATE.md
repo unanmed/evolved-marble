@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: 王国系统
 status: executing
-stopped_at: Completed 04-01-PLAN.md (Round 1 type contract, gate approved; Round 2 pending)
-last_updated: "2026-10-20T13:01:56.580Z"
+stopped_at: Completed 04-02-PLAN.md (kingdom runtime tracer; 04-03..05 pending)
+last_updated: "2026-10-20T14:04:50.565Z"
 last_activity: 2026-10-20
 last_activity_desc: Phase 04 round 1 complete — kingdom type contract approved
-state_head: a6b97017faba174030874e3470138b00ced70ae7
+state_head: c98143411024257c1271f724b81dc56f1dfbbffd
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 20
-  completed_plans: 16
+  completed_plans: 17
   percent: 0
 ---
 
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-10-20)
 
 ## Current Position
 
-Phase: 04 (王国系统) — READY TO EXECUTE
-Plan: 1 of 1 (Round 1 complete — Round 2 implementation pending)
-Status: Round 1 type contract APPROVED; Round 2 implementation pending
+Phase: 04 (王国系统) — EXECUTING
+Plan: 2 of 5
+Status: Ready to execute
 Last activity: 2026-10-20 — Phase 04 execution started
 
 Progress: [░░░░░░░░░░] 0%
@@ -77,6 +77,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03 P02 | 14 min | 3 tasks | 8 files |
 | Phase 03 P03 | 8min | 3 tasks | 3 files |
 | Phase 04 P01 | 159 min | 4 tasks | 7 files |
+| Phase 04 P02 | 33 min | 3 tasks | 19 files |
 
 ## Accumulated Context
 
@@ -133,6 +134,10 @@ Recent decisions affecting current work:
 - [Phase 04]: Round 1 type gate APPROVED — 7 numeric enums (incl. ArmyState.Engaging=4), numeric time rate (no TimeRate enum), reduced vision briefs (A21)
 - [Phase 04]: G-1 IHealableUnit, G-2 IStaticObstacleWorld and G-5 IControlSystem.setUnitAI approved as additive declaration-only seams; ControlSystem.setUnitAI shim is the only Round-1 implementation
 - [Phase 04]: army orders reduced to MoveTo/Garrison/Hold and IArmyOrder.afterMinutes is relative game time (omitted = now)
+- [Phase 04]: 04-02: zero-member battles survive their creation tick; join runs after trigger, so the end pass guards members.length === 0
+- [Phase 04]: 04-02: pair locks are stored separately from battles and released only past the 80 m trigger distance; end/merge never relock
+- [Phase 04]: 04-02: brake mode is driven by World-owned lastBattleOfUnit + brakeUntilMinutes (>= 6 game min); a battle that ends clears both immediately
+- [Phase 04]: 04-02: ArmyState.InBattle stays a reserved contract value; only Engaging is assigned and never read
 
 ### Pending Todos
 
@@ -157,6 +162,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-20T11:15:24.114Z
-Stopped at: Completed 04-01-PLAN.md (Round 1 type contract, gate approved; Round 2 pending)
-Resume file: .planning/phases/04-kingdom-system/04-01-SUMMARY.md
+Last session: 2026-10-20T14:04:50.454Z
+Stopped at: Completed 04-02-PLAN.md (kingdom runtime tracer; 04-03..05 pending)
+Resume file: None
