@@ -1,0 +1,321 @@
+import { describe, expect, it } from 'vitest';
+import { advanceArmyCenter, computeFormationSlots } from '@/kingdom/Army';
+import {
+    ARMY_FORMATION_RADIUS,
+    BATTLE_TICK_MINUTES,
+    MAP_HEIGHT,
+    MAP_WIDTH,
+    PEACE_TICK_MINUTES
+} from '@/kingdom/constants';
+import { TimeSystem } from '@/kingdom/TimeSystem';
+
+/**
+ * 把弧度归一到 (-π, π]，便于比较朝向。
+ * @param angle 任意弧度。
+ * @returns 归一化弧度。
+ */
+function normalizeAngle(angle: number): number {
+    return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+
+/**
+ * 构造一个从 `(100, 500)` 指向正东、目标在地图内的行军输入。
+ * @returns 可复用的一组参数。
+ */
+function eastwardMarch(): {
+    centerX: number;
+    centerY: number;
+    heading: number;
+    targetX: number;
+    targetY: number;
+} {
+    return {
+        centerX: 100,
+        centerY: 500,
+        heading: 0,
+        targetX: 900,
+        targetY: 500
+    };
+}
+
+describe('TimeSystem — plain-number game clock', () => {
+    it('starts at minute 0, tick 0, peace rate 24, and 24 substeps', () => {
+        const time = new TimeSystem();
+        expect(time.getGameMinutes()).toBe(0);
+        expect(time.getTickIndex()).toBe(0);
+        expect(time.getMinutesPerTick()).toBe(PEACE_TICK_MINUTES);
+        expect(time.getSubstepsPerTick()).toBe(24);
+    });
+
+    it('advances by valid minutes and ignores negative and NaN input', () => {
+        const time = new TimeSystem();
+        time.advance(10);
+        expect(time.getGameMinutes()).toBe(10);
+
+        time.advance(-5);
+        time.advance(Number.NaN);
+        expect(time.getGameMinutes()).toBe(10);
+    });
+
+    it('advanceTick moves the tick index by exactly one per call', () => {
+        const time = new TimeSystem();
+        time.advanceTick();
+        expect(time.getTickIndex()).toBe(1);
+        time.advanceTick();
+        expect(time.getTickIndex()).toBe(2);
+        expect(time.getGameMinutes()).toBe(0);
+    });
+
+    it('mirrors minutes-per-tick in substeps and pins the battle rate', () => {
+        const time = new TimeSystem();
+        time.setMinutesPerTick(BATTLE_TICK_MINUTES);
+        expect(time.getMinutesPerTick()).toBe(1);
+        expect(time.getSubstepsPerTick()).toBe(1);
+    });
+
+    it('ignores zero and NaN rates', () => {
+        const time = new TimeSystem();
+        time.setMinutesPerTick(0);
+        expect(time.getMinutesPerTick()).toBe(PEACE_TICK_MINUTES);
+        time.setMinutesPerTick(Number.NaN);
+        expect(time.getMinutesPerTick()).toBe(PEACE_TICK_MINUTES);
+    });
+
+    it('lets the last decision win: 24 then 1 reads 1 for both rate and substeps', () => {
+        const time = new TimeSystem();
+        time.setMinutesPerTick(PEACE_TICK_MINUTES);
+        for (let minute = 0; minute < 24; minute += 1) {
+            time.advance(1);
+        }
+        time.setMinutesPerTick(BATTLE_TICK_MINUTES);
+
+        expect(time.getMinutesPerTick()).toBe(1);
+        expect(time.getSubstepsPerTick()).toBe(1);
+        expect(time.getGameMinutes()).toBe(24);
+    });
+});
+
+describe('advanceArmyCenter — 10 m per game hour', () => {
+    it('covers exactly 100 m in 600 game minutes', () => {
+        const march = eastwardMarch();
+        const next = advanceArmyCenter(
+            march.centerX,
+            march.centerY,
+            march.heading,
+            march.targetX,
+            march.targetY,
+            600,
+            MAP_WIDTH,
+            MAP_HEIGHT
+        );
+
+        expect(next.x - march.centerX).toBeCloseTo(100, 9);
+        expect(Math.abs(next.x - march.centerX - 100)).toBeLessThan(1e-9);
+        expect(next.y).toBeCloseTo(march.centerY, 9);
+        expect(next.heading).toBeCloseTo(march.heading, 9);
+    });
+
+    it('does not move when the target is null (Hold)', () => {
+        const march = eastwardMarch();
+        const next = advanceArmyCenter(
+            march.centerX,
+            march.centerY,
+            march.heading,
+            null,
+            null,
+            600,
+            MAP_WIDTH,
+            MAP_HEIGHT
+        );
+
+        expect(next).toEqual({
+            x: march.centerX,
+            y: march.centerY,
+            heading: march.heading
+        });
+    });
+
+    it('clamps at the east edge, reflects x, and then advances back inward', () => {
+        let centerX = 900;
+        const centerY = 500;
+        let heading = 0;
+        const targetX = 2000;
+        const targetY = 500;
+
+        // 10 m per 60 minutes: 10 calls reach the edge, the 11th clamps.
+        for (let step = 0; step < 11; step += 1) {
+            const next = advanceArmyCenter(
+                centerX,
+                centerY,
+                heading,
+                targetX,
+                targetY,
+                60,
+                MAP_WIDTH,
+                MAP_HEIGHT
+            );
+            centerX = next.x;
+            heading = next.heading;
+            expect(centerX).toBeLessThanOrEqual(MAP_WIDTH);
+            expect(centerX).toBeGreaterThanOrEqual(0);
+        }
+
+        expect(centerX).toBeCloseTo(MAP_WIDTH, 9);
+        expect(Math.cos(heading)).toBeLessThan(0);
+
+        const afterBounce = advanceArmyCenter(
+            centerX,
+            centerY,
+            heading,
+            targetX,
+            targetY,
+            60,
+            MAP_WIDTH,
+            MAP_HEIGHT
+        );
+        expect(afterBounce.x).toBeLessThan(centerX);
+        expect(MAP_WIDTH - afterBounce.x).toBeCloseTo(10, 9);
+    });
+
+    it('clamps and reflects both axes when the target is out of bounds on both', () => {
+        let x = 900;
+        let y = 900;
+        let heading = Math.PI / 4;
+        const targetX = 2000;
+        const targetY = 2000;
+
+        // 10 m steps along the diagonal: 15 calls pin both axes at the corner.
+        for (let step = 0; step < 15; step += 1) {
+            const next = advanceArmyCenter(
+                x,
+                y,
+                heading,
+                targetX,
+                targetY,
+                60,
+                MAP_WIDTH,
+                MAP_HEIGHT
+            );
+            x = next.x;
+            y = next.y;
+            heading = next.heading;
+            expect(x).toBeLessThanOrEqual(MAP_WIDTH);
+            expect(y).toBeLessThanOrEqual(MAP_HEIGHT);
+        }
+
+        expect(x).toBeCloseTo(MAP_WIDTH, 9);
+        expect(y).toBeCloseTo(MAP_HEIGHT, 9);
+        expect(Math.cos(heading)).toBeLessThan(0);
+        expect(Math.sin(heading)).toBeLessThan(0);
+
+        const afterBounce = advanceArmyCenter(
+            x,
+            y,
+            heading,
+            targetX,
+            targetY,
+            60,
+            MAP_WIDTH,
+            MAP_HEIGHT
+        );
+        expect(afterBounce.x).toBeLessThan(x);
+        expect(afterBounce.y).toBeLessThan(y);
+    });
+
+    it('never leaves the map over 5000 minutes aimed at an out-of-bounds target', () => {
+        let x = 500;
+        let y = 500;
+        let heading = 0;
+        const targetX = 5000;
+        const targetY = 500;
+
+        for (let step = 0; step < 500; step += 1) {
+            const next = advanceArmyCenter(
+                x,
+                y,
+                heading,
+                targetX,
+                targetY,
+                10,
+                MAP_WIDTH,
+                MAP_HEIGHT
+            );
+            x = next.x;
+            y = next.y;
+            heading = next.heading;
+            expect(x).toBeGreaterThanOrEqual(0);
+            expect(x).toBeLessThanOrEqual(MAP_WIDTH);
+            expect(y).toBeGreaterThanOrEqual(0);
+            expect(y).toBeLessThanOrEqual(MAP_HEIGHT);
+        }
+
+        // After the bounce the centre keeps moving inward along the reflected heading.
+        expect(x).toBeLessThan(MAP_WIDTH);
+        expect(normalizeAngle(heading)).toBeCloseTo(Math.PI, 6);
+    });
+
+    it('returns the inputs unchanged for non-finite arguments', () => {
+        const next = advanceArmyCenter(
+            Number.NaN,
+            500,
+            0,
+            900,
+            500,
+            60,
+            MAP_WIDTH,
+            MAP_HEIGHT
+        );
+        expect(Number.isNaN(next.x)).toBe(true);
+        expect(next.y).toBe(500);
+        expect(next.heading).toBe(0);
+    });
+});
+
+describe('computeFormationSlots — deterministic disc', () => {
+    it('places one distinct slot per unit strictly inside the 25 m circle', () => {
+        const unitIds = [10, 11, 12, 13];
+        const slots = computeFormationSlots(
+            500,
+            500,
+            0,
+            unitIds,
+            ARMY_FORMATION_RADIUS
+        );
+
+        expect(slots.size).toBe(unitIds.length);
+
+        const points: string[] = [];
+        for (const unitId of unitIds) {
+            const slot = slots.get(unitId);
+            expect(slot).toBeDefined();
+            if (slot === undefined) {
+                continue;
+            }
+            const distance = Math.hypot(slot.x - 500, slot.y - 500);
+            expect(distance).toBeLessThan(ARMY_FORMATION_RADIUS);
+            expect(distance).toBeGreaterThan(0);
+            points.push(`${slot.x.toFixed(6)}:${slot.y.toFixed(6)}`);
+        }
+        expect(new Set(points).size).toBe(unitIds.length);
+    });
+
+    it('rotates the whole disc when the heading changes', () => {
+        const unitIds = [1, 2, 3];
+        const north = computeFormationSlots(500, 500, 0, unitIds, 25);
+        const east = computeFormationSlots(500, 500, Math.PI / 2, unitIds, 25);
+
+        const firstNorth = north.get(1);
+        const firstEast = east.get(1);
+        expect(firstNorth).toBeDefined();
+        expect(firstEast).toBeDefined();
+        if (firstNorth === undefined || firstEast === undefined) {
+            return;
+        }
+        expect(firstNorth.x).not.toBeCloseTo(firstEast.x, 6);
+        expect(firstNorth.y).not.toBeCloseTo(firstEast.y, 6);
+    });
+
+    it('returns an empty map for an empty roster', () => {
+        expect(computeFormationSlots(0, 0, 0, [], 25).size).toBe(0);
+    });
+});
