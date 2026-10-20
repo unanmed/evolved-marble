@@ -1,5 +1,5 @@
 /**
- * 王国系统的全部类型声明：8 个数字枚举、世界/时间/势力/军队/城池/战斗契约、
+ * 王国系统的全部类型声明：7 个数字枚举、世界/时间/势力/军队/城池/战斗契约、
  * 可注入策略接缝、场景表，以及 Round 2 使用的内部可变视图。
  * 本文件只含声明（枚举、接口与函数类型别名），不含任何算法、物理调用、类型实现或顶层 `const`。
  * 所有上游引用均为 `import type`，依赖方向始终是 kingdom → units/physics/control，绝不反向。
@@ -8,33 +8,29 @@
 import type { IUnitBrief } from '@/control/types';
 import type { ClassKind, IUnit } from '@/units/types';
 
-/**
- * 全局时间倍率：枚举值本身即倍率（1× / 24×），因此 `getSubstepsPerTick()`
- * 可直接返回该值。
- * 成员一律为整数——本项目强制使用数字枚举（禁止字符串枚举）。
- */
-export enum TimeRate {
-    /** 战斗进行中：一个外层 tick = 1 游戏分钟 = 1 个物理子步（D-07/D-09）。 */
-    Normal = 1,
-    /** 场上无任何战斗：一个外层 tick = 24 游戏分钟 = 24 个物理子步（D-07）。 */
-    Fast = 24
-}
-
 /** 军队的宏观状态；军队不是物理实体，也不是战斗层实体（D-01）。 */
 export enum ArmyState {
     /** 正在行军：中心按固定速度移动，单位追阵型槽位（D-12）。 */
     Marching = 0,
     /** 驻扎在城池中：中心固定，单位待命，回血按游戏时间累计（D-13/D-26）。 */
     Garrisoned = 1,
-    /** 至少一个单位处于活跃战场：中心冻结（D-14）。 */
+    /** 军队位于战斗区内、已有单位在交战（D-14）。 */
     InBattle = 2,
     /** 战斗结束后幸存单位重新集结：中心重算，随后恢复行军（D-20）。 */
-    Reorganizing = 3
+    Reorganizing = 3,
+    /**
+     * 交战增援（D-02/D-04/D-12/D-14）：军队至少有一个单位被卷入战斗；
+     * 中心/阵型以 10 m/h 继续朝该战场中心移动，单位保持 25 m 圆内聚集，
+     * 并在进入 80 m 战斗区时逐个加入战斗——军队**永不冻结**，其余单位不会被抛下。
+     */
+    Engaging = 4
 }
 
 /**
- * 单位级控制模式：由王国层写入，委托式单位 AI 只读取并转发（D-11/D-14）。
- * 只有 World 写该值（C-10），从而避免多点写入导致的每 tick 抖动。
+ * 单位级控制模式：这是**王国层自己的标签**，表示它为某个单位安装了哪个 AI 实例，
+ * 任何 AI 都不读取该值（D-11/D-14）。Round 2 的 World 维护每单位模式映射，
+ * 按模式创建对应的 `MarchAI`/`BattleAI`/`BrakeAI`/`IdleAI`，
+ * 并在模式变化时调用 `IControlSystem.setUnitAI` 完成切换。
  */
 export enum UnitControlMode {
     /** 程序阵型控制：追阵型槽位并轻微避障（MarchAI）。 */
@@ -178,6 +174,11 @@ export interface IFaction {
 /**
  * 军队：只承载宏观状态（中心、朝向、名册、状态、指令）。
  * 它没有刚体，也不参与战斗成员判定——战斗成员是单位 id 集合（D-01/D-02）。
+ *
+ * 交战增援规则（D-02/D-04/D-12/D-14）：只要任一单位被卷入战斗，军队即进入
+ * `ArmyState.Engaging`；其中心/阵型以 10 m/h 朝该战场中心推进，单位保持在 25 m
+ * 圆内，并在进入 80 m 战斗区时逐个加入。军队会持续移动，直到全部单位进入或战斗结束——
+ * **永不冻结**，其余单位不会被抛下。
  */
 export interface IArmy {
     /** 军队 id；跨战斗持久保留（D-05）。 */
@@ -194,6 +195,11 @@ export interface IArmy {
     getUnitIds(): readonly number[];
     /** 驻扎城池 id；未驻扎时为 `undefined`（缺失字面量，AGENTS §8）。 */
     getGarrisonedCityId(): number | undefined;
+    /**
+     * 该军队正在增援的活跃战场 id；没有任何单位处于战斗时为 `undefined`
+     * （缺失字面量，AGENTS §8）。供 World 与 Phase 5 绘制交战增援。
+     */
+    getEngagedBattleId(): number | undefined;
     /** 当前宏观指令；无指令时为 `null`（缺失对象，AGENTS §8）。 */
     getOrder(): IArmyOrder | null;
 }
@@ -224,24 +230,26 @@ export interface ICity {
 
 /**
  * 时间系统：只以**游戏时间**计时，不存在 wall-clock 或帧时间（D-07/D-08）。
+ * 倍率一律用普通数字表达（每 tick 的游戏分钟数），**没有倍率枚举**：
+ * 战斗进行中为 1，否则为 24；内置值属于 Round 2 的 `constants.ts` 数据。
  * 三个写方法之所以在接口上，是因为 AGENTS §5 不允许接口外的公共成员；
  * 它们只由 `IWorld` 实现调用（C-3/C-17）。
  */
 export interface ITimeSystem {
     /** 自开局累计的游戏分钟。 */
     getGameMinutes(): number;
-    /** 当前全局倍率。 */
-    getRate(): TimeRate;
+    /** 当前每个外层 tick 覆盖的游戏分钟：战斗中为 1，否则为 24。 */
+    getMinutesPerTick(): number;
     /** 外层 tick 序号；只由 `advanceTick` 递增（C-17）。 */
     getTickIndex(): number;
-    /** 当前倍率下每个外层 tick 的物理子步数：等于当前倍率（1 或 24）。 */
+    /** 当前每个外层 tick 的物理子步数（今日为 1 或 24，可独立校准）。 */
     getSubstepsPerTick(): number;
     /** 推进游戏分钟；仅 World 调用。 */
     advance(gameMinutes: number): void;
     /** 结束一个外层 tick 并使 `getTickIndex` 前进一格；仅 World 调用。 */
     advanceTick(): void;
-    /** 设置全局倍率（D-09：任一战斗活跃即 1×）；仅 World 调用。 */
-    setRate(rate: TimeRate): void;
+    /** 设置每个外层 tick 的分钟数（内置值 1 / 24）；仅 World 调用。 */
+    setMinutesPerTick(minutes: number): void;
 }
 
 /** 一场战斗的只读视图：成员是单位 id 集合，不引用军队（D-02/D-17）。 */
@@ -347,31 +355,20 @@ export interface ICommander {
     decide(context: ICommanderContext): readonly IArmyOrder[];
 }
 
-/**
- * 单位模式/阵型/战斗区读取面：委托式单位 AI 读取的**唯一**外部状态来源。
- * 因此 March/Battle/Brake/Idle 切换不需要改动 Phase 3 冻结的 `IUnitAI` 契约（D-11/D-14）。
- */
-export interface IUnitModeSource {
-    /** 该单位当前控制模式。 */
-    getMode(unitId: number): UnitControlMode;
-    /** 该单位当前阵型槽位；不处于行军/集结时为 `null`（缺失对象）。 */
-    getFormationSlot(unitId: number): IVec2 | null;
-    /** 该单位当前所在活跃战场；不在战场时为 `null`（缺失对象）。 */
-    getBattleArea(unitId: number): IBattle | null;
-}
-
 /** 一次外层 tick 的结果，供 Phase 5/6 知道本帧跨了多少游戏时间。 */
 export interface IWorldTickResult {
     /** 本次外层 tick 覆盖的游戏分钟（1 或最多 24）。 */
     readonly gameMinutes: number;
-    /** 本次 tick 结束时的全局倍率。 */
-    readonly rate: TimeRate;
+    /** 本次 tick 结束时的每 tick 分钟数（普通数字，1 或 24）。 */
+    readonly minutesPerTick: number;
 }
 
 /**
  * 王国世界：唯一的编排器，也是 Phase 5（渲染）与 Phase 7（指挥官）的读取面。
  * 它**不**暴露 `IControlSystem` 或 `IPhysicsWorld`，也不复制单位读数——组合根把三者
- * 一并交给渲染层（A18/C-6/C-19）；`dispose()` 幂等，且不释放外部持有的物理/控制实例。
+ * 一并交给渲染层（A18/C-6/C-19）；`KingdomWorld` 通过构造函数注入持有
+ * `IControlSystem`，只用于内部调用 `setUnitAI` 切换单位 AI 实例。
+ * `dispose()` 幂等，且不释放外部持有的物理/控制实例。
  * 三个可见性查询每次调用都实时计算、不保存历史（D-25），且始终包含本势力自身的实体。
  * 可见性粒度是不对称的（A21）：可见的军队/城池查询只返回精简简讯，
  * 完整的 `IArmy`/`ICity` 读取面（`getArmy`/`getCity`/`getFactions` 与己方列表）属于
