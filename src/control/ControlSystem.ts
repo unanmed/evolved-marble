@@ -181,6 +181,10 @@ export class ControlSystem implements IControlSystem {
         const skillIntents: SkillIntent[] = [];
         if (this.tickIndex % DECISION_INTERVAL_TICKS === 0) {
             for (const unitId of this.listUnitIds()) {
+                const unit = this.units.get(unitId);
+                if (unit === undefined || !unit.isAlive()) {
+                    continue;
+                }
                 const observation = this.sensor.sense(unitId);
                 if (observation === null) {
                     continue;
@@ -201,6 +205,12 @@ export class ControlSystem implements IControlSystem {
                     action = this.zeroAction();
                 }
 
+                // 决策期间可能被重入注销/击杀：此时不得复活动作或泄漏技能意图。
+                const current = this.units.get(unitId);
+                if (current === undefined || !current.isAlive()) {
+                    continue;
+                }
+
                 this.actions.set(unitId, action);
                 if (action.skillIntent !== null) {
                     skillIntents.push(action.skillIntent);
@@ -209,6 +219,10 @@ export class ControlSystem implements IControlSystem {
         }
 
         for (const [unitId, action] of this.actions) {
+            const owner = this.units.get(unitId);
+            if (owner === undefined || !owner.isAlive()) {
+                continue;
+            }
             const { fx, fy, torque } = this.composeAction(action);
             if (Math.abs(fx) > FORCE_EPSILON || Math.abs(fy) > FORCE_EPSILON) {
                 this.physics.applyForce(unitId, fx, fy);

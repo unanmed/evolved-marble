@@ -706,6 +706,98 @@ describe('ControlSystem — execution semantics', () => {
         expect(forceCalls).toHaveLength(0);
     });
 
+    it('does not decide or apply actions for a unit already dead before the tick', () => {
+        const forceCalls: [number, number, number][] = [];
+        let decideCalls = 0;
+        const destroyed: number[] = [];
+        const dead = makeUnit(29);
+        dead.takeDamage(dead.getAttribute(AttributeKind.MaxHealth) + 1);
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            (unitId, forceX, forceY) =>
+                forceCalls.push([unitId, forceX, forceY]),
+            () => {},
+            emptyTick
+        );
+        const provider = new RecordingProvider(
+            () =>
+                new RecordingAI(() => {
+                    decideCalls += 1;
+                    return { ...zeroAction(), forceRight: 10 };
+                }),
+            undefined,
+            unitId => destroyed.push(unitId)
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: dead,
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+
+        const result = controller.tick();
+
+        expect(decideCalls).toBe(0);
+        expect(forceCalls).toHaveLength(0);
+        expect(result.skillIntents).toHaveLength(0);
+        expect(destroyed).toEqual([1]);
+        expect(controller.getUnit(1)).toBeNull();
+    });
+
+    it('drops the action and skill intent when decide re-enters and unregisters the unit', () => {
+        const forceCalls: [number, number, number][] = [];
+        let controller: ControlSystem | null = null;
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            (unitId, forceX, forceY) =>
+                forceCalls.push([unitId, forceX, forceY]),
+            () => {},
+            emptyTick
+        );
+        const provider = new RecordingProvider(
+            () =>
+                new RecordingAI(() => {
+                    controller?.unregisterUnit(1);
+                    return {
+                        ...zeroAction(),
+                        forceRight: 10,
+                        skillIntent: {
+                            kind: SkillIntentKind.Unit,
+                            unitId: 1,
+                            skill: SkillKind.Charge
+                        }
+                    };
+                })
+        );
+        controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(30),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+
+        const result = controller.tick();
+
+        expect(result.skillIntents).toHaveLength(0);
+        expect(forceCalls).toHaveLength(0);
+        expect(controller.getUnit(1)).toBeNull();
+        expect(fake.hasUnit(1)).toBe(false);
+    });
+
     it('routes a queued damage event once with resolved units and team ids', () => {
         const event: IDamageEvent = {
             attackerId: 1,
