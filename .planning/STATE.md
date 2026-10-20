@@ -3,17 +3,17 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: 王国系统
 status: executing
-stopped_at: Completed 04-04-PLAN.md (garrison/training/vision/terrain; 04-05 pending)
-last_updated: "2026-10-20T14:43:27.842Z"
+stopped_at: Completed 04-05-PLAN.md (city battles, commander, scenario validation; phase 04 all plans executed)
+last_updated: "2026-10-20T15:50:08.826Z"
 last_activity: 2026-10-20
-last_activity_desc: Phase 04 round 3 — garrison, training, vision and terrain implemented
-state_head: 84f4eb27d7405dc80511b58ff1ac388e55125577
+last_activity_desc: Phase 04 round 4 — city battles, placeholder commander and scenario validation implemented
+state_head: 13e85417346f4641cf9dd6a0b6190b7603472b03
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 20
-  completed_plans: 19
-  percent: 95
+  completed_plans: 20
+  percent: 100
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-10-20)
 ## Current Position
 
 Phase: 04 (王国系统) — EXECUTING
-Plan: 4 of 5
-Status: Ready to execute
-Last activity: 2026-10-20 — 04-04 garrison, training, vision and terrain complete
+Plan: 5 of 5
+Status: Executed — awaiting verification
+Last activity: 2026-10-20 — 04-05 city battles, commander and scenario validation complete
 
-Progress: [█████████░] 95%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
@@ -80,6 +80,7 @@ Progress: [█████████░] 95%
 | Phase 04 P02 | 33 min | 3 tasks | 19 files |
 | Phase 04 P03 | 12 min | 3 tasks | 7 files |
 | Phase 04 P04 | ~35min | 3 tasks | 6 files |
+| Phase 04 P05 | ~52min | 3 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -148,6 +149,12 @@ Recent decisions affecting current work:
 - [Phase 04]: Garrison resolution keeps a satisfied order as a standing state and refuses a different live holder without touching the city link
 - [Phase 04]: Training pauses by cap/Engaging/MAX_SCENARIO_UNITS, produces at most one unit per substep and keeps the threshold remainder
 - [Phase 04]: Vision and healing stay stateless/per-unit; terrain and boundary walls are separate obstacle id sets removed only by World.dispose
+- [Phase 04]: 04-05: city battles require a real garrison, carry cityId, suppress the garrison army pair and survive merge overlap
+- [Phase 04]: 04-05: settlement transfers ownership through one helper, partitions survivors into a World-allocated garrison army, clears the winning field order and never calls updateTeam
+- [Phase 04]: 04-05: loser regroup uses a participant ledger and living-roster centres; nearest owned city or deterministic golden-angle fallback
+- [Phase 04]: 04-05: PlaceholderCommander runs once per outer tick after expiry, reads only reduced vision briefs, and is isolated at factory/decide/order validation
+- [Phase 04]: 04-05: frozen GarrisonSelector id gap bridged by a WeakMap identity registry populated at unit registration; World still sanitises all ids
+- [Phase 04]: 04-05: validateScenario is the constructor's first statement so invalid tables never touch physics or control
 
 ### Pending Todos
 
@@ -172,6 +179,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-20T14:43:27.726Z
-Stopped at: Completed 04-04-PLAN.md (garrison/training/vision/terrain; 04-05 pending)
+Last session: 2026-10-20T15:50:08.709Z
+Stopped at: Completed 04-05-PLAN.md (city battles, commander, scenario validation; phase 04 all plans executed)
 Resume file: None

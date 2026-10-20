@@ -40,7 +40,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **KING-04**: 视野——军队半径 100m、城池半径 150m，决定势力可获取的信息
 - [x] **KING-05**: 城池——驻扎上限、训练单位（普通 96h/1、主城 72h）、驻扎回血 2/h
 - [x] **KING-06**: 军队战斗——距离 <80m 触发，战斗区为 80m 正方形加权中心，离区/结束判定
-- [ ] **KING-07**: 城池战斗——触发条件与战后结算（获胜方接管、可能入驻；败方重组行军）
+- [x] **KING-07**: 城池战斗——触发条件与战后结算（获胜方接管、可能入驻；败方重组行军）
 - [x] **KING-08**: 势力/阵营概念——多个势力，各拥有军队与城池
 
 ### REND — 渲染系统
@@ -126,7 +126,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | KING-04 | Phase 4 — 王国系统 | Complete |
 | KING-05 | Phase 4 — 王国系统 | Complete |
 | KING-06 | Phase 4 — 王国系统 | Complete |
-| KING-07 | Phase 4 — 王国系统 | Pending |
+| KING-07 | Phase 4 — 王国系统 | Complete |
 | KING-08 | Phase 4 — 王国系统 | Complete |
 | REND-01 | Phase 5 — 渲染系统 | Pending |
 | REND-02 | Phase 5 — 渲染系统 | Pending |
