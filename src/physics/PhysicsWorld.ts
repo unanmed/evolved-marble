@@ -1,5 +1,5 @@
 /**
- * 物理世界：`class PhysicsWorld implements IPhysicsWorld`（D-07）。
+ * 物理世界：`class PhysicsWorld implements IPhysicsWorld, IStaticObstacleWorld`（D-07/G-2）。
  * 拥有一个 Rapier `World` 与一个 `EventQueue`，按 `unitId` 注册单位（每个单位 =
  * 一个复合刚体：本体 / 武器 / 防具各一个碰撞体，固定局部偏移、逐 collider 设质量，D-03/D-05），
  * 并用「碰撞体 handle → 部位标签」映射承载部位标识（D-04）。
@@ -19,6 +19,8 @@ import type {
     IPhysicsConfig,
     IPhysicsTickResult,
     IPhysicsWorld,
+    IStaticObstacleSpec,
+    IStaticObstacleWorld,
     IUnitPhysicsSpec,
     IUnitState,
     IVelocitySnapshot
@@ -33,9 +35,9 @@ import type { ArmorKind } from '@/units/types';
 import type { IRng } from '@/common/types';
 
 /**
- * 复合刚体：`class PhysicsWorld implements IPhysicsWorld`。
+ * 复合刚体与静态障碍：`class PhysicsWorld implements IPhysicsWorld, IStaticObstacleWorld`。
  */
-export class PhysicsWorld implements IPhysicsWorld {
+export class PhysicsWorld implements IPhysicsWorld, IStaticObstacleWorld {
     /** 构造参数（固定步长与几何尺寸，D-06/D-10）。 */
     private readonly config: IPhysicsConfig;
     /** 本世界拥有的 Rapier 世界；`dispose()` 时释放。 */
@@ -73,6 +75,20 @@ export class PhysicsWorld implements IPhysicsWorld {
     private preVelocities = new Map<number, IVelocitySnapshot>();
     /** 是否已释放：`dispose()` 幂等性的唯一标记（第二次调用为安全空操作，绝不二次 free）。 */
     private disposed = false;
+    /**
+     * obstacleId → 静态障碍的固定刚体与其唯一 cuboid 碰撞体（G-2）。
+     * 障碍碰撞体**绝不**设 active events、也**绝不**写入 `index`，因此它永远不会成为
+     * `IContactEvent`/`IDamageEvent` 的一方。
+     */
+    private obstacles = new Map<
+        number,
+        {
+            body: InstanceType<typeof RAPIER.RigidBody>;
+            collider: InstanceType<typeof RAPIER.Collider>;
+        }
+    >();
+    /** 下一个静态障碍 id：从 1 起单调递增，同一世界内永不复用。 */
+    private nextObstacleId = 1;
 
     /**
      * 构造物理世界。
@@ -169,6 +185,58 @@ export class PhysicsWorld implements IPhysicsWorld {
 
     hasUnit(unitId: number): boolean {
         return this.bodies.has(unitId);
+    }
+
+    /**
+     * 在同一 Rapier 世界中创建一个固定矩形障碍并返回其 id（G-2 / D-01/D-27）。
+     * 障碍是 fixed 刚体 + cuboid 碰撞体，会阻挡动态单位；碰撞体**不**设 active events、
+     * 也**不**写入 handle 标签索引，故永不产生接触或伤害事件。
+     * 规格在创建任何 Rapier 对象**之前**校验：无效规格不消耗 id、不留下半成品刚体。
+     * @param spec 障碍规格（中心与半宽/半高，单位米）。
+     * @returns 该障碍的 id（同一世界内单调递增且唯一）。
+     * @throws {Error} 当坐标非有限、或半宽/半高非有限且非正时。
+     */
+    addStaticObstacle(spec: IStaticObstacleSpec): number {
+        if (
+            !Number.isFinite(spec.x) ||
+            !Number.isFinite(spec.y) ||
+            !Number.isFinite(spec.halfWidth) ||
+            !Number.isFinite(spec.halfHeight) ||
+            spec.halfWidth <= 0 ||
+            spec.halfHeight <= 0
+        ) {
+            throw new Error(
+                'PhysicsWorld.addStaticObstacle: x/y must be finite and halfWidth/halfHeight must be positive'
+            );
+        }
+
+        const body = this.world.createRigidBody(
+            RAPIER.RigidBodyDesc.fixed().setTranslation(spec.x, spec.y)
+        );
+        const collider = this.world.createCollider(
+            RAPIER.ColliderDesc.cuboid(spec.halfWidth, spec.halfHeight),
+            body
+        );
+
+        const id = this.nextObstacleId;
+        this.nextObstacleId += 1;
+        this.obstacles.set(id, { body, collider });
+        return id;
+    }
+
+    /**
+     * 移除一个静态障碍（G-2）；未知 id 为安全空操作。
+     * 只移除其固定刚体——Rapier 连同其 cuboid 碰撞体一并释放；障碍从不进入 handle 标签
+     * 索引，故没有索引条目需要清理。
+     * @param obstacleId 障碍 id。
+     */
+    removeStaticObstacle(obstacleId: number): void {
+        const entry = this.obstacles.get(obstacleId);
+        if (entry === undefined) {
+            return;
+        }
+        this.world.removeRigidBody(entry.body);
+        this.obstacles.delete(obstacleId);
     }
 
     applyForce(unitId: number, forceX: number, forceY: number): void {
@@ -447,5 +515,6 @@ export class PhysicsWorld implements IPhysicsWorld {
         this.colliders.clear();
         this.index.clear();
         this.preVelocities.clear();
+        this.obstacles.clear();
     }
 }
