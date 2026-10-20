@@ -90,22 +90,18 @@ export class Sensor implements ISensor {
                 blockers
             )
         );
-        const projectiles = [
-            ...this.world.queryProjectiles(
-                motion.x,
-                motion.y,
-                SENSING_MAX_DISTANCE
-            )
-        ];
+        const projectiles = this.world
+            .queryProjectiles(motion.x, motion.y, SENSING_MAX_DISTANCE)
+            .map(sighting => ({ ...sighting }));
 
         return {
             unitId,
             tick: this.getTick(),
             attributes: this.buildAttributes(unit),
             classKind: unit.getClass(),
-            equipment: [...unit.getEquipment()],
+            equipment: unit.getEquipment().map(item => ({ ...item })),
             skills: [...unit.getSkills()],
-            motion,
+            motion: { ...motion },
             rayDistances,
             enemies,
             allies,
@@ -202,7 +198,9 @@ export class Sensor implements ISensor {
                     level: otherUnit.getAttribute(AttributeKind.Level),
                     x: state.x,
                     y: state.y,
-                    equipment: [...otherUnit.getEquipment()]
+                    equipment: otherUnit
+                        .getEquipment()
+                        .map(item => ({ ...item }))
                 },
                 otherTeam
             ]);

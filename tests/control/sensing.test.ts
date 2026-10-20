@@ -21,7 +21,7 @@ import type {
     IUnitState
 } from '@/physics/types';
 import { spawnUnit } from '@/units/spawn';
-import { AttributeKind, ClassKind } from '@/units/types';
+import { AttributeKind, ClassKind, WeaponKind } from '@/units/types';
 import type { IUnit } from '@/units/types';
 import { mulberry32 } from '../helpers/rng';
 import { ArenaSensingWorld } from './arena';
@@ -180,6 +180,45 @@ class RecordingSensingWorld implements ISensingWorld {
         radius: number
     ): readonly IProjectileSighting[] {
         return this.inner.queryProjectiles(x, y, radius);
+    }
+}
+
+/**
+ * 静态感知世界：返回固定的射线/射弹数据，便于验证快照拷贝与清洗。
+ * 字段以 `unknown` 保存，允许测试故意返回畸形值（如非数组）。
+ * 除 `ISensingWorld` 外不暴露任何公共成员。
+ */
+class StaticSensingWorld implements ISensingWorld {
+    /** 原始射线返回值（可能是任意畸形值）。 */
+    private readonly rays: unknown;
+    /** 原始射弹返回值（可能是任意畸形值）。 */
+    private readonly projectiles: unknown;
+
+    /**
+     * 构造静态世界。
+     * @param rays `castRayFan` 的原始返回值。
+     * @param projectiles `queryProjectiles` 的原始返回值。
+     */
+    constructor(rays: unknown, projectiles: unknown) {
+        this.rays = rays;
+        this.projectiles = projectiles;
+    }
+
+    castRayFan(
+        _originX: number,
+        _originY: number,
+        _maxDistance: number,
+        _blockers: readonly ISensedUnit[]
+    ): readonly number[] {
+        return this.rays as readonly number[];
+    }
+
+    queryProjectiles(
+        _x: number,
+        _y: number,
+        _radius: number
+    ): readonly IProjectileSighting[] {
+        return this.projectiles as readonly IProjectileSighting[];
     }
 }
 
@@ -555,6 +594,7 @@ describe('Sensor — observation contract (CTRL-01)', () => {
             self.getAttribute(AttributeKind.Mass)
         );
         expect(observation.attributes[AttributeKind.Level]).toBe(1);
+        expect(observation.motion).not.toBe(motion);
         expect(observation.motion).toEqual(motion);
         expect(observation.tick).toBe(42);
         expect(observation.unitId).toBe(1);
@@ -562,6 +602,70 @@ describe('Sensor — observation contract (CTRL-01)', () => {
         expect(observation.equipment).toEqual(self.getEquipment());
         expect(observation.skills).toEqual(self.getSkills());
         expect(observation.projectiles).toHaveLength(0);
+    });
+
+    it('deep-copies equipment entries so plugins cannot mutate class data', () => {
+        const self = makeUnit(30);
+        const enemy = makeUnit(31);
+        const selfEquipment = self.getEquipment();
+        const enemyEquipment = enemy.getEquipment();
+        const states = new Map([
+            [1, stateAt(0, 0)],
+            [2, stateAt(10, 0)]
+        ]);
+        const units = new Map([
+            [1, self],
+            [2, enemy]
+        ]);
+        const teams = new Map([
+            [1, 1],
+            [2, 2]
+        ]);
+        const sensor = new Sensor(
+            new StubPhysicsWorld(states),
+            new StubCatalog(units, teams),
+            new ArenaSensingWorld(50),
+            () => 0
+        );
+
+        const observation = senseOrFail(sensor, 1);
+
+        expect(observation.equipment[0]).not.toBe(selfEquipment[0]);
+        expect(observation.equipment[0]).toEqual(selfEquipment[0]);
+        expect(observation.enemies[0].equipment[0]).not.toBe(enemyEquipment[0]);
+        expect(observation.enemies[0].equipment[0]).toEqual(enemyEquipment[0]);
+
+        // TypeScript 的 `readonly` 在运行时被擦除：插件可强转后写入。
+        const mutable = observation.equipment[0] as {
+            weapon?: WeaponKind;
+        };
+        mutable.weapon = WeaponKind.Axe;
+
+        expect(selfEquipment[0].weapon).toBe(WeaponKind.Longsword);
+    });
+
+    it('deep-copies projectile sightings', () => {
+        const self = makeUnit(32);
+        const sighting: IProjectileSighting = { x: 1, y: 2, distance: 3 };
+        const states = new Map([[1, stateAt(0, 0)]]);
+        const units = new Map([[1, self]]);
+        const teams = new Map([[1, 1]]);
+        const rays = Array.from(
+            { length: RAY_COUNT },
+            () => SENSING_MAX_DISTANCE
+        );
+        const sensor = new Sensor(
+            new StubPhysicsWorld(states),
+            new StubCatalog(units, teams),
+            new StaticSensingWorld(rays, [sighting]),
+            () => 0
+        );
+
+        const observation = senseOrFail(sensor, 1);
+
+        expect(observation.projectiles).toHaveLength(1);
+        expect(observation.projectiles[0]).not.toBe(sighting);
+        expect(observation.projectiles[0]).toEqual(sighting);
     });
 
     it('returns null for an unknown unit, missing motion, and unknown team', () => {
