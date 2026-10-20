@@ -688,6 +688,57 @@ describe('Sensor — observation contract (CTRL-01)', () => {
         }
     });
 
+    it('sanitizes each ray element independently and pads to exactly 64', () => {
+        const self = makeUnit(46);
+        const states = new Map([[1, stateAt(0, 0)]]);
+        const units = new Map([[1, self]]);
+        const teams = new Map([[1, 1]]);
+        const sensor = new Sensor(
+            new StubPhysicsWorld(states),
+            new StubCatalog(units, teams),
+            new StaticSensingWorld(
+                [10, Number.NaN, -1, 100, Number.POSITIVE_INFINITY],
+                []
+            ),
+            () => 0
+        );
+
+        const observation = senseOrFail(sensor, 1);
+
+        expect(observation.rayDistances).toHaveLength(RAY_COUNT);
+        // 合法值原样保留；非法值逐个映射为上限（不是整组清零）。
+        expect(observation.rayDistances[0]).toBe(10);
+        for (let index = 1; index < 5; index += 1) {
+            expect(observation.rayDistances[index]).toBe(SENSING_MAX_DISTANCE);
+        }
+        for (const distance of observation.rayDistances) {
+            expect(Number.isFinite(distance)).toBe(true);
+            expect(distance).toBeGreaterThanOrEqual(0);
+            expect(distance).toBeLessThanOrEqual(SENSING_MAX_DISTANCE);
+        }
+    });
+
+    it('truncates an over-long ray array to exactly 64 entries', () => {
+        const self = makeUnit(47);
+        const states = new Map([[1, stateAt(0, 0)]]);
+        const units = new Map([[1, self]]);
+        const teams = new Map([[1, 1]]);
+        const rays = Array.from({ length: 70 }, (_unused, index) => index % 50);
+        const sensor = new Sensor(
+            new StubPhysicsWorld(states),
+            new StubCatalog(units, teams),
+            new StaticSensingWorld(rays, []),
+            () => 0
+        );
+
+        const observation = senseOrFail(sensor, 1);
+
+        expect(observation.rayDistances).toHaveLength(RAY_COUNT);
+        expect(observation.rayDistances[0]).toBe(0);
+        expect(observation.rayDistances[49]).toBe(49);
+        expect(observation.rayDistances[63]).toBe(13);
+    });
+
     it('drops malformed projectile entries and clamps distances', () => {
         const self = makeUnit(34);
         const valid: IProjectileSighting = { x: 1, y: 2, distance: 3 };

@@ -497,6 +497,49 @@ describe('ControlSystem — execution semantics', () => {
         expect(torqueCalls).toHaveLength(0);
     });
 
+    it('sanitizes each action magnitude independently, preserving valid fields', () => {
+        const forceCalls: [number, number, number][] = [];
+        const torqueCalls: [number, number][] = [];
+        const mixed: IUnitAction = {
+            forceUp: Number.NaN,
+            forceDown: 0,
+            forceLeft: 0,
+            forceRight: 10,
+            torqueClockwise: Number.POSITIVE_INFINITY,
+            torqueCounterClockwise: 5,
+            skillIntent: null
+        };
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            (unitId, forceX, forceY) =>
+                forceCalls.push([unitId, forceX, forceY]),
+            (unitId, torque) => torqueCalls.push([unitId, torque]),
+            emptyTick
+        );
+        const provider = new RecordingProvider(
+            () => new RecordingAI(() => mixed)
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(45),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+
+        controller.tick();
+
+        // 无效字段归零，合法字段不受牵连。
+        expect(forceCalls).toEqual([[1, 10, 0]]);
+        expect(torqueCalls).toEqual([[1, 5]]);
+    });
+
     it('caps net force magnitude and torque at their limits', () => {
         const forceCalls: [number, number, number][] = [];
         const torqueCalls: [number, number][] = [];
