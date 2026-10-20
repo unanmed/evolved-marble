@@ -972,7 +972,36 @@ describe('ControlSystem — execution semantics', () => {
         expect(deadAttacker.isAlive()).toBe(false);
     });
 
-    it('keeps same-team bodies colliding but never routes same-team damage', () => {
+    it('test sink drops same-team damage before touching either unit', () => {
+        const sink = new TestDamageSink();
+        const attacker = makeUnit(40);
+        const defender = makeUnit(41);
+        const event: IDamageEvent = {
+            attackerId: 1,
+            defenderId: 2,
+            attackerPart: ColliderPart.Weapon,
+            defenderPart: ColliderPart.Body,
+            weaponKind: WeaponKind.Longsword,
+            deltaV: 12,
+            damageMean: 100,
+            damage: 1e9,
+            damageReduced: 0
+        };
+        const healthBefore = defender.getAttribute(AttributeKind.Health);
+
+        sink.applyDamage({
+            event,
+            attacker,
+            defender,
+            attackerTeamId: 7,
+            defenderTeamId: 7
+        });
+
+        expect(defender.getAttribute(AttributeKind.Health)).toBe(healthBefore);
+        expect(defender.isAlive()).toBe(true);
+    });
+
+    it('keeps same-team bodies colliding while the test sink drops same-team damage (production sinks must re-apply the filter)', () => {
         const world = new PhysicsWorld(
             { dt: DT, geometry: DEFAULT_GEOMETRY },
             mulberry32(4242)

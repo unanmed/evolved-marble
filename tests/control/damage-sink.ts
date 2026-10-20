@@ -9,6 +9,10 @@ import type { IDamageContext, IDamageSink } from '@/control/types';
 
 /**
  * 测试伤害接收方：拥有战斗规则，但不拥有物理生命周期。
+ *
+ * 注意：同队免伤是**接收方规则**（D-09/D-10），`ControlSystem` 仍会把同队伤害事件
+ * 路由给任一 `IDamageSink`。因此每个生产 sink（Phase 4 战斗模块）都必须自行实现
+ * 同队过滤；本类只是 Phase 3 的测试胶合实现，不能作为生产行为的保证。
  */
 export class TestDamageSink implements IDamageSink {
     /** 成功应用一条伤害后的观察回调（可选）。 */
