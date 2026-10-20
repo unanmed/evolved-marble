@@ -7,7 +7,7 @@
 import { sampleNormal } from '@/common/rng';
 import type { IRng } from '@/common/types';
 import { CLASS_DEFS, CONTROL_LEVEL_BASE } from '@/units/data';
-import type { ClassKind, ISpawnAttributes, IUnit } from '@/units/types';
+import type { ClassKind, IHealableUnit, ISpawnAttributes } from '@/units/types';
 import { Unit } from '@/units/Unit';
 
 /**
@@ -27,8 +27,11 @@ let spawnIndex = 0;
  * @param classKind 职业。
  * @param rng 注入的随机源。
  * @returns 新生成、带唯一显示名 `<职业名>#<序号>` 的单位。
+ *
+ * 返回类型为 `IHealableUnit`（C-2 决定）：`Unit` 本身实现该接口（G-1），
+ * 故王国层可直接回血而无需任何类型断言。
  */
-export function spawnUnit(classKind: ClassKind, rng: IRng): IUnit {
+export function spawnUnit(classKind: ClassKind, rng: IRng): IHealableUnit {
     const def = CLASS_DEFS[classKind];
 
     /**

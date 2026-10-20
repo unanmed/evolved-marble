@@ -1,5 +1,5 @@
 /**
- * 单位核心实现：`class Unit implements IUnit`。
+ * 单位核心实现：`class Unit implements IHealableUnit`（G-1）。
  * 数值统一经 `getAttribute(kind)` 读取；随等级派生的值实时计算、绝不存储（D-04）；
  * 基础值一律取自生成时随机得到的 rolled 值（`ISpawnAttributes`），职业表只提供成长系数与比例。
  * 本文件只依赖 `@/units/data` 与 `@/units/types`，不引入任何顶层 `const`。
@@ -18,14 +18,14 @@ import type {
     ClassKind,
     IClassDef,
     IEquipment,
+    IHealableUnit,
     IModifier,
     ISpawnAttributes,
-    IUnit,
     SkillKind
 } from '@/units/types';
 
 /** 单位：承载生成属性、区分职业、并实现经验累积与升级的状态机。 */
-export class Unit implements IUnit {
+export class Unit implements IHealableUnit {
     /** 职业定义（基础值、成长系数、初始装备与升级解锁表）。 */
     private readonly def: IClassDef;
     /** 职业标识。 */
@@ -192,6 +192,26 @@ export class Unit implements IUnit {
             this.maxHealth()
         );
         this.hp = Math.max(0, Math.min(this.hp - amount, maxHealth));
+    }
+
+    /**
+     * 恢复生命值（G-1）。策略与 `takeDamage` 对称：`amount` 非有限或非正时视为无效并直接忽略
+     * （不改变状态、不引入 `NaN`/`Infinity`）；已死亡的单位保持 0 生命，绝不复活（D-06 死亡永久）；
+     * 合法回血将生命值钳制到经修正器调整后的生命上限，以维持
+     * `getAttribute(Health) <= getAttribute(MaxHealth)` 的公开不变量。
+     */
+    heal(amount: number): void {
+        if (!Number.isFinite(amount) || amount <= 0) {
+            return;
+        }
+        if (!this.isAlive()) {
+            return;
+        }
+        const maxHealth = this.applyModifiers(
+            AttributeKind.MaxHealth,
+            this.maxHealth()
+        );
+        this.hp = Math.max(0, Math.min(this.hp + amount, maxHealth));
     }
 
     /** 生命值大于 0 时返回 `true`。 */
