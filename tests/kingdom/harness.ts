@@ -8,9 +8,9 @@ import { IdleAI } from '@/kingdom/IdleAI';
 import { KingdomWorld } from '@/kingdom/KingdomWorld';
 import { DEFAULT_SCENARIO } from '@/kingdom/scenario';
 import { KingdomSensingWorld } from '@/kingdom/SensingWorld';
-import type { IKingdomConfig, IScenario, UnitWeight } from '@/kingdom/types';
+import { createDefaultKingdomConfig } from '@/kingdom/strategies';
+import type { ICommander, IKingdomConfig, IScenario } from '@/kingdom/types';
 import type { IRng } from '@/common/types';
-import { AttributeKind } from '@/units/types';
 import type { IUnit } from '@/units/types';
 import { mulberry32 } from '../helpers/rng';
 
@@ -24,6 +24,8 @@ export interface IKingdomHarnessOptions {
     readonly seed?: number;
     /** 可替换策略；默认 `defaultKingdomConfig()`。 */
     readonly config?: IKingdomConfig;
+    /** 指挥官工厂覆盖（仅在未提供 `config` 时生效）。 */
+    readonly commanderFactory?: (factionId: number) => ICommander;
 }
 
 /**
@@ -63,38 +65,16 @@ export function disposeKingdom(fixture: IKingdomFixture): void {
 }
 
 /**
- * 默认单位权重：单位等级（D-18）。
- * @param unit 单位。
- * @returns 等级。
- */
-const defaultUnitWeight: UnitWeight = unit =>
-    unit.getAttribute(AttributeKind.Level);
-
-/**
- * 默认入驻选择器。
- *
- * 注意（已知契约缺口）：冻结的 `GarrisonSelector` 要求返回单位 **id**，但
- * `IUnit` 不暴露任何 id，调用方也无法从 `IUnit` 反查 id。因此本测试配置返回空选择，
- * 与「抛出即空选择」的容错语义一致；plan 04-05 会决定这一接缝的真实接线方式。
- * @param _city 城池。
- * @param _candidates 候选存活单位。
- * @returns 空选择。
- */
-const defaultGarrisonSelector = (): readonly number[] => [];
-
-/**
- * 默认王国配置：等级权重、25 % 入驻比例（测试中为空选择，见上）与抛出型指挥官工厂
- * （本计划不接指挥官，04-05 替换）。
+ * 默认王国配置：委派给生产 `createDefaultKingdomConfig`（等级权重、25 % 入驻、
+ * 占位指挥官）。`GarrisonSelector` 的单位 id 身份由 World 注册时的
+ * `rememberUnitIdentity` 提供，因此默认选择器返回真实候选 id。
+ * @param commanderFactory 可选的指挥官工厂覆盖（脚本化或抛出型）。
  * @returns 可用的 `IKingdomConfig`。
  */
-export function defaultKingdomConfig(): IKingdomConfig {
-    return {
-        unitWeight: defaultUnitWeight,
-        garrisonSelector: defaultGarrisonSelector,
-        commanderFactory: () => {
-            throw new Error('no commander in this suite');
-        }
-    };
+export function defaultKingdomConfig(
+    commanderFactory?: (factionId: number) => ICommander
+): IKingdomConfig {
+    return createDefaultKingdomConfig(commanderFactory);
 }
 
 /**
@@ -152,7 +132,7 @@ export function createKingdom(
         control,
         rng,
         scenario,
-        options.config ?? defaultKingdomConfig()
+        options.config ?? defaultKingdomConfig(options.commanderFactory)
     );
     worldRef = world;
 

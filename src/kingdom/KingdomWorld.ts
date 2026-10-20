@@ -51,6 +51,8 @@ import type {
     IBattle,
     IBattleSystem,
     ICity,
+    ICommander,
+    ICommanderContext,
     IFaction,
     IKingdomConfig,
     IMapBounds,
@@ -66,10 +68,12 @@ import type {
     IWorld,
     IWorldTickResult
 } from '@/kingdom/types';
-import type { IControlSystem, IUnitAI } from '@/control/types';
+import { rememberUnitIdentity } from '@/kingdom/strategies';
+import type { IControlSystem, IUnitAI, IUnitBrief } from '@/control/types';
 import type { IPhysicsWorld, IStaticObstacleWorld } from '@/physics/types';
 import type { IRng } from '@/common/types';
 import { spawnUnit } from '@/units/spawn';
+import { AttributeKind } from '@/units/types';
 import type { IHealableUnit } from '@/units/types';
 
 /**
@@ -139,6 +143,8 @@ export class KingdomWorld implements IWorld {
     private readonly orderAcceptedAt = new Map<number, number>();
     /** battleId → 曾加入过该战斗的全部单位 id（城池战败方重组的数据源）。 */
     private readonly battleParticipants = new Map<number, Set<number>>();
+    /** 势力 id → 指挥官；工厂失败的势力没有条目（世界继续运行）。 */
+    private readonly commanders = new Map<number, ICommander>();
     /** 下一个单位 id（单调递增，永不重用，T-04-07）。 */
     private nextUnitId = 1;
     /** 下一个军队 id（单调递增，永不重用；初值高于全部场景军队 id）。 */
@@ -210,6 +216,21 @@ export class KingdomWorld implements IWorld {
             1
         );
 
+        for (const faction of this.factions.values()) {
+            try {
+                const commander = this.config.commanderFactory(faction.getId());
+                if (
+                    commander !== null &&
+                    commander !== undefined &&
+                    typeof commander.decide === 'function'
+                ) {
+                    this.commanders.set(faction.getId(), commander);
+                }
+            } catch {
+                // A broken factory leaves that faction commander-less.
+            }
+        }
+
         this.battles = new BattleSystem(
             this.physics,
             unitId => this.unitArmy.get(unitId)?.factionId,
@@ -239,6 +260,9 @@ export class KingdomWorld implements IWorld {
      * @returns 本 tick 实际推进的游戏分钟与结束时的每 tick 分钟数。
      */
     tick(): IWorldTickResult {
+        this.expireFulfilledOrders();
+        this.runCommanders();
+
         const rate = this.battles.hasActiveBattle()
             ? BATTLE_TICK_MINUTES
             : PEACE_TICK_MINUTES;
@@ -584,6 +608,167 @@ export class KingdomWorld implements IWorld {
     }
 
     /**
+     * 在每个外层 tick 的最开始结算“已完成”的指令（先于任何指挥官决策）：
+     * - `MoveTo` 抵达目标容差内 → 清空；
+     * - `Hold` → 清空（因此下一 tick 会重新规划）；
+     * - `Garrison` 永不清空——满足的驻扎由“保留指令 + 城池链接”表达；
+     * - 非法枚举或缺失目标点 → 清空（防御数字枚举的运行时污染）。
+     * `afterMinutes` 是相对接受时刻的游戏分钟，未到期时不结算。
+     */
+    private expireFulfilledOrders(): void {
+        const now = this.time.getGameMinutes();
+        for (const army of this.armies.values()) {
+            const order = army.getOrder();
+            if (order === null) {
+                continue;
+            }
+            if (ArmyOrderKind[order.kind] === undefined) {
+                army.setOrder(null);
+                continue;
+            }
+            const accepted = this.orderAcceptedAt.get(army.getId()) ?? 0;
+            const delay = order.afterMinutes ?? 0;
+            if (now < accepted + delay) {
+                continue;
+            }
+
+            if (order.kind === ArmyOrderKind.Hold) {
+                army.setOrder(null);
+                continue;
+            }
+            if (order.kind !== ArmyOrderKind.MoveTo) {
+                continue;
+            }
+            if (order.targetX === undefined || order.targetY === undefined) {
+                army.setOrder(null);
+                continue;
+            }
+            const center = army.getCenter();
+            const dx = order.targetX - center.x;
+            const dy = order.targetY - center.y;
+            if (
+                dx * dx + dy * dy <=
+                ARRIVAL_TOLERANCE_METERS * ARRIVAL_TOLERANCE_METERS
+            ) {
+                army.setOrder(null);
+            }
+        }
+    }
+
+    /**
+     * 每个外层 tick 对每个势力调用一次指挥官（绝不进入子步循环）：
+     * 用当前可见性构建受限上下文，隔离 `decide` 抛出的异常，并逐条校验/应用指令。
+     * 指挥官缺失或工厂失败时静默跳过，世界继续推进（T-04-04）。
+     */
+    private runCommanders(): void {
+        for (const faction of this.factions.values()) {
+            const factionId = faction.getId();
+            const commander = this.commanders.get(factionId);
+            if (commander === undefined) {
+                continue;
+            }
+
+            let orders: readonly IArmyOrder[];
+            try {
+                orders = commander.decide(
+                    this.buildCommanderContext(factionId)
+                );
+            } catch {
+                continue;
+            }
+            if (!Array.isArray(orders)) {
+                continue;
+            }
+            for (const order of orders) {
+                this.applyCommanderOrder(order);
+            }
+        }
+    }
+
+    /**
+     * 构建指挥官上下文：己方完整只读视图 + 当前可见的敌方简讯（无记忆，D-25/A21）。
+     * 敌方单位只暴露 `IUnitBrief`，绝不泄漏名册、指令或城池内部状态。
+     * @param factionId 势力 id。
+     * @returns 指挥官上下文。
+     */
+    private buildCommanderContext(factionId: number): ICommanderContext {
+        const armies: IArmy[] = [];
+        const cities: ICity[] = [];
+        const faction = this.factions.get(factionId);
+        if (faction !== undefined) {
+            for (const armyId of faction.getArmyIds()) {
+                const army = this.armies.get(armyId);
+                if (army !== undefined) {
+                    armies.push(army);
+                }
+            }
+            for (const cityId of faction.getCityIds()) {
+                const city = this.cities.get(cityId);
+                if (city !== undefined) {
+                    cities.push(city);
+                }
+            }
+        }
+
+        const visibleEnemyArmies = this.getVisibleArmies(factionId).filter(
+            brief => brief.factionId !== factionId
+        );
+        const visibleEnemyCities = this.getVisibleCities(factionId).filter(
+            brief => brief.factionId !== factionId
+        );
+
+        const visibleEnemyUnits: IUnitBrief[] = [];
+        for (const unitId of this.getVisibleUnitIds(factionId)) {
+            const owner = this.unitArmy.get(unitId);
+            if (owner !== undefined && owner.factionId === factionId) {
+                continue;
+            }
+            const unit = this.units.get(unitId);
+            const state = this.physics.getUnitState(unitId);
+            if (unit === undefined || state === null) {
+                continue;
+            }
+            visibleEnemyUnits.push({
+                unitId,
+                health: unit.getAttribute(AttributeKind.Health),
+                level: unit.getAttribute(AttributeKind.Level),
+                x: state.x,
+                y: state.y,
+                equipment: unit.getEquipment()
+            });
+        }
+
+        return {
+            factionId,
+            gameMinutes: this.time.getGameMinutes(),
+            armies,
+            cities,
+            visibleEnemyArmies,
+            visibleEnemyCities,
+            visibleEnemyUnits
+        };
+    }
+
+    /**
+     * 校验并应用一条指挥官指令：军队存在、名册非空、当前无未完成指令，
+     * 其余字段交由 `issueOrder` 的同一套校验（T-04-04）。不满足时静默丢弃。
+     * @param order 指挥官返回的指令。
+     */
+    private applyCommanderOrder(order: IArmyOrder): void {
+        if (order === null || typeof order !== 'object') {
+            return;
+        }
+        const army = this.armies.get(order.armyId);
+        if (army === undefined || army.getUnitIds().length === 0) {
+            return;
+        }
+        if (army.getOrder() !== null) {
+            return;
+        }
+        this.issueOrder(order);
+    }
+
+    /**
      * 释放内部引用；幂等。**不**释放外部持有的物理/控制实例。
      */
     dispose(): void {
@@ -612,6 +797,7 @@ export class KingdomWorld implements IWorld {
         this.reorganizingArmies.clear();
         this.orderAcceptedAt.clear();
         this.battleParticipants.clear();
+        this.commanders.clear();
     }
 
     /**
@@ -833,6 +1019,7 @@ export class KingdomWorld implements IWorld {
         const unit = spawnUnit(city.getTrainingClass(), this.rng);
         const unitId = this.nextUnitId;
         this.nextUnitId += 1;
+        rememberUnitIdentity(unit, unitId);
 
         const position = city.getPosition();
         const angle = (unitId % 8) * (Math.PI / 4);
@@ -1665,6 +1852,7 @@ export class KingdomWorld implements IWorld {
                 const unit = spawnUnit(entry.classKind, this.rng);
                 const unitId = this.nextUnitId;
                 this.nextUnitId += 1;
+                rememberUnitIdentity(unit, unitId);
 
                 const angle = total > 0 ? (Math.PI * 2 * index) / total : 0;
                 this.control.registerUnit({
