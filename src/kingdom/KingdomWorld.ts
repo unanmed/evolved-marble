@@ -23,6 +23,7 @@ import {
     BATTLE_AREA_HYSTERESIS,
     BATTLE_TICK_MINUTES,
     BATTLE_TRIGGER_DISTANCE,
+    BOUNDARY_WALL_THICKNESS,
     BRAKE_MIN_MINUTES,
     CITY_VISION_RADIUS,
     GARRISON_HEAL_PER_HOUR,
@@ -66,7 +67,7 @@ import type {
     IWorldTickResult
 } from '@/kingdom/types';
 import type { IControlSystem, IUnitAI } from '@/control/types';
-import type { IPhysicsWorld } from '@/physics/types';
+import type { IPhysicsWorld, IStaticObstacleWorld } from '@/physics/types';
 import type { IRng } from '@/common/types';
 import { spawnUnit } from '@/units/spawn';
 import type { IHealableUnit } from '@/units/types';
@@ -86,8 +87,8 @@ const ARRIVAL_TOLERANCE_METERS = ARMY_SPEED_METERS_PER_HOUR / MINUTES_PER_HOUR;
  * 王国世界：场景构建、子步循环、军队/战斗/AI 模式编排与读取面。
  */
 export class KingdomWorld implements IWorld {
-    /** 外部持有的物理世界（不在 `dispose` 中释放）。 */
-    private readonly physics: IPhysicsWorld;
+    /** 外部持有的物理世界（同一实例提供静态障碍接缝，不在 `dispose` 中释放）。 */
+    private readonly physics: IPhysicsWorld & IStaticObstacleWorld;
     /** 外部持有的控制系统（AI 切换的唯一通道，不在 `dispose` 中释放）。 */
     private readonly control: IControlSystem;
     /** 注入的随机源（单位生成）。 */
@@ -104,6 +105,10 @@ export class KingdomWorld implements IWorld {
     private readonly terrain: readonly ITerrainRect[];
     /** 战斗容器。 */
     private readonly battles: BattleSystem;
+    /** 本世界添加的地形障碍 id（`dispose` 时移除）。 */
+    private readonly terrainObstacleIds: number[] = [];
+    /** 本世界添加的四道地图边界墙 id（`dispose` 时移除，且永不进入 `getTerrain`）。 */
+    private readonly wallObstacleIds: number[] = [];
 
     /** 势力 id → 势力。 */
     private readonly factions = new Map<number, IMutableFaction>();
@@ -138,16 +143,17 @@ export class KingdomWorld implements IWorld {
     private disposed = false;
 
     /**
-     * 构造王国世界：先建模型、再建战斗容器、最后物化单位。
+     * 构造王国世界：先建模型、再加入地形/边界墙、再建战斗容器、最后物化单位。
      * 物理与控制实例由调用方持有，本类不释放它们。
-     * @param physics 物理世界。
+     * @param physics 物理世界；组合根必须传入同一个同时实现
+     * `IStaticObstacleWorld` 的 `PhysicsWorld` 实例。
      * @param control 控制系统（单位注册与 AI 切换的唯一入口）。
      * @param rng 随机源（单位生成）。
      * @param scenario 只读场景表。
      * @param config 可替换策略（权重/入驻/指挥官）。
      */
     constructor(
-        physics: IPhysicsWorld,
+        physics: IPhysicsWorld & IStaticObstacleWorld,
         control: IControlSystem,
         rng: IRng,
         scenario: IScenario,
@@ -208,6 +214,8 @@ export class KingdomWorld implements IWorld {
             BATTLE_AREA_HYSTERESIS,
             battle => this.handleBattleEnded(battle)
         );
+
+        this.addStaticGeometry();
 
         for (const spec of scenario.armies) {
             this.spawnArmyUnits(spec);
@@ -573,6 +581,14 @@ export class KingdomWorld implements IWorld {
             return;
         }
         this.disposed = true;
+        for (const obstacleId of this.terrainObstacleIds) {
+            this.physics.removeStaticObstacle(obstacleId);
+        }
+        for (const obstacleId of this.wallObstacleIds) {
+            this.physics.removeStaticObstacle(obstacleId);
+        }
+        this.terrainObstacleIds.length = 0;
+        this.wallObstacleIds.length = 0;
         this.factions.clear();
         this.armies.clear();
         this.cities.clear();
@@ -1154,6 +1170,55 @@ export class KingdomWorld implements IWorld {
                 }
             }
         }
+    }
+
+    /**
+     * 把场景地形与四面地图边界墙加入注入的物理世界（D-27/G-2）：
+     * 地形逐字段映射为静态障碍；边界墙位于地图外侧、厚度
+     * `BOUNDARY_WALL_THICKNESS`，半尺寸覆盖整条边与四角。两组 id 分开保存，
+     * 使 `dispose()` 只移除本世界创建的障碍，且边界墙绝不进入 `getTerrain()`。
+     */
+    private addStaticGeometry(): void {
+        for (const rect of this.terrain) {
+            this.terrainObstacleIds.push(
+                this.physics.addStaticObstacle({
+                    x: rect.x,
+                    y: rect.y,
+                    halfWidth: rect.halfWidth,
+                    halfHeight: rect.halfHeight
+                })
+            );
+        }
+
+        const halfThickness = BOUNDARY_WALL_THICKNESS / 2;
+        const halfWidth = this.bounds.width / 2;
+        const halfHeight = this.bounds.height / 2;
+        this.wallObstacleIds.push(
+            this.physics.addStaticObstacle({
+                x: -halfThickness,
+                y: halfHeight,
+                halfWidth: halfThickness,
+                halfHeight: halfHeight + BOUNDARY_WALL_THICKNESS
+            }),
+            this.physics.addStaticObstacle({
+                x: this.bounds.width + halfThickness,
+                y: halfHeight,
+                halfWidth: halfThickness,
+                halfHeight: halfHeight + BOUNDARY_WALL_THICKNESS
+            }),
+            this.physics.addStaticObstacle({
+                x: halfWidth,
+                y: -halfThickness,
+                halfWidth: halfWidth + BOUNDARY_WALL_THICKNESS,
+                halfHeight: halfThickness
+            }),
+            this.physics.addStaticObstacle({
+                x: halfWidth,
+                y: this.bounds.height + halfThickness,
+                halfWidth: halfWidth + BOUNDARY_WALL_THICKNESS,
+                halfHeight: halfThickness
+            })
+        );
     }
 
     /**

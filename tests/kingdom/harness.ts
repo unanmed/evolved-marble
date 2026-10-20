@@ -3,7 +3,6 @@ import { ControlSystem } from '@/control/ControlSystem';
 import type { IControlSystem, IUnitAI, IUnitAIProvider } from '@/control/types';
 import { DEFAULT_GEOMETRY, DT } from '@/physics/constants';
 import { PhysicsWorld } from '@/physics/PhysicsWorld';
-import type { IPhysicsWorld } from '@/physics/types';
 import { BattleDamageSink } from '@/kingdom/DamageSink';
 import { IdleAI } from '@/kingdom/IdleAI';
 import { KingdomWorld } from '@/kingdom/KingdomWorld';
@@ -35,8 +34,8 @@ export interface IKingdomFixture {
     readonly world: KingdomWorld;
     /** 控制系统（外部持有，测试需自行 dispose）。 */
     readonly control: IControlSystem;
-    /** 物理世界（外部持有，测试需自行 dispose）。 */
-    readonly physics: IPhysicsWorld;
+    /** 物理世界（外部持有，测试需自行 dispose；同时实现静态障碍接缝）。 */
+    readonly physics: PhysicsWorld;
     /** 王国感知世界。 */
     readonly sensing: KingdomSensingWorld;
     /** 注入世界构造的单位生成随机源。 */
@@ -49,6 +48,18 @@ export interface IKingdomFixture {
  */
 export function initRapier(): Promise<void> {
     return RAPIER.init();
+}
+
+/**
+ * 释放一套夹具：先 `world.dispose()`（移除本世界添加的地形与边界墙障碍），
+ * 再释放外部持有的控制系统与物理世界。顺序不可颠倒——世界只清理自己创建的
+ * 障碍，物理世界仍须由外部持有者释放。
+ * @param fixture 已接线的王国夹具。
+ */
+export function disposeKingdom(fixture: IKingdomFixture): void {
+    fixture.world.dispose();
+    fixture.control.dispose();
+    fixture.physics.dispose();
 }
 
 /**
