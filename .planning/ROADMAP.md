@@ -154,8 +154,14 @@ Plans:
   4. 视野生效：军队半径 100m、城池半径 150m，决定势力可获取的信息。
   5. 军队战斗（距离 <80m 触发、80m 加权中心正方形战斗区、离区/结束判定）与城池战斗（同流程 + 战后获胜方接管、可能入驻、败方重组行军）按规格触发与结算。
 
-**Plans**: TBD
-**Type-first gate**: Wave 1 writes the kingdom folder's `types.ts` + `IFaction`/`IArmy`/`ICity`/`IWorld`/`ITimeSystem` interfaces and the numeric enums for faction/state; **user reviews and approves before implementation**.
+**Plans:** 0/1 plans complete
+Plans:
+
+**Wave 1** *(round 1 — the type-first gate)*
+
+- [ ] 04-01-PLAN.md — 类型先行：`src/kingdom/types.ts`（8 个数字枚举 + `IFaction`/`IArmy`/`ICity`/`IBattle`/`IBattleSystem`/`IWorld`/`ITimeSystem`/`ICommander`/`IScenario` 等全部契约，仅声明）+ 两个阻塞型加性接缝（G-1 `IHealableUnit`、G-2 `IStaticObstacleWorld`，仅类型）+ `tests/kingdom/types.test.ts`（枚举钉版 + 编译期契约断言）→ **用户类型设计审查门禁**
+
+**Type-first gate**: Wave 1 (04-01, type declarations only) writes the kingdom folder's `types.ts` — the numeric enums (`TimeRate`/`ArmyState`/`UnitControlMode`/`ArmyOrderKind`/`BattleState`/`BattleTriggerKind`/`BattleLifecycleKind`/`CityKind`) plus `IFaction`/`IArmy`/`ICity`/`IBattle`/`IBattleSystem`/`IWorld`/`ITimeSystem`/`ICommander`/`IScenario` and the two injected function types — together with two additive, declaration-only seams in the frozen folders: `IHealableUnit extends IUnit` (`src/units/types.ts`, G-1) and `IStaticObstacleWorld`/`IStaticObstacleSpec` (`src/physics/types.ts`, G-2). **The user must review and approve the type design — including G-1 (march 1/h + garrison 2/h healing) and G-2 (terrain blocking movement in the same Rapier world) — before round-2 implementation is planned.** `IUnit`, `IPhysicsWorld` and `src/control/types.ts` stay unchanged; `Unit.heal`, `PhysicsWorld.addStaticObstacle` and every kingdom implementation file are round 2.
 
 ### Phase 5: 渲染系统
 
@@ -227,7 +233,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 1. 单位系统 | 5/5 | Complete    | 2026-10-18 |
 | 2. 物理模拟系统 | 7/7 | Complete    | 2026-10-19 |
 | 3. 操控系统 | 3/3 | Complete    | 2026-10-20 |
-| 4. 王国系统 | 0/0 | Not started | - |
+| 4. 王国系统 | 0/1 | In progress | - |
 | 5. 渲染系统 | 0/0 | Not started | - |
 | 6. 录制系统 | 0/0 | Not started | - |
 | 7. AI 接入系统 | 0/0 | Not started | - |
