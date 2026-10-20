@@ -9,7 +9,6 @@ import {
     BattleState,
     BattleTriggerKind,
     CityKind,
-    TimeRate,
     UnitControlMode
 } from '@/kingdom/types';
 import type {
@@ -22,7 +21,6 @@ import type {
     ICommanderContext,
     IFaction,
     ITimeSystem,
-    IUnitModeSource,
     IScenario,
     IVec2,
     IVisibleArmyBrief,
@@ -40,8 +38,8 @@ import { ClassKind } from '@/units/types';
 import type { IHealableUnit, IUnit } from '@/units/types';
 
 /**
- * 军队只读 stub：完整实现 8 个方法，并覆盖缺失值约定
- * （无指令 → `null`，未驻扎 → `undefined`）。
+ * 军队只读 stub：完整实现 9 个方法，并覆盖缺失值约定
+ * （无指令 → `null`，未驻扎 / 未交战 → `undefined`）。
  */
 function makeArmy(id: number, factionId: number): IArmy {
     const order: IArmyOrder | null = null;
@@ -54,6 +52,7 @@ function makeArmy(id: number, factionId: number): IArmy {
         getState: () => ArmyState.Marching,
         getUnitIds: () => [101, 102],
         getGarrisonedCityId: () => undefined,
+        getEngagedBattleId: () => undefined,
         getOrder: () => order
     };
 }
@@ -89,30 +88,13 @@ function makeBattle(id: number): IBattle {
     };
 }
 
-describe('kingdom types — numeric TimeRate enum', () => {
-    it('pins Normal to 1 and Fast to 24 as numbers', () => {
-        expect(TimeRate.Normal).toBe(1);
-        expect(TimeRate.Fast).toBe(24);
-        expect(typeof TimeRate.Normal).toBe('number');
-        expect(typeof TimeRate.Fast).toBe('number');
-    });
-
-    it('both members are integers and distinct', () => {
-        const members: readonly number[] = [TimeRate.Normal, TimeRate.Fast];
-        expect(members).toHaveLength(2);
-        for (const member of members) {
-            expect(Number.isInteger(member)).toBe(true);
-        }
-        expect(new Set<number>(members).size).toBe(2);
-    });
-});
-
 describe('kingdom types — numeric ArmyState enum', () => {
-    it('pins all four macro states', () => {
+    it('pins all five macro states', () => {
         expect(ArmyState.Marching).toBe(0);
         expect(ArmyState.Garrisoned).toBe(1);
         expect(ArmyState.InBattle).toBe(2);
         expect(ArmyState.Reorganizing).toBe(3);
+        expect(ArmyState.Engaging).toBe(4);
     });
 
     it('all members are integers and distinct', () => {
@@ -120,13 +102,14 @@ describe('kingdom types — numeric ArmyState enum', () => {
             ArmyState.Marching,
             ArmyState.Garrisoned,
             ArmyState.InBattle,
-            ArmyState.Reorganizing
+            ArmyState.Reorganizing,
+            ArmyState.Engaging
         ];
-        expect(members).toHaveLength(4);
+        expect(members).toHaveLength(5);
         for (const member of members) {
             expect(Number.isInteger(member)).toBe(true);
         }
-        expect(new Set<number>(members).size).toBe(4);
+        expect(new Set<number>(members).size).toBe(5);
     });
 });
 
@@ -359,11 +342,17 @@ describe('kingdom types — read surfaces compile as complete literals', () => {
     });
 });
 
-describe('kingdom types — time signatures', () => {
-    it('pins getRate to TimeRate and getSubstepsPerTick to number', () => {
+describe('kingdom types — numeric time contract (no rate enum)', () => {
+    it('pins per-tick minutes as plain numbers', () => {
         expectTypeOf<
-            ITimeSystem['getRate']
-        >().returns.toEqualTypeOf<TimeRate>();
+            ITimeSystem['getMinutesPerTick']
+        >().returns.toEqualTypeOf<number>();
+        expectTypeOf<ITimeSystem['setMinutesPerTick']>()
+            .parameter(0)
+            .toEqualTypeOf<number>();
+        expectTypeOf<
+            ITimeSystem['setMinutesPerTick']
+        >().returns.toEqualTypeOf<void>();
         expectTypeOf<
             ITimeSystem['getSubstepsPerTick']
         >().returns.toEqualTypeOf<number>();
@@ -373,6 +362,10 @@ describe('kingdom types — time signatures', () => {
         expectTypeOf<
             ITimeSystem['advanceTick']
         >().returns.toEqualTypeOf<void>();
+        expectTypeOf<
+            IWorldTickResult['minutesPerTick']
+        >().toEqualTypeOf<number>();
+        expectTypeOf<IWorldTickResult['gameMinutes']>().toEqualTypeOf<number>();
     });
 });
 
@@ -395,15 +388,6 @@ describe('kingdom types — world read surface', () => {
         expectTypeOf<IWorld['getVisibleUnitIds']>().returns.toEqualTypeOf<
             readonly number[]
         >();
-    });
-
-    it('pins IUnitModeSource absent objects to null', () => {
-        expectTypeOf<
-            IUnitModeSource['getFormationSlot']
-        >().returns.toEqualTypeOf<IVec2 | null>();
-        expectTypeOf<
-            IUnitModeSource['getBattleArea']
-        >().returns.toEqualTypeOf<IBattle | null>();
     });
 });
 
@@ -445,6 +429,9 @@ describe('kingdom types — absent literals are undefined', () => {
             number | undefined
         >();
         expectTypeOf<IArmy['getGarrisonedCityId']>().returns.toEqualTypeOf<
+            number | undefined
+        >();
+        expectTypeOf<IArmy['getEngagedBattleId']>().returns.toEqualTypeOf<
             number | undefined
         >();
         expectTypeOf<IBattle['getCityId']>().returns.toEqualTypeOf<
