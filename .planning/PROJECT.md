@@ -17,14 +17,14 @@
 ### Validated
 
 - ✓ 游戏设计规格（机制与数值）—— 已由用户在飞书知识库确立（`杂项 / AI 版球球王国`），缓存于 `.planning/reference/ai-marble-kingdom.md`
+- ✓ **单位系统** —— 16 项单位属性、7 个职业、6 种武器、2 种防具、等级/经验/升级、正态生成 — Phase 1
+- ✓ **物理模拟系统** —— Rapier2D 复合刚体、部位标记类型化事件、伤害/减伤、固定 tick — Phase 2
+- ✓ **操控系统** —— 单位级 AI 输入/输出契约、每 0.1s（6 tick）决策、可插拔 `IUnitAIProvider` + 默认基线 AI — Phase 3
 
 ### Active
 
 项目由 8 个相对独立、低耦合的系统构成。**一阶段只攻一个系统**，不按层级纵向推进。
 
-- [ ] **单位系统** —— 16 项单位属性、7 个职业、6 种武器、2 种防具、等级/经验/升级机制、单位生成正态随机
-- [ ] **物理模拟系统** —— Rapier2D 复合刚体（本体/武器/防具为独立碰撞体并按部位打标）、接触转为带部位标记的类型化事件、伤害计算、tick 推进
-- [ ] **操控系统** —— 单位级 AI 的输入/输出定义（每 0.1s 决策：64 射线 + 16 敌 + 16 友 → 力/旋转/技能），AI 控制做成**可插拔**接口
 - [ ] **王国系统** —— 地图、行军、视野、军队、城池、驻扎/训练、军队/城池战斗触发与战后结算
 - [ ] **渲染系统** —— PixiJS 顶视渲染、HUD（HP/等级/阵营）、镜头
 - [ ] **录制系统** —— 全程持续帧采集 → 视频（浏览器 WebCodecs + Mediabunny 库）
@@ -90,6 +90,11 @@
 | 规划分两轮（先类型、后实现） | 避免类型契约在实现规划后才变动，导致实现计划返工 | — Pending |
 | 缺失值：对象用 null、字面量用 undefined | 一眼可辨量是否为对象 | — Pending |
 | 通用可复用抽象放 `src/common/`（如 `IRng`） | 简单抽象即做；供各系统共享，不重复实现 | — Pending |
+| 操控系统类型契约（D-01..D-19）经门禁批准 | 类型先行 + 用户审查；契约冻结后 round 2 实现 | ✓ Phase 3 |
+| 感知走控制层 `ISensingWorld`/`Sensor`，不扩展 `IPhysicsWorld` | 保持物理契约冻结；Phase 4 可替换为王国世界 | ✓ Phase 3 |
+| 阵营 `teamId` 注册注入；同队保留碰撞但不结算伤害 | 不在 `IUnit` 提前引入势力；伤害过滤在应用层 | ✓ Phase 3 |
+| 每单位 `IUnitAI` 由 `IUnitAIProvider` 创建；动作保持 6 tick 每 tick 重施加 | 可插拔 AI + 物理每 `tick()` 清空力/力矩 | ✓ Phase 3 |
+| 默认基线 AI 仅验证用最小三行为；技能只输出意图 + 冷却 | 核心是 AI，后续整体替换；不提前做射弹/技能物理 | ✓ Phase 3 |
 
 ## Evolution
 
@@ -109,4 +114,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-10-17 after initialization*
+*Last updated: 2026-10-20 after Phase 3*

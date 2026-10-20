@@ -20,10 +20,10 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-10-17)
+See: .planning/PROJECT.md (updated 2026-10-20)
 
 **Core value:** 战斗必须激烈好看。
-**Current focus:** Phase 03 — 操控系统
+**Current focus:** Phase 4 — 王国系统
 
 ## Current Position
 
@@ -145,7 +145,11 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 | Category | Item | Status | Deferred At | Milestone |
 |----------|------|--------|-------------|-----------|
-| *(none)* | | | | |
+| Control | 射弹与技能物理效果（弓箭/万箭齐发/冲锋/旋转） | Deferred to later combat/skill layer | Phase 3 | v1 |
+| Control | 丰富默认 AI 行为/职业战术/个性参数 | Deferred to pluggable AI implementations | Phase 3 | v1 |
+| Control | 地图障碍物射线感知 | Phase 4 (`ISensingWorld` implementation) | Phase 3 | v1 |
+| Control | 运行时阵营更新 (`updateTeam`) | Reserved, enabled in Phase 4 | Phase 3 | v1 |
+| Control | 按控制等级选择 AI / RL / LLM 单位控制 | v2 / Phase 7 | Phase 3 | v1 |
 
 ## Session Continuity
 
