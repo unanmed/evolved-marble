@@ -3,17 +3,17 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: 王国系统
 status: executing
-stopped_at: Phase 4 context gathered
-last_updated: "2026-10-20T07:54:34.062Z"
+stopped_at: Completed 04-01-PLAN.md (Round 1 type contract, gate approved; Round 2 pending)
+last_updated: "2026-10-20T11:15:24.223Z"
 last_activity: 2026-10-20
-last_activity_desc: Phase 3 complete, transitioned to Phase 4
-state_head: b9450416fd5c929a39c2964b975a7eb157ef2836
+last_activity_desc: Phase 04 round 1 complete — kingdom type contract approved
+state_head: 6700288fe738ad3ea4b70642ba32bf2deed4275f
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 0
   total_plans: 16
-  completed_plans: 15
-  percent: 13
+  completed_plans: 16
+  percent: 0
 ---
 
 # Project State
@@ -23,16 +23,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-20)
 
 **Core value:** 战斗必须激烈好看。
-**Current focus:** Phase 4 — 王国系统
+**Current focus:** Phase 04 — 王国系统
 
 ## Current Position
 
-Phase: 04 (王国系统) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-10-20 — Phase 3 complete, transitioned to Phase 4
+Phase: 04 (王国系统) — EXECUTING
+Plan: 1 of 1 (Round 1 complete — Round 2 implementation pending)
+Status: Round 1 type contract APPROVED; Round 2 implementation pending
+Last activity: 2026-10-20 — Phase 04 execution started
 
-Progress: [█░░░░░░░░░] 13%
+Progress: [░░░░░░░░░░] 0%
 
 ## Performance Metrics
 
@@ -76,6 +76,7 @@ Progress: [█░░░░░░░░░] 13%
 | Phase 03 P02 | 14 min | 3 tasks | 8 files |
 | Phase 03 P02 | 14 min | 3 tasks | 8 files |
 | Phase 03 P03 | 8min | 3 tasks | 3 files |
+| Phase 04 P01 | 159 min | 4 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -129,6 +130,9 @@ Recent decisions affecting current work:
 - [Phase 03]: Phase 03 P03: DefaultUnitAI priority is idle -> retreat -> ram -> approach; retreat never emits a skill intent (D-14/D-16)
 - [Phase 03]: Phase 03 P03: skill intents are one-shot per decision (Charge -> Spin close-range, then ArrowStorm, then bow) armed as observation.tick + cooldown ticks (D-17)
 - [Phase 03]: Phase 03 P03: pluggability is proven by swapping providers across identical real Rapier setups; a throwing provider falls back to zero action without poisoning the loop
+- [Phase 04]: Round 1 type gate APPROVED — 7 numeric enums (incl. ArmyState.Engaging=4), numeric time rate (no TimeRate enum), reduced vision briefs (A21)
+- [Phase 04]: G-1 IHealableUnit, G-2 IStaticObstacleWorld and G-5 IControlSystem.setUnitAI approved as additive declaration-only seams; ControlSystem.setUnitAI shim is the only Round-1 implementation
+- [Phase 04]: army orders reduced to MoveTo/Garrison/Hold and IArmyOrder.afterMinutes is relative game time (omitted = now)
 
 ### Pending Todos
 
@@ -153,6 +157,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-20T06:13:31.506Z
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-kingdom-system/04-CONTEXT.md
+Last session: 2026-10-20T11:15:24.114Z
+Stopped at: Completed 04-01-PLAN.md (Round 1 type contract, gate approved; Round 2 pending)
+Resume file: .planning/phases/04-kingdom-system/04-01-SUMMARY.md
