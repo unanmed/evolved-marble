@@ -2,261 +2,235 @@ import RAPIER from '@dimforge/rapier2d-compat';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { ControlSystem } from '@/control/ControlSystem';
 import { DefaultUnitAI } from '@/control/DefaultUnitAI';
-import { RAY_COUNT } from '@/control/constants';
+import {
+    DECISION_INTERVAL_TICKS,
+    MAX_FORCE_MAGNITUDE,
+    MAX_TORQUE_MAGNITUDE
+} from '@/control/constants';
+import { SkillIntentKind } from '@/control/types';
 import type {
+    IControlTickResult,
     IDamageContext,
-    IDamageSink,
-    ISensedUnit,
-    ISensingWorld,
     IUnitAction,
     IUnitAI,
     IUnitAIProvider,
-    IUnitObservation,
-    IProjectileSighting
+    IUnitObservation
 } from '@/control/types';
 import { DEFAULT_GEOMETRY, DT } from '@/physics/constants';
 import { PhysicsWorld } from '@/physics/PhysicsWorld';
-import type { IUnitState } from '@/physics/types';
+import { ColliderPart } from '@/physics/types';
+import type {
+    IDamageEvent,
+    IPhysicsTickResult,
+    IPhysicsWorld,
+    IUnitPhysicsSpec,
+    IUnitState
+} from '@/physics/types';
 import { spawnUnit } from '@/units/spawn';
-import { AttributeKind, ClassKind } from '@/units/types';
+import { AttributeKind, ClassKind, SkillKind, WeaponKind } from '@/units/types';
 import type { IUnit } from '@/units/types';
 import { mulberry32 } from '../helpers/rng';
+import { ArenaSensingWorld } from './arena';
+import { TestDamageSink } from './damage-sink';
 
 /**
- * 测试用感知世界：矩形边界 + 敌方遮挡圆 + 空射弹（Phase 3 不填充射弹）。
+ * 构造一个静止的运动读数。
+ * @param x 位置的 x 坐标。
+ * @param y 位置的 y 坐标。
+ * @returns 静止状态。
  */
-class TracerSensingWorld implements ISensingWorld {
-    /** 竞技场半边长（米）。 */
-    private readonly halfExtent: number;
-
-    /**
-     * 构造竞技场。
-     * @param halfExtent 半边长（米）。
-     */
-    constructor(halfExtent: number) {
-        this.halfExtent = halfExtent;
-    }
-
-    /**
-     * 投射 64 条世界坐标固定方向射线，返回最近命中距离。
-     * @param originX 原点 x。
-     * @param originY 原点 y。
-     * @param maxDistance 最远距离。
-     * @param blockers 敌方遮挡圆。
-     * @returns 每条射线的最短距离。
-     */
-    castRayFan(
-        originX: number,
-        originY: number,
-        maxDistance: number,
-        blockers: readonly ISensedUnit[]
-    ): readonly number[] {
-        const distances: number[] = [];
-        const step = (Math.PI * 2) / RAY_COUNT;
-        for (let index = 0; index < RAY_COUNT; index += 1) {
-            const angle = index * step;
-            const dx = Math.cos(angle);
-            const dy = Math.sin(angle);
-            let nearest = this.rayBoundaryDistance(originX, originY, dx, dy);
-            for (const blocker of blockers) {
-                const hit = this.rayCircleDistance(
-                    originX,
-                    originY,
-                    dx,
-                    dy,
-                    blocker.x,
-                    blocker.y,
-                    blocker.radius
-                );
-                if (hit < nearest) {
-                    nearest = hit;
-                }
-            }
-            const bounded = Math.min(nearest, maxDistance);
-            distances.push(
-                Number.isFinite(bounded) ? Math.max(0, bounded) : maxDistance
-            );
-        }
-        return distances;
-    }
-
-    /**
-     * Phase 3 恒返回空射弹列表（D-04）。
-     * @returns 空数组。
-     */
-    queryProjectiles(): readonly IProjectileSighting[] {
-        return [];
-    }
-
-    /**
-     * 射线与轴对齐边界矩形的最近正向交点（slab 法）。
-     * @param originX 原点 x。
-     * @param originY 原点 y。
-     * @param dx 方向 x 分量（单位向量）。
-     * @param dy 方向 y 分量（单位向量）。
-     * @returns 最近正向距离；无命中返回 `Infinity`。
-     */
-    private rayBoundaryDistance(
-        originX: number,
-        originY: number,
-        dx: number,
-        dy: number
-    ): number {
-        const slab = (origin: number, direction: number): [number, number] => {
-            if (Math.abs(direction) < 1e-12) {
-                const outside =
-                    origin < -this.halfExtent || origin > this.halfExtent;
-                return outside ? [Infinity, -Infinity] : [-Infinity, Infinity];
-            }
-            const first = (-this.halfExtent - origin) / direction;
-            const second = (this.halfExtent - origin) / direction;
-            return first < second ? [first, second] : [second, first];
-        };
-
-        const [xEnter, xExit] = slab(originX, dx);
-        const [yEnter, yExit] = slab(originY, dy);
-        const enter = Math.max(xEnter, yEnter);
-        const exit = Math.min(xExit, yExit);
-        if (exit < 0 || enter > exit) {
-            return Infinity;
-        }
-        return enter >= 0 ? enter : exit;
-    }
-
-    /**
-     * 射线与圆（单位本体）的最近正向交点。
-     * @param originX 原点 x。
-     * @param originY 原点 y。
-     * @param dx 方向 x 分量（单位向量）。
-     * @param dy 方向 y 分量（单位向量）。
-     * @param centerX 圆心 x。
-     * @param centerY 圆心 y。
-     * @param radius 圆半径。
-     * @returns 最近正向距离；无命中返回 `Infinity`。
-     */
-    private rayCircleDistance(
-        originX: number,
-        originY: number,
-        dx: number,
-        dy: number,
-        centerX: number,
-        centerY: number,
-        radius: number
-    ): number {
-        const relX = originX - centerX;
-        const relY = originY - centerY;
-        const b = 2 * (relX * dx + relY * dy);
-        const c = relX * relX + relY * relY - radius * radius;
-        const discriminant = b * b - 4 * c;
-        if (discriminant < 0) {
-            return Infinity;
-        }
-        const root = Math.sqrt(discriminant);
-        const first = (-b - root) / 2;
-        if (first >= 0) {
-            return first;
-        }
-        const second = (-b + root) / 2;
-        return second >= 0 ? 0 : Infinity;
-    }
+function stateAt(x: number, y: number): IUnitState {
+    return { x, y, angle: 0, vx: 0, vy: 0, angularVelocity: 0 };
 }
 
 /**
- * 记录型 Provider：包装 `DefaultUnitAI`，通过回调记录创建与决策，不暴露额外公共成员。
+ * 构造一个空的物理 tick 结果。
+ * @returns 无接触、无伤害的结果。
  */
-class TracerProvider implements IUnitAIProvider {
-    /** 创建单位 AI 时回调。 */
-    private readonly onCreate: (unitId: number) => void;
-    /** 每次决策时回调。 */
-    private readonly onDecide: (observation: IUnitObservation) => void;
+function emptyTick(): IPhysicsTickResult {
+    return { contacts: [], damages: [] };
+}
+
+/**
+ * 生成一个用于注册的真实单位。
+ * @param seed 确定性随机种子。
+ * @returns 单位实例。
+ */
+function makeUnit(seed: number): IUnit {
+    return spawnUnit(ClassKind.Swordsman, mulberry32(seed));
+}
+
+/**
+ * 构造全零动作。
+ * @returns 全零动作。
+ */
+function zeroAction(): IUnitAction {
+    return {
+        forceUp: 0,
+        forceDown: 0,
+        forceLeft: 0,
+        forceRight: 0,
+        torqueClockwise: 0,
+        torqueCounterClockwise: 0,
+        skillIntent: null
+    };
+}
+
+/**
+ * 记录型物理世界：把力/力矩/注册/移除事件通过回调外泄，便于断言调用语义；
+ * 除 `IPhysicsWorld` 外不暴露任何公共成员。
+ */
+class RecordingPhysicsWorld implements IPhysicsWorld {
+    /** unitId → 对外报告的运动读数。 */
+    private readonly states: Map<number, IUnitState>;
+    /** 每次 `applyForce` 的回调。 */
+    private readonly forceSink: (
+        unitId: number,
+        forceX: number,
+        forceY: number
+    ) => void;
+    /** 每次 `applyTorque` 的回调。 */
+    private readonly torqueSink: (unitId: number, torque: number) => void;
+    /** 每次 `tick()` 返回的结果。 */
+    private readonly nextTickResult: () => IPhysicsTickResult;
+    /** 注册回调（可抛错以模拟物理注册失败）。 */
+    private readonly onRegister?: (unitId: number) => void;
+    /** 移除回调。 */
+    private readonly onRemove?: (unitId: number) => void;
+    /** 释放回调。 */
+    private readonly onDispose?: () => void;
+    /** 当前已注册的 id 集合（`hasUnit` 的数据源）。 */
+    private readonly registered = new Set<number>();
 
     /**
-     * 构造 Provider。
-     * @param onCreate 创建回调。
-     * @param onDecide 决策回调。
+     * 构造记录型物理世界。
+     * @param states 运动读数表。
+     * @param forceSink 力回调。
+     * @param torqueSink 力矩回调。
+     * @param nextTickResult 每次 tick 的结果工厂。
+     * @param onRegister 注册回调。
+     * @param onRemove 移除回调。
+     * @param onDispose 释放回调。
      */
     constructor(
-        onCreate: (unitId: number) => void,
-        onDecide: (observation: IUnitObservation) => void
+        states: Map<number, IUnitState>,
+        forceSink: (unitId: number, forceX: number, forceY: number) => void,
+        torqueSink: (unitId: number, torque: number) => void,
+        nextTickResult: () => IPhysicsTickResult,
+        onRegister?: (unitId: number) => void,
+        onRemove?: (unitId: number) => void,
+        onDispose?: () => void
     ) {
-        this.onCreate = onCreate;
-        this.onDecide = onDecide;
+        this.states = states;
+        this.forceSink = forceSink;
+        this.torqueSink = torqueSink;
+        this.nextTickResult = nextTickResult;
+        this.onRegister = onRegister;
+        this.onRemove = onRemove;
+        this.onDispose = onDispose;
     }
 
-    /**
-     * 为一个单位创建默认 AI。
-     * @param unitId 单位 id。
-     * @param _unit 单位实例（此处不使用）。
-     * @returns AI 实例。
-     */
-    create(unitId: number, _unit: IUnit): IUnitAI {
-        this.onCreate(unitId);
-        const ai = new DefaultUnitAI();
-        return {
-            decide: (observation: IUnitObservation): IUnitAction => {
-                this.onDecide(observation);
-                return ai.decide(observation);
-            }
-        };
+    registerUnit(spec: IUnitPhysicsSpec): void {
+        this.onRegister?.(spec.unitId);
+        this.registered.add(spec.unitId);
     }
 
-    /**
-     * 释放单位 AI（无内部状态）。
-     * @param _unitId 单位 id。
-     */
-    destroy(_unitId: number): void {
-        // 默认 AI 无状态，无需清理。
+    removeUnit(unitId: number): void {
+        this.onRemove?.(unitId);
+        this.registered.delete(unitId);
+    }
+
+    hasUnit(unitId: number): boolean {
+        return this.registered.has(unitId);
+    }
+
+    applyForce(unitId: number, forceX: number, forceY: number): void {
+        this.forceSink(unitId, forceX, forceY);
+    }
+
+    applyTorque(unitId: number, torque: number): void {
+        this.torqueSink(unitId, torque);
+    }
+
+    getUnitState(unitId: number): IUnitState | null {
+        return this.states.get(unitId) ?? null;
+    }
+
+    tick(): IPhysicsTickResult {
+        return this.nextTickResult();
+    }
+
+    dispose(): void {
+        this.onDispose?.();
     }
 }
 
 /**
- * 测试伤害接收方：同队免伤 + 存活守卫 + 伤害/经验 + 击杀经验；绝不触碰物理。
+ * 记录型 AI：把决策转交给闭包，便于记录 tick 或返回畸形值。
  */
-class TracerDamageSink implements IDamageSink {
-    /** 成功应用一条伤害时回调。 */
-    private readonly onApplied: (context: IDamageContext) => void;
+class RecordingAI implements IUnitAI {
+    /** 决策函数。 */
+    private readonly decideFn: (observation: IUnitObservation) => IUnitAction;
 
     /**
-     * 构造接收方。
-     * @param onApplied 应用回调。
+     * 构造记录型 AI。
+     * @param decideFn 决策函数。
      */
-    constructor(onApplied: (context: IDamageContext) => void) {
-        this.onApplied = onApplied;
+    constructor(decideFn: (observation: IUnitObservation) => IUnitAction) {
+        this.decideFn = decideFn;
     }
 
-    /**
-     * 应用一条已解析伤害。
-     * @param context 已解析的伤害上下文。
-     */
-    applyDamage(context: IDamageContext): void {
-        if (context.attackerTeamId === context.defenderTeamId) {
-            return;
-        }
-        if (!context.defender.isAlive()) {
-            return;
-        }
-        const wasAlive = context.defender.isAlive();
-        context.defender.takeDamage(context.event.damage);
-        context.attacker.gainAttackExperience(context.event.damage);
-        context.defender.gainDefenseExperience(context.event.damageReduced);
-        if (wasAlive && !context.defender.isAlive()) {
-            context.attacker.gainKillExperience(
-                context.defender.getAttribute(AttributeKind.Level)
-            );
-        }
-        this.onApplied(context);
+    decide(observation: IUnitObservation): IUnitAction {
+        return this.decideFn(observation);
     }
 }
 
-describe('ControlSystem — end-to-end autonomous tracer', () => {
+/**
+ * 记录型 Provider：把所有创建/销毁经回调外泄，便于断言生命周期与顺序。
+ */
+class RecordingProvider implements IUnitAIProvider {
+    /** 每单位 AI 工厂。 */
+    private readonly aiFactory: (unitId: number, unit: IUnit) => IUnitAI;
+    /** 创建回调。 */
+    private readonly onCreate?: (unitId: number) => void;
+    /** 销毁回调。 */
+    private readonly onDestroy?: (unitId: number) => void;
+
+    /**
+     * 构造记录型 Provider。
+     * @param aiFactory 每单位 AI 工厂。
+     * @param onCreate 创建回调。
+     * @param onDestroy 销毁回调。
+     */
+    constructor(
+        aiFactory: (unitId: number, unit: IUnit) => IUnitAI,
+        onCreate?: (unitId: number) => void,
+        onDestroy?: (unitId: number) => void
+    ) {
+        this.aiFactory = aiFactory;
+        this.onCreate = onCreate;
+        this.onDestroy = onDestroy;
+    }
+
+    create(unitId: number, unit: IUnit): IUnitAI {
+        this.onCreate?.(unitId);
+        return this.aiFactory(unitId, unit);
+    }
+
+    destroy(unitId: number): void {
+        this.onDestroy?.(unitId);
+    }
+}
+
+describe('ControlSystem — execution semantics', () => {
     beforeAll(async () => {
         // WASM 必须在使用任何库方法前异步加载完成（init 幂等）。
         await RAPIER.init();
     });
 
-    /** 当前测试持有的物理世界。 */
+    /** 当前测试持有的真实物理世界（仅 tracer 与同队碰撞测试使用）。 */
     let physics: PhysicsWorld | null = null;
-    /** 当前测试持有的控制系统。 */
+    /** 当前测试持有的控制系统（同上）。 */
     let control: ControlSystem | null = null;
 
     afterEach(() => {
@@ -266,51 +240,900 @@ describe('ControlSystem — end-to-end autonomous tracer', () => {
         physics = null;
     });
 
-    it('decides, applies forces, steps physics, and routes a damage event to the sink', () => {
+    it('decides exactly on ticks 0/6/12/18 and never between', () => {
+        const decided: number[] = [];
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            () => {},
+            () => {},
+            emptyTick
+        );
+        const provider = new RecordingProvider(
+            () =>
+                new RecordingAI(observation => {
+                    decided.push(observation.tick);
+                    return zeroAction();
+                })
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(1),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+
+        for (let tick = 0; tick < 13; tick += 1) {
+            controller.tick();
+        }
+        expect(decided).toEqual([
+            0,
+            DECISION_INTERVAL_TICKS,
+            DECISION_INTERVAL_TICKS * 2
+        ]);
+
+        for (let tick = 0; tick < 6; tick += 1) {
+            controller.tick();
+        }
+        expect(decided).toEqual([0, 6, 12, 18]);
+    });
+
+    it('composes net force/torque and re-applies the held action on every physics tick', () => {
+        const forceCalls: [number, number, number][] = [];
+        const torqueCalls: [number, number][] = [];
+        const decided: number[] = [];
+        const action: IUnitAction = {
+            forceRight: 10,
+            forceLeft: 3,
+            forceUp: 5,
+            forceDown: 2,
+            torqueCounterClockwise: 7,
+            torqueClockwise: 4,
+            skillIntent: null
+        };
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            (unitId, forceX, forceY) =>
+                forceCalls.push([unitId, forceX, forceY]),
+            (unitId, torque) => torqueCalls.push([unitId, torque]),
+            emptyTick
+        );
+        const provider = new RecordingProvider(
+            () =>
+                new RecordingAI(observation => {
+                    decided.push(observation.tick);
+                    return action;
+                })
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(2),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+
+        for (let tick = 0; tick < 13; tick += 1) {
+            controller.tick();
+        }
+
+        expect(forceCalls).toHaveLength(13);
+        expect(
+            forceCalls.every(
+                ([unitId, forceX, forceY]) =>
+                    unitId === 1 && forceX === 7 && forceY === 3
+            )
+        ).toBe(true);
+        expect(torqueCalls).toHaveLength(13);
+        expect(
+            torqueCalls.every(
+                ([unitId, torque]) => unitId === 1 && torque === 3
+            )
+        ).toBe(true);
+        expect(decided).toEqual([0, 6, 12]);
+    });
+
+    it('skips applyForce/applyTorque when the composed action is all zero', () => {
+        const forceCalls: [number, number, number][] = [];
+        const torqueCalls: [number, number][] = [];
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            (unitId, forceX, forceY) =>
+                forceCalls.push([unitId, forceX, forceY]),
+            (unitId, torque) => torqueCalls.push([unitId, torque]),
+            emptyTick
+        );
+        const provider = new RecordingProvider(
+            () => new RecordingAI(() => zeroAction())
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(3),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+
+        for (let tick = 0; tick < 3; tick += 1) {
+            controller.tick();
+        }
+
+        expect(forceCalls).toHaveLength(0);
+        expect(torqueCalls).toHaveLength(0);
+    });
+
+    it('maps non-finite and negative magnitudes to zero', () => {
+        const forceCalls: [number, number, number][] = [];
+        const torqueCalls: [number, number][] = [];
+        const malformed: IUnitAction = {
+            forceUp: Number.POSITIVE_INFINITY,
+            forceDown: Number.NEGATIVE_INFINITY,
+            forceLeft: -5,
+            forceRight: Number.NaN,
+            torqueClockwise: -3,
+            torqueCounterClockwise: Number.NaN,
+            skillIntent: null
+        };
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            (unitId, forceX, forceY) =>
+                forceCalls.push([unitId, forceX, forceY]),
+            (unitId, torque) => torqueCalls.push([unitId, torque]),
+            emptyTick
+        );
+        const provider = new RecordingProvider(
+            () => new RecordingAI(() => malformed)
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(4),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+
+        for (let tick = 0; tick < 2; tick += 1) {
+            controller.tick();
+        }
+
+        expect(forceCalls).toHaveLength(0);
+        expect(torqueCalls).toHaveLength(0);
+    });
+
+    it('caps net force magnitude and torque at their limits', () => {
+        const forceCalls: [number, number, number][] = [];
+        const torqueCalls: [number, number][] = [];
+        const huge: IUnitAction = {
+            forceUp: 1e9,
+            forceDown: 0,
+            forceLeft: 0,
+            forceRight: 1e9,
+            torqueClockwise: 0,
+            torqueCounterClockwise: 1e9,
+            skillIntent: null
+        };
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            (unitId, forceX, forceY) =>
+                forceCalls.push([unitId, forceX, forceY]),
+            (unitId, torque) => torqueCalls.push([unitId, torque]),
+            emptyTick
+        );
+        const provider = new RecordingProvider(
+            () => new RecordingAI(() => huge)
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(5),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+
+        controller.tick();
+
+        expect(forceCalls).toHaveLength(1);
+        const [, forceX, forceY] = forceCalls[0];
+        const magnitude = Math.hypot(forceX, forceY);
+        expect(magnitude).toBeLessThanOrEqual(MAX_FORCE_MAGNITUDE + 1e-6);
+        expect(magnitude).toBeCloseTo(MAX_FORCE_MAGNITUDE, 6);
+        expect(torqueCalls).toHaveLength(1);
+        expect(torqueCalls[0][1]).toBeLessThanOrEqual(MAX_TORQUE_MAGNITUDE);
+        expect(torqueCalls[0][1]).toBeCloseTo(MAX_TORQUE_MAGNITUDE, 6);
+    });
+
+    it('emits skill intents only on decision ticks', () => {
+        const results: IControlTickResult[] = [];
+        const action: IUnitAction = {
+            ...zeroAction(),
+            skillIntent: {
+                kind: SkillIntentKind.Unit,
+                unitId: 1,
+                skill: SkillKind.Charge
+            }
+        };
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            () => {},
+            () => {},
+            emptyTick
+        );
+        const provider = new RecordingProvider(
+            () => new RecordingAI(() => action)
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(6),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+
+        for (let tick = 0; tick < 13; tick += 1) {
+            results.push(controller.tick());
+        }
+
+        expect(results[0].skillIntents).toHaveLength(1);
+        expect(results[1].skillIntents).toHaveLength(0);
+        expect(results[6].skillIntents).toHaveLength(1);
+        expect(results[12].skillIntents).toHaveLength(1);
+        expect(
+            results.reduce((sum, item) => sum + item.skillIntents.length, 0)
+        ).toBe(3);
+    });
+
+    it('drops a spoofed skill intent whose unitId differs from the deciding unit', () => {
+        const action: IUnitAction = {
+            ...zeroAction(),
+            skillIntent: {
+                kind: SkillIntentKind.Weapon,
+                unitId: 2,
+                weapon: WeaponKind.Bow
+            }
+        };
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            () => {},
+            () => {},
+            emptyTick
+        );
+        const provider = new RecordingProvider(
+            () => new RecordingAI(() => action)
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(7),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+
+        const results: IControlTickResult[] = [];
+        for (let tick = 0; tick < 13; tick += 1) {
+            results.push(controller.tick());
+        }
+
+        expect(results.every(result => result.skillIntents.length === 0)).toBe(
+            true
+        );
+    });
+
+    it('isolates a throwing decide, falls back to a zero action, and keeps deciding', () => {
+        const forceCalls: [number, number, number][] = [];
+        const decided: number[] = [];
+        let calls = 0;
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            (unitId, forceX, forceY) =>
+                forceCalls.push([unitId, forceX, forceY]),
+            () => {},
+            emptyTick
+        );
+        const provider = new RecordingProvider(
+            () =>
+                new RecordingAI(observation => {
+                    calls += 1;
+                    decided.push(observation.tick);
+                    if (calls === 1) {
+                        throw new Error('plugin exploded');
+                    }
+                    return zeroAction();
+                })
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(8),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+
+        for (let tick = 0; tick < 13; tick += 1) {
+            expect(() => controller.tick()).not.toThrow();
+        }
+
+        expect(decided).toEqual([0, 6, 12]);
+        expect(forceCalls).toHaveLength(0);
+    });
+
+    it('routes a queued damage event once with resolved units and team ids', () => {
+        const event: IDamageEvent = {
+            attackerId: 1,
+            defenderId: 2,
+            attackerPart: ColliderPart.Weapon,
+            defenderPart: ColliderPart.Body,
+            weaponKind: WeaponKind.Longsword,
+            deltaV: 12,
+            damageMean: 100,
+            damage: 60,
+            damageReduced: 0
+        };
+        let tickCount = 0;
+        const fake = new RecordingPhysicsWorld(
+            new Map([
+                [1, stateAt(0, 0)],
+                [2, stateAt(1, 0)]
+            ]),
+            () => {},
+            () => {},
+            () => {
+                tickCount += 1;
+                return tickCount === 1
+                    ? { contacts: [], damages: [event] }
+                    : emptyTick();
+            }
+        );
+        const applied: IDamageContext[] = [];
+        const sink = new TestDamageSink(context => applied.push(context));
+        const provider = new RecordingProvider(
+            () => new RecordingAI(() => zeroAction())
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            sink
+        );
+        const attackerUnit = makeUnit(9);
+        const defenderUnit = makeUnit(10);
+        controller.registerUnit({
+            unitId: 1,
+            unit: attackerUnit,
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+        controller.registerUnit({
+            unitId: 2,
+            unit: defenderUnit,
+            teamId: 2,
+            x: 1,
+            y: 0
+        });
+        const healthBefore = defenderUnit.getAttribute(AttributeKind.Health);
+
+        controller.tick();
+
+        expect(applied).toHaveLength(1);
+        expect(applied[0].attacker).toBe(attackerUnit);
+        expect(applied[0].defender).toBe(defenderUnit);
+        expect(applied[0].attackerTeamId).toBe(1);
+        expect(applied[0].defenderTeamId).toBe(2);
+        expect(defenderUnit.getAttribute(AttributeKind.Health)).toBeCloseTo(
+            healthBefore - event.damage,
+            6
+        );
+    });
+
+    it('keeps same-team bodies colliding but never routes same-team damage', () => {
         const world = new PhysicsWorld(
             { dt: DT, geometry: DEFAULT_GEOMETRY },
-            mulberry32(20261020)
+            mulberry32(4242)
         );
         physics = world;
-
-        const createdIds: number[] = [];
-        const decidedTicks: number[] = [];
+        const routed: IDamageContext[] = [];
         const applied: IDamageContext[] = [];
-        const provider = new TracerProvider(
-            unitId => createdIds.push(unitId),
-            observation => decidedTicks.push(observation.tick)
+        const innerSink = new TestDamageSink(context => applied.push(context));
+        const sink = {
+            applyDamage(context: IDamageContext): void {
+                routed.push(context);
+                innerSink.applyDamage(context);
+            }
+        };
+        const provider = new RecordingProvider(
+            unitId =>
+                new RecordingAI(() =>
+                    unitId === 1
+                        ? { ...zeroAction(), forceRight: 500 }
+                        : { ...zeroAction(), forceLeft: 500 }
+                )
         );
-        const sink = new TracerDamageSink(context => applied.push(context));
         const controller = new ControlSystem(
             world,
-            new TracerSensingWorld(50),
+            new ArenaSensingWorld(50),
             provider,
             sink
         );
         control = controller;
 
-        const first = spawnUnit(ClassKind.Swordsman, mulberry32(11));
-        const second = spawnUnit(ClassKind.Swordsman, mulberry32(12));
+        const first = makeUnit(21);
+        const second = makeUnit(22);
         controller.registerUnit({
             unitId: 1,
             unit: first,
+            teamId: 1,
+            x: -1,
+            y: 0
+        });
+        controller.registerUnit({
+            unitId: 2,
+            unit: second,
+            teamId: 1,
+            x: 1,
+            y: 0
+        });
+        const healthOne = first.getAttribute(AttributeKind.Health);
+        const healthTwo = second.getAttribute(AttributeKind.Health);
+        let minDistance = Number.POSITIVE_INFINITY;
+
+        for (let tick = 0; tick < 120; tick += 1) {
+            controller.tick();
+            const one = world.getUnitState(1);
+            const two = world.getUnitState(2);
+            if (one !== null && two !== null) {
+                minDistance = Math.min(
+                    minDistance,
+                    Math.hypot(one.x - two.x, one.y - two.y)
+                );
+            }
+        }
+
+        // 同队碰撞确实发生：物理层发出了伤害事件（经控制层路由到 sink），
+        // 但 TestDamageSink 的同队过滤使其一条都未被应用（D-09）。
+        expect(routed.length).toBeGreaterThan(0);
+        expect(applied).toHaveLength(0);
+        expect(first.getAttribute(AttributeKind.Health)).toBe(healthOne);
+        expect(second.getAttribute(AttributeKind.Health)).toBe(healthTwo);
+        expect(minDistance).toBeGreaterThanOrEqual(0.9);
+        expect(minDistance).toBeLessThanOrEqual(1.4);
+    });
+
+    it('batch-removes a dead unit after routing and destroys its AI exactly once', () => {
+        const order: string[] = [];
+        const destroyed: number[] = [];
+        const event: IDamageEvent = {
+            attackerId: 1,
+            defenderId: 2,
+            attackerPart: ColliderPart.Weapon,
+            defenderPart: ColliderPart.Body,
+            weaponKind: WeaponKind.Longsword,
+            deltaV: 20,
+            damageMean: 1e9,
+            damage: 1e9,
+            damageReduced: 0
+        };
+        let tickCount = 0;
+        const fake = new RecordingPhysicsWorld(
+            new Map([
+                [1, stateAt(0, 0)],
+                [2, stateAt(1, 0)]
+            ]),
+            () => {},
+            () => {},
+            () => {
+                tickCount += 1;
+                return tickCount === 1
+                    ? { contacts: [], damages: [event] }
+                    : emptyTick();
+            }
+        );
+        const sink = new TestDamageSink(() => order.push('sink:2'));
+        const provider = new RecordingProvider(
+            () => new RecordingAI(() => zeroAction()),
+            undefined,
+            unitId => {
+                destroyed.push(unitId);
+                order.push(`provider.destroy:${unitId}`);
+            }
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            sink
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(11),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+        controller.registerUnit({
+            unitId: 2,
+            unit: makeUnit(12),
+            teamId: 2,
+            x: 1,
+            y: 0
+        });
+
+        controller.tick();
+
+        expect(controller.getUnit(2)).toBeNull();
+        expect(fake.hasUnit(2)).toBe(false);
+        expect(controller.getUnit(1)).not.toBeNull();
+        expect(destroyed).toEqual([2]);
+        expect(order.indexOf('sink:2')).toBeGreaterThanOrEqual(0);
+        expect(order.indexOf('sink:2')).toBeLessThan(
+            order.indexOf('provider.destroy:2')
+        );
+    });
+
+    it('creates the AI before registering with physics', () => {
+        const order: string[] = [];
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            () => {},
+            () => {},
+            emptyTick,
+            unitId => order.push(`physics.registerUnit:${unitId}`)
+        );
+        const provider = new RecordingProvider(
+            () => new RecordingAI(() => zeroAction()),
+            unitId => order.push(`provider.create:${unitId}`)
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        const unit = makeUnit(13);
+
+        controller.registerUnit({ unitId: 1, unit, teamId: 1, x: 0, y: 0 });
+
+        expect(order).toEqual(['provider.create:1', 'physics.registerUnit:1']);
+        expect(controller.getUnit(1)).toBe(unit);
+        expect(fake.hasUnit(1)).toBe(true);
+    });
+
+    it('destroys the AI and leaves no partial state when physics registration throws', () => {
+        const created: number[] = [];
+        const destroyed: number[] = [];
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            () => {},
+            () => {},
+            emptyTick,
+            unitId => {
+                if (unitId === 1) {
+                    throw new Error('physics boom');
+                }
+            }
+        );
+        const provider = new RecordingProvider(
+            () => new RecordingAI(() => zeroAction()),
+            unitId => created.push(unitId),
+            unitId => destroyed.push(unitId)
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+
+        expect(() =>
+            controller.registerUnit({
+                unitId: 1,
+                unit: makeUnit(14),
+                teamId: 1,
+                x: 0,
+                y: 0
+            })
+        ).toThrow('physics boom');
+
+        expect(created).toEqual([1]);
+        expect(destroyed).toEqual([1]);
+        expect(controller.getUnit(1)).toBeNull();
+        expect(controller.listUnitIds()).toHaveLength(0);
+        expect(fake.hasUnit(1)).toBe(false);
+    });
+
+    it('deregisters in provider.destroy → catalog delete → physics.removeUnit order', () => {
+        const order: string[] = [];
+        let controller: ControlSystem | null = null;
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            () => {},
+            () => {},
+            emptyTick,
+            undefined,
+            unitId => {
+                expect(controller?.getUnit(unitId)).toBeNull();
+                order.push(`physics.removeUnit:${unitId}`);
+            }
+        );
+        const provider = new RecordingProvider(
+            () => new RecordingAI(() => zeroAction()),
+            undefined,
+            unitId => order.push(`provider.destroy:${unitId}`)
+        );
+        controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(15),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+
+        controller.unregisterUnit(1);
+
+        expect(order).toEqual(['provider.destroy:1', 'physics.removeUnit:1']);
+        expect(fake.hasUnit(1)).toBe(false);
+    });
+
+    it('handles duplicate registration, updateTeam, and unregisterUnit', () => {
+        const destroyed: number[] = [];
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            () => {},
+            () => {},
+            emptyTick
+        );
+        const provider = new RecordingProvider(
+            () => new RecordingAI(() => zeroAction()),
+            undefined,
+            unitId => destroyed.push(unitId)
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(16),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+
+        expect(() =>
+            controller.registerUnit({
+                unitId: 1,
+                unit: makeUnit(17),
+                teamId: 1,
+                x: 0,
+                y: 0
+            })
+        ).toThrow(/already registered/);
+
+        controller.updateTeam(1, 9);
+        expect(controller.getTeam(1)).toBe(9);
+
+        controller.unregisterUnit(1);
+        expect(controller.getUnit(1)).toBeNull();
+        expect(controller.getTeam(1)).toBeUndefined();
+        expect(fake.hasUnit(1)).toBe(false);
+        expect(destroyed).toEqual([1]);
+
+        controller.unregisterUnit(1);
+        expect(destroyed).toEqual([1]);
+    });
+
+    it('dispose is idempotent, destroys remaining AIs, and does not dispose physics', () => {
+        const destroyed: number[] = [];
+        let physicsDisposeCalls = 0;
+        const fake = new RecordingPhysicsWorld(
+            new Map([
+                [1, stateAt(0, 0)],
+                [2, stateAt(1, 0)]
+            ]),
+            () => {},
+            () => {},
+            emptyTick,
+            undefined,
+            undefined,
+            () => {
+                physicsDisposeCalls += 1;
+            }
+        );
+        const provider = new RecordingProvider(
+            () => new RecordingAI(() => zeroAction()),
+            undefined,
+            unitId => destroyed.push(unitId)
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(18),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+        controller.registerUnit({
+            unitId: 2,
+            unit: makeUnit(19),
+            teamId: 1,
+            x: 1,
+            y: 0
+        });
+
+        controller.dispose();
+        controller.dispose();
+
+        expect(destroyed.sort((left, right) => left - right)).toEqual([1, 2]);
+        expect(physicsDisposeCalls).toBe(0);
+        expect(fake.hasUnit(1)).toBe(true);
+        expect(fake.hasUnit(2)).toBe(true);
+        expect(controller.listUnitIds()).toHaveLength(0);
+        expect(controller.tick().skillIntents).toHaveLength(0);
+    });
+
+    it('falls back to a zero action for null, undefined, partial, and undefined skillIntent returns', () => {
+        const malformedCases: (() => IUnitAction)[] = [
+            () => null as unknown as IUnitAction,
+            () => undefined as unknown as IUnitAction,
+            () => ({}) as unknown as IUnitAction,
+            () =>
+                ({
+                    ...zeroAction(),
+                    skillIntent: undefined
+                }) as unknown as IUnitAction
+        ];
+
+        for (const makeMalformed of malformedCases) {
+            const forceCalls: [number, number, number][] = [];
+            const torqueCalls: [number, number][] = [];
+            let calls = 0;
+            const fake = new RecordingPhysicsWorld(
+                new Map([[1, stateAt(0, 0)]]),
+                (unitId, forceX, forceY) =>
+                    forceCalls.push([unitId, forceX, forceY]),
+                (unitId, torque) => torqueCalls.push([unitId, torque]),
+                emptyTick
+            );
+            const provider = new RecordingProvider(
+                () =>
+                    new RecordingAI(() => {
+                        calls += 1;
+                        return makeMalformed();
+                    })
+            );
+            const controller = new ControlSystem(
+                fake,
+                new ArenaSensingWorld(50),
+                provider,
+                new TestDamageSink()
+            );
+            controller.registerUnit({
+                unitId: 1,
+                unit: makeUnit(20),
+                teamId: 1,
+                x: 0,
+                y: 0
+            });
+
+            for (let tick = 0; tick < 7; tick += 1) {
+                expect(() => controller.tick()).not.toThrow();
+            }
+
+            expect(calls).toBe(2);
+            expect(forceCalls).toHaveLength(0);
+            expect(torqueCalls).toHaveLength(0);
+        }
+    });
+
+    it('tracer: two opposite teams decide, move, and route a damage event to the sink', () => {
+        const world = new PhysicsWorld(
+            { dt: DT, geometry: DEFAULT_GEOMETRY },
+            mulberry32(20261020)
+        );
+        physics = world;
+        const createdIds: number[] = [];
+        const decidedTicks: number[] = [];
+        const applied: IDamageContext[] = [];
+        const provider = new RecordingProvider(
+            () => {
+                const ai = new DefaultUnitAI();
+                return new RecordingAI(observation => {
+                    decidedTicks.push(observation.tick);
+                    return ai.decide(observation);
+                });
+            },
+            unitId => createdIds.push(unitId)
+        );
+        const sink = new TestDamageSink(context => applied.push(context));
+        const controller = new ControlSystem(
+            world,
+            new ArenaSensingWorld(50),
+            provider,
+            sink
+        );
+        control = controller;
+
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(23),
             teamId: 1,
             x: -0.8,
             y: 0
         });
         controller.registerUnit({
             unitId: 2,
-            unit: second,
+            unit: makeUnit(24),
             teamId: 2,
             x: 0.8,
             y: 0
         });
-
         expect(createdIds).toEqual([1, 2]);
-        expect(controller.listUnitIds()).toEqual([1, 2]);
 
-        const startOne = world.getUnitState(1) as IUnitState;
-        const startTwo = world.getUnitState(2) as IUnitState;
+        const startOne = world.getUnitState(1);
+        const startTwo = world.getUnitState(2);
+        if (startOne === null || startTwo === null) {
+            throw new Error('expected both tracer units to be registered');
+        }
         let sawMovement = false;
 
         for (let tick = 0; tick < 300; tick += 1) {
@@ -318,22 +1141,20 @@ describe('ControlSystem — end-to-end autonomous tracer', () => {
             expect(Array.isArray(result.skillIntents)).toBe(true);
 
             const one = world.getUnitState(1);
-            if (one !== null) {
-                if (
-                    Math.abs(one.x - startOne.x) > 1e-6 ||
-                    Math.abs(one.y - startOne.y) > 1e-6
-                ) {
-                    sawMovement = true;
-                }
+            if (
+                one !== null &&
+                (Math.abs(one.x - startOne.x) > 1e-6 ||
+                    Math.abs(one.y - startOne.y) > 1e-6)
+            ) {
+                sawMovement = true;
             }
             const two = world.getUnitState(2);
-            if (two !== null) {
-                if (
-                    Math.abs(two.x - startTwo.x) > 1e-6 ||
-                    Math.abs(two.y - startTwo.y) > 1e-6
-                ) {
-                    sawMovement = true;
-                }
+            if (
+                two !== null &&
+                (Math.abs(two.x - startTwo.x) > 1e-6 ||
+                    Math.abs(two.y - startTwo.y) > 1e-6)
+            ) {
+                sawMovement = true;
             }
 
             if (applied.length > 0) {
@@ -341,11 +1162,8 @@ describe('ControlSystem — end-to-end autonomous tracer', () => {
             }
         }
 
-        // 第一次决策发生在绝对 tick 0（6-tick 节奏）。
         expect(decidedTicks[0]).toBe(0);
-        // 至少一个单位在物理世界中被力推动。
         expect(sawMovement).toBe(true);
-        // 至少一条伤害上下文经控制层路由到注入的 sink。
         expect(applied.length).toBeGreaterThan(0);
         expect(applied[0].attackerTeamId).not.toBe(applied[0].defenderTeamId);
     });
