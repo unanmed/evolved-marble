@@ -210,3 +210,31 @@ export interface IPhysicsWorld {
     /** 释放 Rapier world 与事件队列。 */
     dispose(): void;
 }
+
+/**
+ * 静态障碍规格（G-2）：轴对齐固定矩形，单位为米。
+ * 形状有意与王国层的 `ITerrainRect` 重复——依赖方向必须保持 kingdom → physics，
+ * 物理层不得反向引用王国层类型；`KingdomWorld` 在构建场景时逐字段映射。
+ */
+export interface IStaticObstacleSpec {
+    /** 中心 x 坐标（米）。 */
+    readonly x: number;
+    /** 中心 y 坐标（米）。 */
+    readonly y: number;
+    /** 半宽（米）。 */
+    readonly halfWidth: number;
+    /** 半高（米）。 */
+    readonly halfHeight: number;
+}
+
+/**
+ * 静态障碍接缝（G-2）：由同一个 `PhysicsWorld` 实例在 `IPhysicsWorld` 之外一并提供
+ * （D-01/D-27）。同一 Rapier world 中的固定矩形阻挡动态单位，但不产生接触/伤害事件；
+ * 移除未知 id 是空操作。涉及 Rapier 的实现属 Round 2，由门禁 G-2 批准后落地。
+ */
+export interface IStaticObstacleWorld {
+    /** 在同一物理世界中创建一个固定矩形，返回障碍 id。 */
+    addStaticObstacle(spec: IStaticObstacleSpec): number;
+    /** 移除一个静态障碍；未知 id 为空操作。 */
+    removeStaticObstacle(obstacleId: number): void;
+}

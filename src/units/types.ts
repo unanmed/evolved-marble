@@ -245,3 +245,17 @@ export interface IUnit {
     /** 击杀敌人时按敌人等级额外累积攻击经验。 */
     gainKillExperience(enemyLevel: number): void;
 }
+
+/**
+ * 可回血单位：王国层按游戏时间回血的入口（G-1）。
+ * `IUnit` 本体保持逐字不变——本接口是**加性**扩展，只新增回血能力。
+ */
+export interface IHealableUnit extends IUnit {
+    /**
+     * 恢复生命值。`amount` 非有限或非正时忽略（不改变状态）；
+     * 合法回血钳制到当前经修正器调整后的生命上限，维持
+     * `Health <= MaxHealth` 的公开不变量，与 `takeDamage` 对称。
+     * `Unit.heal` 本体属 Round 2 实现，由门禁 G-1 批准后落地。
+     */
+    heal(amount: number): void;
+}
