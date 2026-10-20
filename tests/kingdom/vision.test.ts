@@ -25,7 +25,7 @@ interface IVisionScenarioOptions {
     readonly enemyArmyX?: number;
     /** 敌方军队中心 y；默认 900。 */
     readonly enemyArmyY?: number;
-    /** 敌方军队单位数；默认 0（只测中心）。 */
+    /** 敌方军队单位数；默认 1（军队必须有正数名册，中心可见性仍独立于单位）。 */
     readonly enemyArmyUnits?: number;
     /** 敌方城池点 x；默认 900。 */
     readonly enemyCityX?: number;
@@ -89,7 +89,7 @@ function visionScenario(options: IVisionScenarioOptions = {}): IScenario {
                 units: [
                     {
                         classKind: ClassKind.Swordsman,
-                        count: options.enemyArmyUnits ?? 0
+                        count: options.enemyArmyUnits ?? 1
                     }
                 ]
             }
@@ -198,7 +198,7 @@ describe('vision — 100 m army union with 150 m city vision, no memory', () => 
             ownCityY: 100,
             enemyArmyX: 500,
             enemyArmyY: 500,
-            enemyArmyUnits: 0,
+            enemyArmyUnits: 1,
             enemyCityX: 500,
             enemyCityY: 900
         });
@@ -289,7 +289,7 @@ describe('vision — 100 m army union with 150 m city vision, no memory', () => 
             ownCityY: 500,
             enemyArmyX: 900,
             enemyArmyY: 900,
-            enemyArmyUnits: 0,
+            enemyArmyUnits: 1,
             enemyCityX: 649,
             enemyCityY: 500
         });
@@ -304,7 +304,7 @@ describe('vision — 100 m army union with 150 m city vision, no memory', () => 
             ownCityY: 500,
             enemyArmyX: 900,
             enemyArmyY: 900,
-            enemyArmyUnits: 0,
+            enemyArmyUnits: 1,
             enemyCityX: 651,
             enemyCityY: 500
         });
@@ -317,7 +317,7 @@ describe('vision — 100 m army union with 150 m city vision, no memory', () => 
             ownArmyY: 500,
             enemyArmyX: 599,
             enemyArmyY: 500,
-            enemyArmyUnits: 0
+            enemyArmyUnits: 1
         });
         expect(visibleArmyIds(kingdom, 1)).toEqual([1, 2]);
 
@@ -340,7 +340,7 @@ describe('vision — 100 m army union with 150 m city vision, no memory', () => 
             ownCityY: 500,
             enemyArmyX: 599,
             enemyArmyY: 500,
-            enemyArmyUnits: 0,
+            enemyArmyUnits: 1,
             enemyCityX: 640,
             enemyCityY: 500
         });

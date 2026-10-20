@@ -37,6 +37,7 @@ import {
 import { Faction } from '@/kingdom/Faction';
 import { IdleAI } from '@/kingdom/IdleAI';
 import { MarchAI } from '@/kingdom/MarchAI';
+import { validateScenario } from '@/kingdom/scenario';
 import { TimeSystem } from '@/kingdom/TimeSystem';
 import {
     ArmyOrderKind,
@@ -153,7 +154,8 @@ export class KingdomWorld implements IWorld {
     private disposed = false;
 
     /**
-     * 构造王国世界：先建模型、再加入地形/边界墙、再建战斗容器、最后物化单位。
+     * 构造王国世界：**先完整校验场景表**（非法表绝不触及物理世界或控制系统），
+     * 再建模型、加入地形/边界墙、建战斗容器、最后物化单位。
      * 物理与控制实例由调用方持有，本类不释放它们。
      * @param physics 物理世界；组合根必须传入同一个同时实现
      * `IStaticObstacleWorld` 的 `PhysicsWorld` 实例。
@@ -169,6 +171,8 @@ export class KingdomWorld implements IWorld {
         scenario: IScenario,
         config: IKingdomConfig
     ) {
+        validateScenario(scenario);
+
         this.physics = physics;
         this.control = control;
         this.rng = rng;
