@@ -371,6 +371,53 @@ describe('ControlSystem — execution semantics', () => {
         expect(decided).toEqual([0, 6, 12]);
     });
 
+    it('replaces the held action at the next decision instead of reusing the first', () => {
+        const forceCalls: [number, number, number][] = [];
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            (unitId, forceX, forceY) =>
+                forceCalls.push([unitId, forceX, forceY]),
+            () => {},
+            emptyTick
+        );
+        const provider = new RecordingProvider(
+            () =>
+                new RecordingAI(observation =>
+                    observation.tick === 0
+                        ? { ...zeroAction(), forceRight: 10 }
+                        : { ...zeroAction(), forceUp: 20 }
+                )
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ArenaSensingWorld(50),
+            provider,
+            new TestDamageSink()
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(44),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+
+        for (let tick = 0; tick < 13; tick += 1) {
+            controller.tick();
+        }
+
+        const actionA: [number, number, number] = [1, 10, 0];
+        const actionB: [number, number, number] = [1, 0, 20];
+        const expected = [
+            ...Array.from({ length: DECISION_INTERVAL_TICKS }, () => actionA),
+            ...Array.from(
+                { length: 13 - DECISION_INTERVAL_TICKS },
+                () => actionB
+            )
+        ];
+        expect(forceCalls).toEqual(expected);
+    });
+
     it('skips applyForce/applyTorque when the composed action is all zero', () => {
         const forceCalls: [number, number, number][] = [];
         const torqueCalls: [number, number][] = [];
