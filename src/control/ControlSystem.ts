@@ -68,6 +68,12 @@ export class ControlSystem implements IControlSystem {
     private actions = new Map<number, IUnitAction>();
     /** 正在注销中的单位 id：防止 provider.destroy 重入导致重复销毁。 */
     private readonly removing = new Set<number>();
+    /**
+     * provider 创建、因而必须由 provider 释放的单位 id（G-5 所有权）。
+     * `IUnitAI` 本身不声明释放钩子，故 provider 是所有权的唯一可释放路径；
+     * `setUnitAI` 注入的实例不经 provider 创建，卸载时只丢弃引用、绝不交给 `provider.destroy`。
+     */
+    private readonly providerOwned = new Set<number>();
     /** 下一个控制 tick 的绝对序号：决策节奏的唯一依据。 */
     private tickIndex = 0;
     /** 是否已释放：`dispose()` 幂等性的唯一标记。 */
@@ -127,9 +133,11 @@ export class ControlSystem implements IControlSystem {
 
         const spec = this.buildSpec(request);
         const ai = this.provider.create(request.unitId, request.unit);
+        this.providerOwned.add(request.unitId);
         try {
             this.physics.registerUnit(spec);
         } catch (error) {
+            this.providerOwned.delete(request.unitId);
             try {
                 this.provider.destroy(request.unitId);
             } catch {
@@ -173,9 +181,13 @@ export class ControlSystem implements IControlSystem {
     }
 
     /**
-     * 替换某单位决策所用的 AI 实例（G-5）：先经 provider 释放旧实例（清理其内部状态），
-     * 再接管传入实例；未注册或正在注销的 id 抛错（与 `registerUnit` 一致）。
+     * 替换某单位决策所用的 AI 实例（G-5）：先经 provider 释放**由 provider 创建**的旧实例
+     * （清理其内部状态），再接管传入实例；未注册或正在注销的 id 抛错（与 `registerUnit` 一致）。
      * 调用是 O(1)，不触碰物理刚体、阵营、注册信息或已保持的动作。
+     *
+     * 所有权规则：`IUnitAI` 没有释放钩子，故 provider 是唯一能释放「provider 创建」实例的路径；
+     * 只有 `providerOwned` 中的 id 会调用 `provider.destroy`。注入的实例改由控制层直接持有，
+     * 后续替换/卸载/`dispose` 只丢弃引用，绝不交给 provider（否则会释放 provider 从未创建的实例）。
      * @param unitId 单位 id。
      * @param ai 新的 AI 实例（控制层接管其释放责任）。
      * @throws {Error} 当单位未注册或正在注销时。
@@ -186,8 +198,8 @@ export class ControlSystem implements IControlSystem {
                 `ControlSystem.setUnitAI: unit ${unitId} is not registered`
             );
         }
-        const hadAi = this.ais.delete(unitId);
-        if (hadAi) {
+        if (this.providerOwned.has(unitId)) {
+            this.providerOwned.delete(unitId);
             try {
                 this.provider.destroy(unitId);
             } catch {
@@ -294,14 +306,15 @@ export class ControlSystem implements IControlSystem {
     }
 
     /**
-     * 释放全部 AI 实例与内部状态。幂等；**不**释放物理世界（不拥有它）。
+     * 释放全部由 provider 创建的 AI 实例与内部状态。幂等；**不**释放物理世界（不拥有它）。
+     * 经 `setUnitAI` 注入的实例不归 provider 所有，只随映射清空而丢弃引用。
      */
     dispose(): void {
         if (this.disposed) {
             return;
         }
         this.disposed = true;
-        for (const unitId of [...this.ais.keys()]) {
+        for (const unitId of [...this.providerOwned]) {
             this.removing.add(unitId);
             this.ais.delete(unitId);
             try {
@@ -311,6 +324,7 @@ export class ControlSystem implements IControlSystem {
             }
             this.removing.delete(unitId);
         }
+        this.providerOwned.clear();
         this.ais.clear();
         this.actions.clear();
         this.units.clear();
@@ -562,8 +576,9 @@ export class ControlSystem implements IControlSystem {
     }
 
     /**
-     * 单点注销路径（A8）：先移出 AI 表并销毁（重入守卫），再删除目录/阵营/动作，
-     * 最后删除物理刚体。`units`/`teams` 在 `provider.destroy` 期间保持可读，
+     * 单点注销路径（A8）：先移出 AI 表，再删除目录/阵营/动作，最后删除物理刚体。
+     * 仅当该单位当前实例由 provider 创建时才调用 `provider.destroy`（G-5 所有权）；
+     * 注入实例只丢弃引用。`units`/`teams` 在 `provider.destroy` 期间保持可读，
      * 因此 sink/回调仍能读到删除前的状态；目录删除发生在物理删除之前，
      * 故 `removeUnit` 时 `getUnit` 已为 `null`。
      * @param unitId 单位 id。
@@ -573,9 +588,10 @@ export class ControlSystem implements IControlSystem {
             return;
         }
         this.removing.add(unitId);
-        const hadAi = this.ais.delete(unitId);
+        this.ais.delete(unitId);
         this.actions.delete(unitId);
-        if (hadAi) {
+        const providerOwned = this.providerOwned.delete(unitId);
+        if (providerOwned) {
             try {
                 this.provider.destroy(unitId);
             } catch {
