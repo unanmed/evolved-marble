@@ -1,13 +1,14 @@
 /**
- * 默认基线 AI：`class DefaultUnitAI implements IUnitAI`（D-14/D-15/D-16）。
- * 固定优先级选择器：无敌人 → 静止；低生命 → 远离最近敌人；否则追击/冲撞。
+ * 默认基线 AI：`class DefaultUnitAI implements IUnitAI`（D-14/D-15/D-16/D-17）。
+ * 固定优先级选择器：无敌人 → 静止；低生命 → 远离最近敌人；进入攻击距离 → 冲撞；
+ * 否则 → 追击。行为树以私有方法表达，不引入节点类、状态枚举或外部 BT 库。
  *
  * 实现要点：
- * - **确定性**：不使用 `IRng`（D-15）。
+ * - **确定性**：不使用 `IRng`，也不读取 wall-clock（D-15）。
  * - 转向用速度误差控制与 PD 朝向控制：Rapier 无默认阻尼，恒定力会持续加速
  *   （research Pitfall 2）。
  * - 输出保持契约的四向力 + 双向力矩；伤害来自物理碰撞，契约没有独立「攻击」字段。
- * 技能意图与冷却在 03-03 完成；本计划始终输出 `skillIntent: null`。
+ * - 技能只输出意图 + 实例内 tick 冷却，不实现任何技能物理（D-17）。
  */
 
 import type {
@@ -16,8 +17,12 @@ import type {
     IUnitAction,
     IUnitObservation
 } from '@/control/types';
+import { SkillIntentKind } from '@/control/types';
 import type { SkillIntent } from '@/control/types';
 import {
+    ARROW_STORM_COOLDOWN_TICKS,
+    BOW_SHOT_INTERVAL_TICKS,
+    CHARGE_COOLDOWN_TICKS,
     DEFAULT_AI_ANGULAR_DAMPING,
     DEFAULT_AI_ANGULAR_GAIN,
     DEFAULT_AI_APPROACH_SPEED,
@@ -26,18 +31,35 @@ import {
     DEFAULT_AI_LINEAR_GAIN,
     DEFAULT_AI_LOW_HEALTH_RATIO,
     DEFAULT_AI_RETREAT_SPEED,
+    DEFAULT_AI_SKILL_RANGE,
     FORCE_EPSILON,
     MAX_FORCE_MAGNITUDE,
-    MAX_TORQUE_MAGNITUDE
+    MAX_TORQUE_MAGNITUDE,
+    SPIN_COOLDOWN_TICKS
 } from '@/control/constants';
-import { AttributeKind } from '@/units/types';
+import {
+    AttributeKind,
+    EquipmentKind,
+    SkillKind,
+    WeaponKind
+} from '@/units/types';
 
 /**
- * 默认基线 AI：确定性的追击 / 冲撞 / 撤退选择器。
+ * 默认基线 AI：确定性的追击 / 冲撞 / 撤退选择器，附带一次性技能意图。
  */
 export class DefaultUnitAI implements IUnitAI {
+    /** 弓箭射击的下一次可用 tick：0 表示出生即可用（D-17）。 */
+    private bowReadyTick = 0;
+    /** 万箭齐发的下一次可用 tick。 */
+    private arrowStormReadyTick = 0;
+    /** 冲锋的下一次可用 tick。 */
+    private chargeReadyTick = 0;
+    /** 旋转的下一次可用 tick。 */
+    private spinReadyTick = 0;
+
     /**
      * 基于一次决策快照选择动作。纯计算，不持有物理或单位引用。
+     * 优先级：无敌人 → 低生命撤退 → 攻击距离内冲撞 → 否则追击。
      * @param observation 纯数据快照。
      * @returns 世界坐标四向力 + 双向力矩 + 技能意图。
      */
@@ -60,11 +82,17 @@ export class DefaultUnitAI implements IUnitAI {
             );
         }
 
-        const speed =
-            target.distance <= DEFAULT_AI_ATTACK_RANGE
-                ? DEFAULT_AI_ATTACK_SPEED
-                : DEFAULT_AI_APPROACH_SPEED;
-        return this.buildAction(observation, dx, dy, speed, null);
+        const inAttackRange = target.distance <= DEFAULT_AI_ATTACK_RANGE;
+        const speed = inAttackRange
+            ? DEFAULT_AI_ATTACK_SPEED
+            : DEFAULT_AI_APPROACH_SPEED;
+        return this.buildAction(
+            observation,
+            dx,
+            dy,
+            speed,
+            this.chooseSkillIntent(observation, target.distance)
+        );
     }
 
     /**
@@ -127,6 +155,90 @@ export class DefaultUnitAI implements IUnitAI {
     }
 
     /**
+     * 每决策至多输出一个技能意图，按「近距单位技能 → 万箭齐发 → 弓箭」优先
+     * （D-17）。命中时在实例上记录下一次可用 tick；撤退路径不调用本方法。
+     * @param observation 纯数据快照。
+     * @param distance 与最近敌人的距离（米）。
+     * @returns 本决策的技能意图，或 `null`。
+     */
+    private chooseSkillIntent(
+        observation: IUnitObservation,
+        distance: number
+    ): SkillIntent | null {
+        if (distance <= DEFAULT_AI_ATTACK_RANGE) {
+            if (
+                observation.skills.includes(SkillKind.Charge) &&
+                observation.tick >= this.chargeReadyTick
+            ) {
+                this.chargeReadyTick =
+                    observation.tick + CHARGE_COOLDOWN_TICKS;
+                return {
+                    kind: SkillIntentKind.Unit,
+                    unitId: observation.unitId,
+                    skill: SkillKind.Charge
+                };
+            }
+            if (
+                observation.skills.includes(SkillKind.Spin) &&
+                observation.tick >= this.spinReadyTick
+            ) {
+                this.spinReadyTick = observation.tick + SPIN_COOLDOWN_TICKS;
+                return {
+                    kind: SkillIntentKind.Unit,
+                    unitId: observation.unitId,
+                    skill: SkillKind.Spin
+                };
+            }
+        }
+
+        if (distance <= DEFAULT_AI_SKILL_RANGE) {
+            if (
+                observation.skills.includes(SkillKind.ArrowStorm) &&
+                observation.tick >= this.arrowStormReadyTick
+            ) {
+                this.arrowStormReadyTick =
+                    observation.tick + ARROW_STORM_COOLDOWN_TICKS;
+                return {
+                    kind: SkillIntentKind.Unit,
+                    unitId: observation.unitId,
+                    skill: SkillKind.ArrowStorm
+                };
+            }
+            if (
+                this.hasBow(observation) &&
+                observation.tick >= this.bowReadyTick
+            ) {
+                this.bowReadyTick =
+                    observation.tick + BOW_SHOT_INTERVAL_TICKS;
+                return {
+                    kind: SkillIntentKind.Weapon,
+                    unitId: observation.unitId,
+                    weapon: WeaponKind.Bow
+                };
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * 快照的装备列表中是否有弓：只有装备弓的单位才能输出射箭意图。
+     * @param observation 纯数据快照。
+     * @returns 是否装备弓箭。
+     */
+    private hasBow(observation: IUnitObservation): boolean {
+        for (const item of observation.equipment) {
+            if (
+                item.kind === EquipmentKind.Weapon &&
+                item.weapon === WeaponKind.Bow
+            ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * PD 朝向控制：`torque = gain · angleError − damping · ω`，并截到力矩上限。
      * 方向向量为零或非有限时输出 0（不产生无意义的自旋）。
      * @param observation 纯数据快照。
@@ -164,10 +276,10 @@ export class DefaultUnitAI implements IUnitAI {
      * 期望速度 = 单位方向 × 目标速度；`force = (vDesired − vCurrent) · Mass · gain`，
      * 向量幅值截到 `MAX_FORCE_MAGNITUDE`。
      * @param observation 纯数据快照。
-     * @param dirX 期望方向的 x 分量（无需预先归一化）。
-     * @param dirY 期望方向的 y 分量（无需预先归一化）。
+     * @param dirX 期望方向的 x 分量（无需预先归一化；撤退时传入反向）。
+     * @param dirY 期望方向的 y 分量（无需预先归一化；撤退时传入反向）。
      * @param speed 期望线速度大小（米/秒）。
-     * @param skillIntent 本决策的技能意图（本计划恒为 `null`）。
+     * @param skillIntent 本决策的技能意图。
      * @returns 动作。
      */
     private buildAction(
