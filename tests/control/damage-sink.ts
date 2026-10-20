@@ -37,10 +37,17 @@ export class TestDamageSink implements IDamageSink {
 
         const wasAlive = context.defender.isAlive();
         context.defender.takeDamage(context.event.damage);
-        context.attacker.gainAttackExperience(context.event.damage);
-        context.defender.gainDefenseExperience(context.event.damageReduced);
+        const survivedHit = context.defender.isAlive();
 
-        if (wasAlive && !context.defender.isAlive()) {
+        // 经验会触发升级回血：绝不给已被该击杀死/死亡的单位授予经验，否则会复活。
+        if (context.attacker.isAlive()) {
+            context.attacker.gainAttackExperience(context.event.damage);
+        }
+        if (survivedHit) {
+            context.defender.gainDefenseExperience(context.event.damageReduced);
+        }
+
+        if (wasAlive && !survivedHit && context.attacker.isAlive()) {
             context.attacker.gainKillExperience(
                 context.defender.getAttribute(AttributeKind.Level)
             );

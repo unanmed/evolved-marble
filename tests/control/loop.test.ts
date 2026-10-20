@@ -929,6 +929,49 @@ describe('ControlSystem — execution semantics', () => {
         );
     });
 
+    it('does not let XP level-ups resurrect units killed by the same blow', () => {
+        const sink = new TestDamageSink();
+        const event: IDamageEvent = {
+            attackerId: 1,
+            defenderId: 2,
+            attackerPart: ColliderPart.Weapon,
+            defenderPart: ColliderPart.Body,
+            weaponKind: WeaponKind.Longsword,
+            deltaV: 1e6,
+            damageMean: 1e9,
+            damage: 1e9,
+            damageReduced: 1e9
+        };
+
+        const attacker = makeUnit(36);
+        const defender = makeUnit(37);
+        sink.applyDamage({
+            event,
+            attacker,
+            defender,
+            attackerTeamId: 1,
+            defenderTeamId: 2
+        });
+
+        expect(defender.isAlive()).toBe(false);
+        expect(defender.getAttribute(AttributeKind.Health)).toBe(0);
+
+        const deadAttacker = makeUnit(38);
+        deadAttacker.takeDamage(
+            deadAttacker.getAttribute(AttributeKind.MaxHealth) + 1
+        );
+        const victim = makeUnit(39);
+        sink.applyDamage({
+            event,
+            attacker: deadAttacker,
+            defender: victim,
+            attackerTeamId: 1,
+            defenderTeamId: 2
+        });
+
+        expect(deadAttacker.isAlive()).toBe(false);
+    });
+
     it('keeps same-team bodies colliding but never routes same-team damage', () => {
         const world = new PhysicsWorld(
             { dt: DT, geometry: DEFAULT_GEOMETRY },
