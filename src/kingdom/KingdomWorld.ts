@@ -18,11 +18,13 @@ import { City } from '@/kingdom/City';
 import {
     ARMY_FORMATION_RADIUS,
     ARMY_SPEED_METERS_PER_HOUR,
+    ARMY_VISION_RADIUS,
     BATTLE_AREA_HALF_EXTENT,
     BATTLE_AREA_HYSTERESIS,
     BATTLE_TICK_MINUTES,
     BATTLE_TRIGGER_DISTANCE,
     BRAKE_MIN_MINUTES,
+    CITY_VISION_RADIUS,
     GARRISON_HEAL_PER_HOUR,
     MARCH_HEAL_PER_HOUR,
     MAX_SCENARIO_UNITS,
@@ -313,8 +315,9 @@ export class KingdomWorld implements IWorld {
     }
 
     /**
-     * 该势力当前可见的军队简讯。**本计划是 stub**：只返回本势力自己的军队；
-     * plan 04-04 替换为 100 m / 150 m 视野并集（D-25/A21）。
+     * 该势力当前可见的军队简讯（D-25/A21，无记忆）：己方军队始终包含；
+     * 敌方军队在中心落入己方视野圆**或**其任一单位位置落入视野圆时可见
+     * （research Pitfall 16）。每次调用都重新计算并返回全新的精简简讯。
      * @param factionId 势力 id。
      * @returns 军队简讯列表。
      */
@@ -323,16 +326,20 @@ export class KingdomWorld implements IWorld {
         if (faction === undefined) {
             return [];
         }
+        const ownArmyIds = new Set(faction.getArmyIds());
+        const circles = this.visionCircles(faction);
         const briefs: IVisibleArmyBrief[] = [];
-        for (const armyId of faction.getArmyIds()) {
-            const army = this.armies.get(armyId);
-            if (army === undefined) {
+
+        for (const army of this.armies.values()) {
+            const own = ownArmyIds.has(army.getId());
+            if (!own && !this.armyInsideCircles(army, circles)) {
                 continue;
             }
+            const center = army.getCenter();
             briefs.push({
                 id: army.getId(),
                 factionId: army.getFactionId(),
-                center: army.getCenter(),
+                center: { x: center.x, y: center.y },
                 heading: army.getHeading(),
                 state: army.getState()
             });
@@ -341,8 +348,9 @@ export class KingdomWorld implements IWorld {
     }
 
     /**
-     * 该势力当前可见的城池简讯。**本计划是 stub**：只返回本势力自己的城池；
-     * plan 04-04 替换为视野并集（D-25/A21）。
+     * 该势力当前可见的城池简讯（D-25/A21，无记忆）：己方城池始终包含；
+     * 其余城池（含无主城）在城池点落入视野圆时可见。简讯只含
+     * `id`/`factionId`/`position`/`kind`，训练与驻军内部状态不可达。
      * @param factionId 势力 id。
      * @returns 城池简讯列表。
      */
@@ -351,16 +359,23 @@ export class KingdomWorld implements IWorld {
         if (faction === undefined) {
             return [];
         }
+        const ownCityIds = new Set(faction.getCityIds());
+        const circles = this.visionCircles(faction);
         const briefs: IVisibleCityBrief[] = [];
-        for (const cityId of faction.getCityIds()) {
-            const city = this.cities.get(cityId);
-            if (city === undefined) {
+
+        for (const city of this.cities.values()) {
+            const position = city.getPosition();
+            const own = ownCityIds.has(city.getId());
+            if (
+                !own &&
+                !this.isInsideAnyCircle(position.x, position.y, circles)
+            ) {
                 continue;
             }
             briefs.push({
                 id: city.getId(),
                 factionId: city.getFactionId(),
-                position: city.getPosition(),
+                position: { x: position.x, y: position.y },
                 kind: city.getKind()
             });
         }
@@ -368,19 +383,118 @@ export class KingdomWorld implements IWorld {
     }
 
     /**
-     * 该势力当前可见的单位 id。**本计划是 stub**：只返回本势力自己的单位；
-     * plan 04-04 替换为视野并集。
+     * 该势力当前可见的单位 id（D-25，无记忆）：己方单位始终包含；
+     * 敌方单位仅当其物理位置落入视野圆时包含；没有物理读数的单位跳过。
      * @param factionId 势力 id。
      * @returns 单位 id 列表。
      */
     getVisibleUnitIds(factionId: number): readonly number[] {
+        const faction = this.factions.get(factionId);
+        if (faction === undefined) {
+            return [];
+        }
+        const circles = this.visionCircles(faction);
         const ids: number[] = [];
         for (const [unitId, owner] of this.unitArmy) {
             if (owner.factionId === factionId) {
                 ids.push(unitId);
+                continue;
+            }
+            const state = this.physics.getUnitState(unitId);
+            if (state === null) {
+                continue;
+            }
+            if (this.isInsideAnyCircle(state.x, state.y, circles)) {
+                ids.push(unitId);
             }
         }
         return ids;
+    }
+
+    /**
+     * 构建一个势力的视野圆并集：己方每支军队中心一个 `ARMY_VISION_RADIUS` 圆，
+     * 己方每座城池点一个 `CITY_VISION_RADIUS` 圆（D-25）。
+     * @param faction 势力。
+     * @returns 视野圆列表（每次调用新建）。
+     */
+    private visionCircles(
+        faction: IMutableFaction
+    ): Array<{ x: number; y: number; radius: number }> {
+        const circles: Array<{ x: number; y: number; radius: number }> = [];
+        for (const armyId of faction.getArmyIds()) {
+            const army = this.armies.get(armyId);
+            if (army === undefined) {
+                continue;
+            }
+            const center = army.getCenter();
+            circles.push({
+                x: center.x,
+                y: center.y,
+                radius: ARMY_VISION_RADIUS
+            });
+        }
+        for (const cityId of faction.getCityIds()) {
+            const city = this.cities.get(cityId);
+            if (city === undefined) {
+                continue;
+            }
+            const position = city.getPosition();
+            circles.push({
+                x: position.x,
+                y: position.y,
+                radius: CITY_VISION_RADIUS
+            });
+        }
+        return circles;
+    }
+
+    /**
+     * 判断敌方军队是否可见：中心落入任一视野圆，或名册内任一单位位置落入视野圆
+     * （Pitfall 16：只看中心会漏掉阵型边缘的接触）。
+     * @param army 敌方军队。
+     * @param circles 视野圆列表。
+     * @returns 是否可见。
+     */
+    private armyInsideCircles(
+        army: IMutableArmy,
+        circles: readonly { x: number; y: number; radius: number }[]
+    ): boolean {
+        const center = army.getCenter();
+        if (this.isInsideAnyCircle(center.x, center.y, circles)) {
+            return true;
+        }
+        for (const unitId of army.getUnitIds()) {
+            const state = this.physics.getUnitState(unitId);
+            if (state === null) {
+                continue;
+            }
+            if (this.isInsideAnyCircle(state.x, state.y, circles)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * 点是否落在任一视野圆内（只比较平方距离，不分配 `Math.hypot`）。
+     * @param x 点 x 坐标。
+     * @param y 点 y 坐标。
+     * @param circles 视野圆列表。
+     * @returns 是否在并集内。
+     */
+    private isInsideAnyCircle(
+        x: number,
+        y: number,
+        circles: readonly { x: number; y: number; radius: number }[]
+    ): boolean {
+        for (const circle of circles) {
+            const dx = x - circle.x;
+            const dy = y - circle.y;
+            if (dx * dx + dy * dy <= circle.radius * circle.radius) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
