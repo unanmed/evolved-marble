@@ -17,18 +17,30 @@ import { BrakeAI } from '@/kingdom/BrakeAI';
 import { City } from '@/kingdom/City';
 import {
     ARMY_FORMATION_RADIUS,
+    ARMY_SPEED_METERS_PER_HOUR,
     BATTLE_AREA_HALF_EXTENT,
     BATTLE_AREA_HYSTERESIS,
     BATTLE_TICK_MINUTES,
     BATTLE_TRIGGER_DISTANCE,
     BRAKE_MIN_MINUTES,
-    PEACE_TICK_MINUTES
+    GARRISON_HEAL_PER_HOUR,
+    MARCH_HEAL_PER_HOUR,
+    MAX_SCENARIO_UNITS,
+    MINUTES_PER_HOUR,
+    PEACE_TICK_MINUTES,
+    TRAINING_HOURS_CAPITAL,
+    TRAINING_HOURS_NORMAL
 } from '@/kingdom/constants';
 import { Faction } from '@/kingdom/Faction';
 import { IdleAI } from '@/kingdom/IdleAI';
 import { MarchAI } from '@/kingdom/MarchAI';
 import { TimeSystem } from '@/kingdom/TimeSystem';
-import { ArmyOrderKind, ArmyState, UnitControlMode } from '@/kingdom/types';
+import {
+    ArmyOrderKind,
+    ArmyState,
+    CityKind,
+    UnitControlMode
+} from '@/kingdom/types';
 import type {
     IArmy,
     IArmyOrder,
@@ -55,12 +67,18 @@ import type { IControlSystem, IUnitAI } from '@/control/types';
 import type { IPhysicsWorld } from '@/physics/types';
 import type { IRng } from '@/common/types';
 import { spawnUnit } from '@/units/spawn';
-import type { IUnit } from '@/units/types';
+import type { IHealableUnit } from '@/units/types';
 
 /**
  * 单位初始聚集环半径（米）：让同军单位出生时不重叠；远小于阵型半径。
  */
 const SPAWN_RING_RADIUS = 4;
+
+/**
+ * 行军抵达容差（米）：一个游戏分钟的行军距离。中心每个子步恰好前进该距离，
+ * 越过目标后的下一步距离同样落在容差内，因此抵达判定不会漏掉目标。
+ */
+const ARRIVAL_TOLERANCE_METERS = ARMY_SPEED_METERS_PER_HOUR / MINUTES_PER_HOUR;
 
 /**
  * 王国世界：场景构建、子步循环、军队/战斗/AI 模式编排与读取面。
@@ -91,8 +109,8 @@ export class KingdomWorld implements IWorld {
     private readonly armies = new Map<number, IMutableArmy>();
     /** 城池 id → 城池。 */
     private readonly cities = new Map<number, IMutableCity>();
-    /** 单位 id → 单位实例。 */
-    private readonly units = new Map<number, IUnit>();
+    /** 单位 id → 单位实例（`IHealableUnit`：回血经 G-1 接缝）。 */
+    private readonly units = new Map<number, IHealableUnit>();
     /** 单位 id → 所属军队/势力。 */
     private readonly unitArmy = new Map<
         number,
@@ -418,6 +436,17 @@ export class KingdomWorld implements IWorld {
         if (army === undefined) {
             return;
         }
+        const garrisonedCityId = army.getGarrisonedCityId();
+        if (garrisonedCityId !== undefined) {
+            const keepsGarrison =
+                order.kind === ArmyOrderKind.Garrison &&
+                order.cityId === garrisonedCityId;
+            if (!keepsGarrison) {
+                this.cities.get(garrisonedCityId)?.setGarrisonArmyId(undefined);
+                army.setGarrisonedCityId(undefined);
+                army.setState(ArmyState.Marching);
+            }
+        }
         army.setOrder({ ...order });
         this.orderAcceptedAt.set(order.armyId, this.time.getGameMinutes());
     }
@@ -445,10 +474,12 @@ export class KingdomWorld implements IWorld {
     }
 
     /**
-     * 推进一个一游戏分钟子步：时钟 → 军队中心 → 槽位 → 战斗判定 → 状态 → 刹车 → AI → 控制。
+     * 推进一个一游戏分钟子步：时钟 → 指令结算 → 军队中心 → 槽位 → 战斗判定 →
+     * 状态 → 刹车 → AI → 控制 → 回血 → 训练 → 名册剪枝。
      */
     private stepSubstep(): void {
         this.time.advance(1);
+        this.resolveOrders();
         this.advanceArmies();
         this.rebuildSlots();
         this.battles.tick();
@@ -456,7 +487,213 @@ export class KingdomWorld implements IWorld {
         this.updateBrakeWindows();
         this.updateUnitModes();
         this.control.tick();
+        this.applyHealing();
+        this.applyTraining();
         this.pruneDeadUnits();
+    }
+
+    /**
+     * 结算抵达目标的指令（D-21/D-29）：
+     * - `Garrison` 抵达城池点时按「一城一驻军」规则建立或拒绝链接；
+     * - `MoveTo` 抵达目标点时清空指令，交由 Phase 7 指挥官重新规划；
+     * - `Hold` 保持到 plan 04-05 的完成判定。
+     */
+    private resolveOrders(): void {
+        for (const army of this.armies.values()) {
+            const order = army.getOrder();
+            if (order === null) {
+                continue;
+            }
+            const accepted = this.orderAcceptedAt.get(army.getId()) ?? 0;
+            const delay = order.afterMinutes ?? 0;
+            if (this.time.getGameMinutes() < accepted + delay) {
+                continue;
+            }
+
+            if (order.kind === ArmyOrderKind.Garrison) {
+                this.resolveGarrisonOrder(army, order);
+                continue;
+            }
+            if (order.kind !== ArmyOrderKind.MoveTo) {
+                continue;
+            }
+            if (order.targetX === undefined || order.targetY === undefined) {
+                continue;
+            }
+            const center = army.getCenter();
+            const dx = order.targetX - center.x;
+            const dy = order.targetY - center.y;
+            if (
+                dx * dx + dy * dy <=
+                ARRIVAL_TOLERANCE_METERS * ARRIVAL_TOLERANCE_METERS
+            ) {
+                army.setOrder(null);
+            }
+        }
+    }
+
+    /**
+     * 结算一条抵达城池点的 `Garrison` 指令（D-21/D-26/KING-05）：
+     * 已由本军驻扎时幂等返回；城池已有**另一支仍真实驻扎**的军队时拒绝抵达方
+     * （清空其指令、保持 `Marching`、不触碰城池链接）；城池无驻军或链接悬空时
+     * 清掉陈旧链接并双向建立链接，同时保留指令（驻扎是持续状态）。
+     * @param army 抵达的军队。
+     * @param order 其 `Garrison` 指令。
+     */
+    private resolveGarrisonOrder(army: IMutableArmy, order: IArmyOrder): void {
+        if (order.cityId === undefined) {
+            return;
+        }
+        const city = this.cities.get(order.cityId);
+        if (city === undefined) {
+            army.setOrder(null);
+            return;
+        }
+        const center = army.getCenter();
+        const target = city.getPosition();
+        const dx = target.x - center.x;
+        const dy = target.y - center.y;
+        if (
+            dx * dx + dy * dy >
+            ARRIVAL_TOLERANCE_METERS * ARRIVAL_TOLERANCE_METERS
+        ) {
+            return;
+        }
+
+        const holderId = city.getGarrisonArmyId();
+        const holder =
+            holderId === undefined ? undefined : this.armies.get(holderId);
+        if (holder === army) {
+            return;
+        }
+        if (
+            holder !== undefined &&
+            holder.getGarrisonedCityId() === city.getId()
+        ) {
+            army.setOrder(null);
+            army.setGarrisonedCityId(undefined);
+            return;
+        }
+
+        if (holderId !== undefined) {
+            city.setGarrisonArmyId(undefined);
+        }
+        const previousCityId = army.getGarrisonedCityId();
+        if (previousCityId !== undefined && previousCityId !== city.getId()) {
+            this.cities.get(previousCityId)?.setGarrisonArmyId(undefined);
+        }
+        army.setGarrisonedCityId(city.getId());
+        army.setState(ArmyState.Garrisoned);
+        city.setGarrisonArmyId(army.getId());
+    }
+
+    /**
+     * 每个子步按游戏时间回血（D-06/D-13，经 G-1 的 `IHealableUnit.heal`）：
+     * 驻扎时 `GARRISON_HEAL_PER_HOUR`，行军/交战增援/重组时 `MARCH_HEAL_PER_HOUR`，
+     * 每子步 heal `rate / MINUTES_PER_HOUR`。
+     * 战斗排除按**单位**判定（`getBattleForUnit`）；`ArmyState.InBattle` 是保留值，
+     * 04-02 起从不赋值，这里也绝不分支读取。
+     */
+    private applyHealing(): void {
+        for (const [unitId, unit] of this.units) {
+            if (!unit.isAlive()) {
+                continue;
+            }
+            if (this.battles.getBattleForUnit(unitId) !== null) {
+                continue;
+            }
+            const owner = this.unitArmy.get(unitId);
+            if (owner === undefined) {
+                continue;
+            }
+            const army = this.armies.get(owner.armyId);
+            const rate =
+                army !== undefined && army.getState() === ArmyState.Garrisoned
+                    ? GARRISON_HEAL_PER_HOUR
+                    : MARCH_HEAL_PER_HOUR;
+            unit.heal(rate / MINUTES_PER_HOUR);
+        }
+    }
+
+    /**
+     * 每个子步按游戏时间推进驻扎城池的训练（D-23/KING-05）：
+     * 有主、有真实驻军、驻军不在战斗（`Engaging` 是唯一战斗状态）时，
+     * 名册未达 `getGarrisonCap()` 才累计 1 游戏分钟；达到普通城 96 h / 主城 72 h
+     * 阈值后**每子步最多产出一个单位**，并保留超出阈值的余量。
+     * 驻军满编或全局 `MAX_SCENARIO_UNITS` 上限时进度暂停，绝不累积。
+     */
+    private applyTraining(): void {
+        for (const city of this.cities.values()) {
+            const factionId = city.getFactionId();
+            if (factionId === undefined) {
+                continue;
+            }
+            const garrisonArmyId = city.getGarrisonArmyId();
+            if (garrisonArmyId === undefined) {
+                continue;
+            }
+            const army = this.armies.get(garrisonArmyId);
+            if (army === undefined) {
+                continue;
+            }
+            if (army.getState() === ArmyState.Engaging) {
+                continue;
+            }
+            const roster = army.getUnitIds();
+            if (roster.length >= city.getGarrisonCap()) {
+                continue;
+            }
+            if (this.units.size >= MAX_SCENARIO_UNITS) {
+                continue;
+            }
+
+            const progress = city.getTrainingProgressMinutes() + 1;
+            city.setTrainingProgressMinutes(progress);
+
+            const hours =
+                city.getKind() === CityKind.Capital
+                    ? TRAINING_HOURS_CAPITAL
+                    : TRAINING_HOURS_NORMAL;
+            const threshold = hours * MINUTES_PER_HOUR;
+            if (progress < threshold) {
+                continue;
+            }
+
+            this.produceGarrisonUnit(city, army, factionId);
+            city.setTrainingProgressMinutes(progress - threshold);
+        }
+    }
+
+    /**
+     * 训练产出一个单位：按场景训练职业生成、取下一个单调 id、经控制系统注册
+     * （`teamId = factionId`）、写入单位/军队/势力索引，最后追加到驻军名册。
+     * 注册抛错时在名册变更前直接向上抛出（不留下半登记单位）。
+     * @param city 产出的城池。
+     * @param army 该城的驻军军队。
+     * @param factionId 城池归属势力 id（同时是注册 `teamId`）。
+     */
+    private produceGarrisonUnit(
+        city: IMutableCity,
+        army: IMutableArmy,
+        factionId: number
+    ): void {
+        const unit = spawnUnit(city.getTrainingClass(), this.rng);
+        const unitId = this.nextUnitId;
+        this.nextUnitId += 1;
+
+        const position = city.getPosition();
+        const angle = (unitId % 8) * (Math.PI / 4);
+        this.control.registerUnit({
+            unitId,
+            unit,
+            teamId: factionId,
+            x: position.x + Math.cos(angle) * SPAWN_RING_RADIUS,
+            y: position.y + Math.sin(angle) * SPAWN_RING_RADIUS
+        });
+
+        this.units.set(unitId, unit);
+        this.unitArmy.set(unitId, { armyId: army.getId(), factionId });
+        army.setUnitIds([...army.getUnitIds(), unitId]);
     }
 
     /**
@@ -669,6 +906,9 @@ export class KingdomWorld implements IWorld {
      * @returns 目标点或 `null`。
      */
     private resolveOrderTarget(army: IMutableArmy): IVec2 | null {
+        if (army.getGarrisonedCityId() !== undefined) {
+            return null;
+        }
         const order = army.getOrder();
         if (order === null) {
             return null;

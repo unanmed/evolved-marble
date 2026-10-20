@@ -16,13 +16,16 @@ import { Army, advanceArmyCenter, computeFormationSlots } from '@/kingdom/Army';
 import { IdleAI } from '@/kingdom/IdleAI';
 import { MarchAI } from '@/kingdom/MarchAI';
 import { KingdomSensingWorld } from '@/kingdom/SensingWorld';
-import type { IVec2 } from '@/kingdom/types';
+import { ArmyOrderKind, CityKind } from '@/kingdom/types';
+import type { IScenario, IVec2 } from '@/kingdom/types';
 import { DEFAULT_GEOMETRY, DT } from '@/physics/constants';
 import { PhysicsWorld } from '@/physics/PhysicsWorld';
 import { spawnUnit } from '@/units/spawn';
 import type { IUnit } from '@/units/types';
-import { ClassKind } from '@/units/types';
+import { AttributeKind, ClassKind } from '@/units/types';
 import { mulberry32 } from '../helpers/rng';
+import { createKingdom } from './harness';
+import type { IKingdomFixture } from './harness';
 
 /**
  * 测试用行军夹具：真实物理 + 王国感知 + 控制系统 + 一支由 MarchAI 驱动的军队。
@@ -306,6 +309,212 @@ describe('march — real Rapier formation control', () => {
         }
 
         expect(created.army.getUnitIds()).toEqual(created.unitIds);
+    });
+});
+
+describe('kingdom — march and battle healing on game time', () => {
+    /** 当前用例持有的王国夹具。 */
+    let kingdom: IKingdomFixture | null = null;
+
+    /**
+     * 构造回血场景：两势力、各一城（一方有地形空表）、无地形；
+     * 敌方默认远在另一角，只有显式放到 50 m 的用例才会开战。
+     * @param options 位置选项。
+     * @returns 场景表。
+     */
+    function healingScenario(options: {
+        armyX: number;
+        armyY: number;
+        cityX: number;
+        cityY: number;
+        enemyX: number;
+        enemyY: number;
+        enemyUnits?: number;
+    }): IScenario {
+        return {
+            width: 1000,
+            height: 1000,
+            factions: [
+                { id: 1, name: 'Red' },
+                { id: 2, name: 'Blue' }
+            ],
+            cities: [
+                {
+                    id: 1,
+                    factionId: 1,
+                    x: options.cityX,
+                    y: options.cityY,
+                    kind: CityKind.Normal,
+                    garrisonCap: 10,
+                    trainingClass: ClassKind.Swordsman
+                },
+                {
+                    id: 2,
+                    factionId: 2,
+                    x: 950,
+                    y: 50,
+                    kind: CityKind.Normal,
+                    garrisonCap: 10,
+                    trainingClass: ClassKind.Swordsman
+                }
+            ],
+            armies: [
+                {
+                    id: 1,
+                    factionId: 1,
+                    x: options.armyX,
+                    y: options.armyY,
+                    heading: 0,
+                    units: [{ classKind: ClassKind.Swordsman, count: 4 }]
+                },
+                {
+                    id: 2,
+                    factionId: 2,
+                    x: options.enemyX,
+                    y: options.enemyY,
+                    heading: 0,
+                    units: [
+                        {
+                            classKind: ClassKind.Swordsman,
+                            count: options.enemyUnits ?? 1
+                        }
+                    ]
+                }
+            ],
+            terrain: []
+        };
+    }
+
+    /**
+     * 构造并登记回血夹具。
+     * @param options 位置选项。
+     * @returns 已接线的夹具。
+     */
+    function createHealingKingdom(options: {
+        armyX: number;
+        armyY: number;
+        cityX: number;
+        cityY: number;
+        enemyX: number;
+        enemyY: number;
+        enemyUnits?: number;
+    }): IKingdomFixture {
+        kingdom = createKingdom({
+            scenario: healingScenario(options),
+            seed: 41
+        });
+        return kingdom;
+    }
+
+    /**
+     * 读取单位生命值。
+     * @param target 夹具。
+     * @param unitId 单位 id。
+     * @returns 生命值。
+     */
+    function healthOf(target: IKingdomFixture, unitId: number): number {
+        const unit = target.control.getUnit(unitId);
+        if (unit === null) {
+            throw new Error(`unit ${unitId} is not registered`);
+        }
+        return unit.getAttribute(AttributeKind.Health);
+    }
+
+    /**
+     * 让名册内每个单位失去相同生命值，制造回血余量。
+     * @param target 夹具。
+     * @param unitIds 单位 id 列表。
+     * @param amount 扣除量。
+     */
+    function damageAll(
+        target: IKingdomFixture,
+        unitIds: readonly number[],
+        amount: number
+    ): void {
+        for (const unitId of unitIds) {
+            const unit = target.control.getUnit(unitId);
+            if (unit === null) {
+                throw new Error(`unit ${unitId} is not registered`);
+            }
+            unit.takeDamage(amount);
+        }
+    }
+
+    beforeAll(async () => {
+        await RAPIER.init();
+    });
+
+    afterEach(() => {
+        if (kingdom !== null) {
+            kingdom.world.dispose();
+            kingdom.control.dispose();
+            kingdom.physics.dispose();
+            kingdom = null;
+        }
+    });
+
+    it('heals a marching army at roughly 1/h', () => {
+        const created = createHealingKingdom({
+            armyX: 200,
+            armyY: 300,
+            cityX: 100,
+            cityY: 100,
+            enemyX: 900,
+            enemyY: 100
+        });
+        created.world.issueOrder({
+            armyId: 1,
+            kind: ArmyOrderKind.MoveTo,
+            targetX: 900,
+            targetY: 300
+        });
+        const unitIds = created.world.getArmy(1)?.getUnitIds() ?? [];
+        expect(unitIds).toHaveLength(4);
+        damageAll(created, unitIds, 10);
+        const before = unitIds.map(unitId => healthOf(created, unitId));
+
+        // 72 game minutes = 3 peace ticks (24 substeps each) → 1.2 health.
+        for (let tick = 0; tick < 3; tick += 1) {
+            created.world.tick();
+        }
+
+        unitIds.forEach((unitId, index) => {
+            const healed = healthOf(created, unitId) - before[index];
+            expect(healed).toBeGreaterThan(0.2);
+            expect(healed).toBeLessThan(2.2);
+        });
+    });
+
+    it('heals nothing while a unit is in an active battle', () => {
+        const created = createHealingKingdom({
+            armyX: 500,
+            armyY: 500,
+            cityX: 500,
+            cityY: 500,
+            enemyX: 550,
+            enemyY: 500,
+            enemyUnits: 4
+        });
+        created.world.issueOrder({
+            armyId: 1,
+            kind: ArmyOrderKind.Garrison,
+            cityId: 1
+        });
+        const unitIds = created.world.getArmy(1)?.getUnitIds() ?? [];
+        damageAll(created, unitIds, 10);
+
+        // 第一个 tick 只跑一个子步（开战立即切 1×）。
+        created.world.tick();
+        expect(created.world.getBattleSystem().hasActiveBattle()).toBe(true);
+        const before = unitIds.map(unitId => healthOf(created, unitId));
+
+        for (let tick = 0; tick < 4; tick += 1) {
+            created.world.tick();
+        }
+
+        unitIds.forEach((unitId, index) => {
+            expect(healthOf(created, unitId)).toBe(before[index]);
+        });
     });
 });
 
