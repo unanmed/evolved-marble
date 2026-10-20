@@ -29,7 +29,9 @@
     {"decision": "All 5 plans complete: 5/5 summaries, 324/324 tests, typecheck/lint green.", "rationale": "Wave 4 finished; only phase tail gates remain.", "phase": "04"},
     {"decision": "Approved types stay frozen: src/kingdom/types.ts and the additive seams in units/physics/control.", "rationale": "Round-1 type gate approved; Round 2 implemented without contract drift.", "phase": "04"},
     {"decision": "Three army orders only: MoveTo/Garrison/Hold; afterMinutes is relative; control owns AI lifecycle via setUnitAI.", "rationale": "User revisions at the Round-1 gate.", "phase": "04"},
-    {"decision": "Armies reinforce as an Engaging 25m formation, never frozen; unit-level battle membership; numeric time 1/24.", "rationale": "User revisions at the Round-1 gate.", "phase": "04"}
+    {"decision": "Armies reinforce as an Engaging 25m formation, never frozen; unit-level battle membership; numeric time 1/24.", "rationale": "User revisions at the Round-1 gate.", "phase": "04"},
+    {"decision": "Code style: forbid get/set accessor syntax; expose readonly members on public interfaces, mutate via explicit setX methods; internal class fields need not be readonly.", "rationale": "User clarification 2026-10-20: dislikes `get value()/set value()`, not readonly properties; readonly interface + setValue is preferred.", "phase": "04"},
+    {"decision": "Code style: prefer object parameters for multi-parameter methods; define an explicit I* interface; no inline object types.", "rationale": "User clarification 2026-10-20: positional parameter lists are unpleasant; inline object types should be zero.", "phase": "04"}
   ],
   "uncommitted_files": [
     "?? .gsd/",
@@ -37,5 +39,5 @@
     "?? .planning/state.json"
   ],
   "next_action": "Resume with /gsd-resume-work, then continue Phase 4 tail: aggregate_results -> code_review_gate -> regression_gate -> verify_phase_goal -> update_roadmap/transition. All plans are summarized, so execute-phase should resume at the phase gates.",
-  "context_notes": "Phase 4 Round 2 executed sequentially (worktrees disabled, parallelization false). 04-02/04-03 wave 2, 04-04 wave 3, 04-05 wave 4. No known blockers. Phase is NOT marked complete; verification has not run. The untracked .gsd/, .planning/state.json and .planning/milestone.lock are GSD runtime files, not source."
+  "context_notes": "Phase 4 Round 2 executed sequentially (worktrees disabled, parallelization false). 04-02/04-03 wave 2, 04-04 wave 3, 04-05 wave 4. No known blockers. Phase is NOT marked complete; verification has not run. The untracked .gsd/, .planning/state.json and .planning/milestone.lock are GSD runtime files, not source. NEW CONVENTIONS recorded in AGENTS.md §11-12 and PROJECT.md: no get/set accessor syntax (readonly interface members + explicit setX), multi-parameter methods use explicit I* object params, no inline object types. Apply to new code and converge existing code when touched."
 }
