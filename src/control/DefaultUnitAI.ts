@@ -170,8 +170,7 @@ export class DefaultUnitAI implements IUnitAI {
                 observation.skills.includes(SkillKind.Charge) &&
                 observation.tick >= this.chargeReadyTick
             ) {
-                this.chargeReadyTick =
-                    observation.tick + CHARGE_COOLDOWN_TICKS;
+                this.chargeReadyTick = observation.tick + CHARGE_COOLDOWN_TICKS;
                 return {
                     kind: SkillIntentKind.Unit,
                     unitId: observation.unitId,
@@ -208,8 +207,7 @@ export class DefaultUnitAI implements IUnitAI {
                 this.hasBow(observation) &&
                 observation.tick >= this.bowReadyTick
             ) {
-                this.bowReadyTick =
-                    observation.tick + BOW_SHOT_INTERVAL_TICKS;
+                this.bowReadyTick = observation.tick + BOW_SHOT_INTERVAL_TICKS;
                 return {
                     kind: SkillIntentKind.Weapon,
                     unitId: observation.unitId,
