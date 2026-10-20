@@ -668,6 +668,85 @@ describe('Sensor — observation contract (CTRL-01)', () => {
         expect(observation.projectiles[0]).toEqual(sighting);
     });
 
+    it('treats a non-array ray result as no hits instead of throwing', () => {
+        const self = makeUnit(33);
+        const states = new Map([[1, stateAt(0, 0)]]);
+        const units = new Map([[1, self]]);
+        const teams = new Map([[1, 1]]);
+        const sensor = new Sensor(
+            new StubPhysicsWorld(states),
+            new StubCatalog(units, teams),
+            new StaticSensingWorld(undefined, []),
+            () => 0
+        );
+
+        const observation = senseOrFail(sensor, 1);
+
+        expect(observation.rayDistances).toHaveLength(RAY_COUNT);
+        for (const distance of observation.rayDistances) {
+            expect(distance).toBe(SENSING_MAX_DISTANCE);
+        }
+    });
+
+    it('drops malformed projectile entries and clamps distances', () => {
+        const self = makeUnit(34);
+        const valid: IProjectileSighting = { x: 1, y: 2, distance: 3 };
+        const raw = [
+            valid,
+            { x: Number.NaN, y: 0, distance: 1 },
+            { x: 0, y: 1 },
+            { x: 0, y: 0, distance: Number.POSITIVE_INFINITY },
+            { x: 5, y: 5, distance: 999 },
+            null,
+            'not-a-sighting'
+        ];
+        const states = new Map([[1, stateAt(0, 0)]]);
+        const units = new Map([[1, self]]);
+        const teams = new Map([[1, 1]]);
+        const rays = Array.from(
+            { length: RAY_COUNT },
+            () => SENSING_MAX_DISTANCE
+        );
+        const sensor = new Sensor(
+            new StubPhysicsWorld(states),
+            new StubCatalog(units, teams),
+            new StaticSensingWorld(rays, raw),
+            () => 0
+        );
+
+        const observation = senseOrFail(sensor, 1);
+
+        expect(observation.projectiles).toHaveLength(2);
+        expect(observation.projectiles[0]).toEqual(valid);
+        expect(observation.projectiles[0]).not.toBe(valid);
+        expect(observation.projectiles[1]).toEqual({
+            x: 5,
+            y: 5,
+            distance: SENSING_MAX_DISTANCE
+        });
+    });
+
+    it('treats a non-array projectile result as no projectiles', () => {
+        const self = makeUnit(35);
+        const states = new Map([[1, stateAt(0, 0)]]);
+        const units = new Map([[1, self]]);
+        const teams = new Map([[1, 1]]);
+        const rays = Array.from(
+            { length: RAY_COUNT },
+            () => SENSING_MAX_DISTANCE
+        );
+        const sensor = new Sensor(
+            new StubPhysicsWorld(states),
+            new StubCatalog(units, teams),
+            new StaticSensingWorld(rays, undefined),
+            () => 0
+        );
+
+        const observation = senseOrFail(sensor, 1);
+
+        expect(observation.projectiles).toHaveLength(0);
+    });
+
     it('returns null for an unknown unit, missing motion, and unknown team', () => {
         const unit = makeUnit(18);
         const units = new Map([

@@ -41,6 +41,7 @@ import type {
     IUnitAction,
     IUnitAI,
     IUnitAIProvider,
+    IUnitObservation,
     SkillIntent
 } from '@/control/types';
 
@@ -185,7 +186,13 @@ export class ControlSystem implements IControlSystem {
                 if (unit === undefined || !unit.isAlive()) {
                     continue;
                 }
-                const observation = this.sensor.sense(unitId);
+                let observation: IUnitObservation | null;
+                try {
+                    // 感知是世界/目录边界的不可信调用：单个失败不终止整个 tick。
+                    observation = this.sensor.sense(unitId);
+                } catch {
+                    continue;
+                }
                 if (observation === null) {
                     continue;
                 }

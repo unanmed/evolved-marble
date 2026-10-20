@@ -17,6 +17,7 @@ import {
 import { AttributeKind } from '@/units/types';
 import type { IUnit } from '@/units/types';
 import type {
+    IProjectileSighting,
     ISensedUnit,
     ISensingWorld,
     ISensor,
@@ -90,9 +91,13 @@ export class Sensor implements ISensor {
                 blockers
             )
         );
-        const projectiles = this.world
-            .queryProjectiles(motion.x, motion.y, SENSING_MAX_DISTANCE)
-            .map(sighting => ({ ...sighting }));
+        const projectiles = this.sanitizeProjectiles(
+            this.world.queryProjectiles(
+                motion.x,
+                motion.y,
+                SENSING_MAX_DISTANCE
+            )
+        );
 
         return {
             unitId,
@@ -253,17 +258,58 @@ export class Sensor implements ISensor {
     }
 
     /**
+     * 把感知世界的射弹输出清洗为新的射弹快照数组：丢弃非对象或坐标/距离
+     * 非有限值的条目，并把距离截到 `[0, SENSING_MAX_DISTANCE]`；
+     * 非数组按「无射弹」处理（T-03-07）。
+     * @param raw 感知世界返回的原始射弹列表（运行时可能是任意畸形值）。
+     * @returns 清洗后的新射弹快照。
+     */
+    private sanitizeProjectiles(raw: unknown): IProjectileSighting[] {
+        if (!Array.isArray(raw)) {
+            return [];
+        }
+        const sanitized: IProjectileSighting[] = [];
+        for (const entry of raw) {
+            if (entry === null || typeof entry !== 'object') {
+                continue;
+            }
+            const sighting = entry as Record<string, unknown>;
+            const x = sighting.x;
+            const y = sighting.y;
+            const distance = sighting.distance;
+            if (
+                typeof x !== 'number' ||
+                !Number.isFinite(x) ||
+                typeof y !== 'number' ||
+                !Number.isFinite(y) ||
+                typeof distance !== 'number' ||
+                !Number.isFinite(distance)
+            ) {
+                continue;
+            }
+            sanitized.push({
+                x,
+                y,
+                distance: Math.max(0, Math.min(distance, SENSING_MAX_DISTANCE))
+            });
+        }
+        return sanitized;
+    }
+
+    /**
      * 把感知世界的输出清洗为恰好 `RAY_COUNT` 个有限距离，每个位于
      * `[0, SENSING_MAX_DISTANCE]`：非有限或负值、超出上限 → 上限；不足补上限、
-     * 超出截断。返回新数组，绝不泄漏世界的数组引用（T-03-07）。
-     * @param raw 感知世界返回的原始距离数组。
+     * 超出截断。返回新数组，绝不泄漏世界的数组引用；非数组按「全部未命中」处理
+     * （T-03-07）。
+     * @param raw 感知世界返回的原始值（运行时可能是任意畸形值）。
      * @returns 清洗后的射线距离。
      */
-    private sanitizeRayDistances(raw: readonly number[]): number[] {
+    private sanitizeRayDistances(raw: unknown): number[] {
+        const source = Array.isArray(raw) ? raw : [];
         const sanitized: number[] = [];
         for (let index = 0; index < RAY_COUNT; index += 1) {
             const value =
-                index < raw.length ? raw[index] : SENSING_MAX_DISTANCE;
+                index < source.length ? source[index] : SENSING_MAX_DISTANCE;
             if (
                 !Number.isFinite(value) ||
                 value < 0 ||

@@ -11,6 +11,9 @@ import { SkillIntentKind } from '@/control/types';
 import type {
     IControlTickResult,
     IDamageContext,
+    IProjectileSighting,
+    ISensedUnit,
+    ISensingWorld,
     IUnitAction,
     IUnitAI,
     IUnitAIProvider,
@@ -219,6 +222,29 @@ class RecordingProvider implements IUnitAIProvider {
 
     destroy(unitId: number): void {
         this.onDestroy?.(unitId);
+    }
+}
+
+/**
+ * 抛错型感知世界：探测 `tick()` 是否隔离感知失败。
+ * 除 `ISensingWorld` 外不暴露任何公共成员。
+ */
+class ThrowingSensingWorld implements ISensingWorld {
+    castRayFan(
+        _originX: number,
+        _originY: number,
+        _maxDistance: number,
+        _blockers: readonly ISensedUnit[]
+    ): readonly number[] {
+        throw new Error('sensing boom');
+    }
+
+    queryProjectiles(
+        _x: number,
+        _y: number,
+        _radius: number
+    ): readonly IProjectileSighting[] {
+        throw new Error('sensing boom');
     }
 }
 
@@ -703,6 +729,42 @@ describe('ControlSystem — execution semantics', () => {
         }
 
         expect(decided).toEqual([0, 6, 12]);
+        expect(forceCalls).toHaveLength(0);
+    });
+
+    it('isolates a throwing sensing world and keeps the tick alive', () => {
+        const forceCalls: [number, number, number][] = [];
+        let decideCalls = 0;
+        const fake = new RecordingPhysicsWorld(
+            new Map([[1, stateAt(0, 0)]]),
+            (unitId, forceX, forceY) =>
+                forceCalls.push([unitId, forceX, forceY]),
+            () => {},
+            emptyTick
+        );
+        const provider = new RecordingProvider(
+            () =>
+                new RecordingAI(() => {
+                    decideCalls += 1;
+                    return { ...zeroAction(), forceRight: 10 };
+                })
+        );
+        const controller = new ControlSystem(
+            fake,
+            new ThrowingSensingWorld(),
+            provider,
+            new TestDamageSink()
+        );
+        controller.registerUnit({
+            unitId: 1,
+            unit: makeUnit(31),
+            teamId: 1,
+            x: 0,
+            y: 0
+        });
+
+        expect(() => controller.tick()).not.toThrow();
+        expect(decideCalls).toBe(0);
         expect(forceCalls).toHaveLength(0);
     });
 
