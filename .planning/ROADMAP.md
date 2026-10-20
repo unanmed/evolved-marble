@@ -154,7 +154,7 @@ Plans:
   4. 视野生效：军队半径 100m、城池半径 150m，决定势力可获取的信息。
   5. 军队战斗（距离 <80m 触发、80m 加权中心正方形战斗区、离区/结束判定）与城池战斗（同流程 + 战后获胜方接管、可能入驻、败方重组行军）按规格触发与结算。
 
-**Plans:** 2/5 plans executed
+**Plans:** 3/5 plans executed
 Plans:
 
 **Wave 1** *(round 1 — the type-first gate)*
@@ -164,7 +164,7 @@ Plans:
 **Wave 2** *(round 2 — implementation, parallel)*
 
 - [x] 04-02-PLAN.md — 王国运行时竖切（tracer）：`constants`/`TimeSystem`/`scenario`/`Faction`/`City`/`Army`/`SensingWorld`/`MarchAI`/`IdleAI`/`BrakeAI`/`BattleAI`/`BattleSystem`/`DamageSink`/`KingdomWorld` + `time`/`march`/`battle`/`tracer` 测试（场景 → tick → 行军 → 遭遇 → 单位加入 → 伤害 → 结束）
-- [ ] 04-03-PLAN.md — 三个加性接缝实现（G-1 `Unit.heal` + `spawnUnit` 返回 `IHealableUnit`、G-2 `PhysicsWorld` 静态障碍、G-5 `setUnitAI` 所有权完成）+ `heal`/`static-obstacles`/`set-unit-ai` 测试
+- [x] 04-03-PLAN.md — 三个加性接缝实现（G-1 `Unit.heal` + `spawnUnit` 返回 `IHealableUnit`、G-2 `PhysicsWorld` 静态障碍、G-5 `setUnitAI` 所有权完成）+ `heal`/`static-obstacles`/`set-unit-ai` 测试
 
 **Wave 3** *(depends on Wave 2)*
 
@@ -246,7 +246,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 1. 单位系统 | 5/5 | Complete    | 2026-10-18 |
 | 2. 物理模拟系统 | 7/7 | Complete    | 2026-10-19 |
 | 3. 操控系统 | 3/3 | Complete    | 2026-10-20 |
-| 4. 王国系统 | 2/5 | In Progress|  |
+| 4. 王国系统 | 3/5 | In Progress|  |
 | 5. 渲染系统 | 0/0 | Not started | - |
 | 6. 录制系统 | 0/0 | Not started | - |
 | 7. AI 接入系统 | 0/0 | Not started | - |

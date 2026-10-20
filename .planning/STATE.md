@@ -3,17 +3,17 @@ gsd_state_version: "1.0"
 current_phase: 04
 current_phase_name: 王国系统
 status: executing
-stopped_at: Completed 04-02-PLAN.md (kingdom runtime tracer; 04-03..05 pending)
-last_updated: "2026-10-20T14:04:50.565Z"
+stopped_at: Completed 04-03-PLAN.md (G-1/G-2/G-5 seams; 04-04..05 pending)
+last_updated: "2026-10-20T22:21:00.000Z"
 last_activity: 2026-10-20
-last_activity_desc: Phase 04 round 1 complete — kingdom type contract approved
+last_activity_desc: Phase 04 round 2 — three frozen-folder seams implemented
 state_head: c98143411024257c1271f724b81dc56f1dfbbffd
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 20
-  completed_plans: 17
-  percent: 0
+  completed_plans: 18
+  percent: 90
 ---
 
 # Project State
@@ -28,11 +28,11 @@ See: .planning/PROJECT.md (updated 2026-10-20)
 ## Current Position
 
 Phase: 04 (王国系统) — EXECUTING
-Plan: 2 of 5
+Plan: 3 of 5
 Status: Ready to execute
-Last activity: 2026-10-20 — Phase 04 execution started
+Last activity: 2026-10-20 — 04-03 seams complete
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█████████░] 90%
 
 ## Performance Metrics
 
@@ -78,6 +78,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 03 P03 | 8min | 3 tasks | 3 files |
 | Phase 04 P01 | 159 min | 4 tasks | 7 files |
 | Phase 04 P02 | 33 min | 3 tasks | 19 files |
+| Phase 04 P03 | 12 min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -138,6 +139,11 @@ Recent decisions affecting current work:
 - [Phase 04]: 04-02: pair locks are stored separately from battles and released only past the 80 m trigger distance; end/merge never relock
 - [Phase 04]: 04-02: brake mode is driven by World-owned lastBattleOfUnit + brakeUntilMinutes (>= 6 game min); a battle that ends clears both immediately
 - [Phase 04]: 04-02: ArmyState.InBattle stays a reserved contract value; only Engaging is assigned and never read
+- [Phase 04]: 04-03: heal validates the amount then refuses when dead, so a corpse stays at zero and healing never reads the max for invalid input (D-06)
+- [Phase 04]: 04-03: spawnUnit returns IHealableUnit (C-2) with no cast — Unit itself implements the seam, so no runtime probe exists
+- [Phase 04]: 04-03: static obstacles are fixed cuboids without active events and never enter the collider tag index; invalid specs are rejected before any Rapier object or id is created
+- [Phase 04]: 04-03: setUnitAI ownership follows creation — a providerOwned set decides every provider.destroy call; injected instances are only dropped
+- [Phase 04]: 04-03: KING-05 stays pending even though its static-obstacle seam shipped; city training/garrison behaviour belongs to 04-04/04-05
 
 ### Pending Todos
 
@@ -162,6 +168,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-20T14:04:50.454Z
-Stopped at: Completed 04-02-PLAN.md (kingdom runtime tracer; 04-03..05 pending)
+Last session: 2026-10-20T22:21:00.000Z
+Stopped at: Completed 04-03-PLAN.md (G-1/G-2/G-5 seams; 04-04..05 pending)
 Resume file: None
