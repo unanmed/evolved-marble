@@ -25,7 +25,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: 单位系统** - 16 项单位属性、7 职业、6 武器、2 防具、等级/经验/升级、正态随机生成 (completed 2026-10-18)
 - [x] **Phase 2: 物理模拟系统** - Rapier2D 复合刚体（部位打标）、类型化接触事件、伤害计算、固定 tick 推进 (completed 2026-10-19)
-- [ ] **Phase 3: 操控系统** - 单位级 AI 输入/输出契约、0.1s 决策节奏、可插拔控制 + 默认基线实现
+- [x] **Phase 3: 操控系统** - 单位级 AI 输入/输出契约、0.1s 决策节奏、可插拔控制 + 默认基线实现 (completed 2026-10-20)
 - [ ] **Phase 4: 王国系统** - 地图、行军、视野、军队、城池、驻扎/训练、军队/城池战斗触发与战后结算
 - [ ] **Phase 5: 渲染系统** - PixiJS 顶视渲染、可辨单位/装备/阵营、HUD、自动镜头、Chrome 帧率
 - [ ] **Phase 6: 录制系统** - 全程持续帧采集 → WebCodecs + Mediabunny 视频，附时间戳/索引
@@ -124,7 +124,7 @@ Plans:
   4. 控制模块可插拔：换入另一个 AI 实现时无需改动物理/单位系统，模拟仍可持续运行。
   5. 默认基线 AI 使单位能自主完成接近、攻击、脱离等行为，模拟无需人工输入即可持续运行。
 
-**Plans:** 3/3 plans executed (round 1 gate approved; round 2 implementation complete; round 3 complete)
+**Plans:** 3/3 plans complete
 Plans:
 
 **Wave 1** *(round 1 — the type-first gate)*
@@ -226,7 +226,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 |-------|----------------|--------|-----------|
 | 1. 单位系统 | 5/5 | Complete    | 2026-10-18 |
 | 2. 物理模拟系统 | 7/7 | Complete    | 2026-10-19 |
-| 3. 操控系统 | 3/3 | In Progress|  |
+| 3. 操控系统 | 3/3 | Complete    | 2026-10-20 |
 | 4. 王国系统 | 0/0 | Not started | - |
 | 5. 渲染系统 | 0/0 | Not started | - |
 | 6. 录制系统 | 0/0 | Not started | - |
