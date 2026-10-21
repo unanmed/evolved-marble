@@ -11,7 +11,7 @@ import {
 } from '@/kingdom/scenario';
 import { KingdomSensingWorld } from '@/kingdom/SensingWorld';
 import { createDefaultKingdomConfig } from '@/kingdom/strategies';
-import { CityKind } from '@/kingdom/types';
+import { ArmyOrderKind, CityKind } from '@/kingdom/types';
 import type { IScenario } from '@/kingdom/types';
 import { MAX_SCENARIO_ARMIES, MAX_SCENARIO_UNITS } from '@/kingdom/constants';
 import { DEFAULT_GEOMETRY, DT } from '@/physics/constants';
@@ -253,6 +253,32 @@ const rejectionCases: readonly IRejectionCase[] = [
         }
     },
     {
+        name: 'numeric-enum reverse-map training class',
+        mutate: scenario => {
+            scenario.cities[0].trainingClass =
+                'Swordsman' as unknown as ClassKind;
+        }
+    },
+    {
+        name: 'numeric-enum reverse-map city kind',
+        mutate: scenario => {
+            scenario.cities[0].kind = 'Capital' as unknown as CityKind;
+        }
+    },
+    {
+        name: 'numeric string city kind',
+        mutate: scenario => {
+            scenario.cities[0].kind = '0' as unknown as CityKind;
+        }
+    },
+    {
+        name: 'numeric-enum reverse-map unit class',
+        mutate: scenario => {
+            scenario.armies[0].units[0].classKind =
+                'Swordsman' as unknown as ClassKind;
+        }
+    },
+    {
         name: 'total units exceed the ceiling',
         mutate: scenario => {
             scenario.armies[0].units = [
@@ -441,5 +467,16 @@ describe('KingdomWorld — scenario ownership and team mapping (KING-08)', () =>
             }
         }
         expect(control.listUnitIds()).toHaveLength(expectedUnits);
+    });
+
+    it('rejects a string order kind from the numeric-enum reverse map', () => {
+        fixture = createKingdom({ scenario: DEFAULT_SCENARIO, seed: 102 });
+
+        fixture.world.issueOrder({
+            armyId: 1,
+            kind: 'Hold' as unknown as ArmyOrderKind
+        });
+
+        expect(fixture.world.getArmy(1)?.getOrder()).toBeNull();
     });
 });

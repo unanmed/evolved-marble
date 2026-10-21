@@ -11,7 +11,9 @@ import { KingdomSensingWorld } from '@/kingdom/SensingWorld';
 import { createDefaultKingdomConfig } from '@/kingdom/strategies';
 import type { ICommander, IKingdomConfig, IScenario } from '@/kingdom/types';
 import type { IRng } from '@/common/types';
-import type { IUnit } from '@/units/types';
+import { ARMOR_DEFS, WEAPON_DEFS } from '@/units/data';
+import { AttributeKind, EquipmentKind } from '@/units/types';
+import type { IArmorDef, IUnit, IWeaponDef } from '@/units/types';
 import { mulberry32 } from '../helpers/rng';
 
 /**
@@ -62,6 +64,57 @@ export function disposeKingdom(fixture: IKingdomFixture): void {
     fixture.world.dispose();
     fixture.control.dispose();
     fixture.physics.dispose();
+}
+
+/**
+ * 纯物理层传送：移除并按同一单位属性重新注册刚体，**不**触碰控制系统的注册状态
+ * （避免重新注册创建新 AI、同时让 `KingdomWorld.modes` 失同步，WR-09）。
+ * @param fixture 夹具。
+ * @param unitId 单位 id。
+ * @param x 新位置 x。
+ * @param y 新位置 y。
+ */
+export function teleportUnitPhysics(
+    fixture: IKingdomFixture,
+    unitId: number,
+    x: number,
+    y: number
+): void {
+    const unit = fixture.control.getUnit(unitId);
+    if (unit === null) {
+        throw new Error(`unit ${unitId} is not registered`);
+    }
+
+    let weapon: IWeaponDef | null = null;
+    const armors: IArmorDef[] = [];
+    for (const item of unit.getEquipment()) {
+        if (
+            item.kind === EquipmentKind.Weapon &&
+            weapon === null &&
+            item.weapon !== undefined
+        ) {
+            weapon = WEAPON_DEFS[item.weapon];
+        } else if (
+            item.kind === EquipmentKind.Armor &&
+            item.armor !== undefined
+        ) {
+            armors.push(ARMOR_DEFS[item.armor]);
+        }
+    }
+
+    fixture.physics.removeUnit(unitId);
+    fixture.physics.registerUnit({
+        unitId,
+        x,
+        y,
+        mass: unit.getAttribute(AttributeKind.Mass),
+        attack: unit.getAttribute(AttributeKind.Attack),
+        weaponRatio: unit.getAttribute(AttributeKind.WeaponRatio),
+        defense: unit.getAttribute(AttributeKind.Defense),
+        armorRatio: unit.getAttribute(AttributeKind.ArmorRatio),
+        weapon,
+        armors
+    });
 }
 
 /**

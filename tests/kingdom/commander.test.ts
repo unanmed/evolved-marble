@@ -586,6 +586,59 @@ describe('commander wiring — cadence, fulfilment and isolation (real Rapier)',
         expect(() => kingdom.world.tick()).not.toThrow();
         expect(kingdom.world.getTime().getGameMinutes()).toBeGreaterThan(0);
     });
+
+    it('rejects a commander order aimed at another faction army (CR-03)', () => {
+        const crossFactionCommander: ICommander = {
+            decide(): readonly IArmyOrder[] {
+                return [
+                    {
+                        armyId: 2,
+                        kind: ArmyOrderKind.MoveTo,
+                        targetX: 500,
+                        targetY: 500
+                    }
+                ];
+            }
+        };
+        fixture = createKingdom({
+            scenario: cityApproachScenario(),
+            seed: 87,
+            commanderFactory: factionId =>
+                factionId === 1 ? crossFactionCommander : { decide: () => [] }
+        });
+        const kingdom = fixture;
+
+        kingdom.world.tick();
+
+        // The blue army belongs to faction 2; faction 1's commander cannot move it.
+        expect(kingdom.world.getArmy(2)?.getOrder()).toBeNull();
+        expect(kingdom.world.getArmy(1)?.getOrder()).toBeNull();
+    });
+
+    it('isolates a hostile commander array with a throwing getter (WR-10)', () => {
+        const hostile: IArmyOrder[] = new Array(5000);
+        Object.defineProperty(hostile, 0, {
+            get(): IArmyOrder {
+                throw new Error('hostile getter');
+            },
+            configurable: true
+        });
+        for (let index = 1; index < hostile.length; index += 1) {
+            hostile[index] = { armyId: 1, kind: ArmyOrderKind.Hold };
+        }
+        fixture = createKingdom({
+            scenario: singleArmyScenario(),
+            seed: 88,
+            commanderFactory: factionId =>
+                factionId === 1
+                    ? { decide: () => hostile }
+                    : { decide: () => [] }
+        });
+        const kingdom = fixture;
+
+        expect(() => kingdom.world.tick()).not.toThrow();
+        expect(kingdom.world.getTime().getGameMinutes()).toBeGreaterThan(0);
+    });
 });
 
 describe('createDefaultKingdomConfig — production strategies', () => {

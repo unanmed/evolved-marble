@@ -1,11 +1,18 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { ControlSystem } from '@/control/ControlSystem';
+import type { IUnitAI, IUnitAIProvider } from '@/control/types';
 import { BattleSystem } from '@/kingdom/BattleSystem';
 import { BrakeAI } from '@/kingdom/BrakeAI';
 import { BattleDamageSink } from '@/kingdom/DamageSink';
+import { IdleAI } from '@/kingdom/IdleAI';
+import { KingdomWorld } from '@/kingdom/KingdomWorld';
+import { KingdomSensingWorld } from '@/kingdom/SensingWorld';
+import { createDefaultKingdomConfig } from '@/kingdom/strategies';
 import { MarchAI } from '@/kingdom/MarchAI';
 import {
     BATTLE_AREA_HALF_EXTENT,
     BATTLE_AREA_HYSTERESIS,
+    BATTLE_JOIN_GRACE_TICKS,
     BATTLE_TRIGGER_DISTANCE,
     BRAKE_MIN_MINUTES
 } from '@/kingdom/constants';
@@ -31,10 +38,10 @@ import type {
     IDamageEvent,
     IPhysicsTickResult,
     IPhysicsWorld,
+    IStaticObstacleSpec,
     IUnitPhysicsSpec,
     IUnitState
 } from '@/physics/types';
-import type { IUnitAI } from '@/control/types';
 import { mulberry32 } from '../helpers/rng';
 import { createKingdom, initRapier } from './harness';
 import type { IKingdomFixture } from './harness';
@@ -396,14 +403,91 @@ describe('battle — real Rapier trigger, membership, damage and end', () => {
         expect(defender.isAlive()).toBe(true);
     });
 
-    it('brakes a member that leaves the active battle and lets it rejoin', () => {
+    it('applies a hit when the defender is knocked past the square by that same hit', () => {
         const created = createKingdom({
             scenario: battleScenario(),
-            seed: 23
+            seed: 25
         });
         fixture = created;
         const { world, control, physics } = created;
         driveTogether(created);
+
+        let battle: IBattle | null = null;
+        for (let tick = 0; tick < 500 && battle === null; tick += 1) {
+            world.tick();
+            battle = world.getBattleSystem().listActiveBattles()[0] ?? null;
+        }
+        battle = tickUntilMembers(world, 20);
+        expect(battle).not.toBeNull();
+        if (battle === null) {
+            return;
+        }
+
+        const firstFaction = world.getArmy(1)?.getFactionId() ?? 1;
+        const members = battle.getMemberUnitIds();
+        const attackerId = members.find(
+            unitId => control.getTeam(unitId) === firstFaction
+        );
+        const defenderId = members.find(
+            unitId => control.getTeam(unitId) !== firstFaction
+        );
+        expect(attackerId).toBeDefined();
+        expect(defenderId).toBeDefined();
+        if (attackerId === undefined || defenderId === undefined) {
+            return;
+        }
+        const attacker = control.getUnit(attackerId);
+        const defender = control.getUnit(defenderId);
+        expect(attacker).not.toBeNull();
+        expect(defender).not.toBeNull();
+        if (attacker === null || defender === null) {
+            return;
+        }
+
+        const center = battle.getCenter();
+        // Move the defender just outside the square WITHOUT a battle tick: membership is
+        // still the pre-step snapshot, so this legitimate edge hit must not be dropped.
+        teleportUnit(
+            physics,
+            defenderId,
+            defender,
+            center.x + battle.getHalfExtent() + 5,
+            center.y
+        );
+        const healthBefore = defender.getAttribute(AttributeKind.Health);
+        const attackerTeam = control.getTeam(attackerId);
+        const defenderTeam = control.getTeam(defenderId);
+        expect(attackerTeam).toBeDefined();
+        expect(defenderTeam).toBeDefined();
+
+        const sink = new BattleDamageSink(physics, () =>
+            world.getBattleSystem()
+        );
+        sink.applyDamage({
+            event: {
+                attackerId,
+                defenderId,
+                attackerPart: ColliderPart.Weapon,
+                defenderPart: ColliderPart.Body,
+                deltaV: 5,
+                damageMean: 1,
+                damage: 1,
+                damageReduced: 0
+            },
+            attacker,
+            defender,
+            attackerTeamId: attackerTeam ?? 0,
+            defenderTeamId: defenderTeam ?? 0
+        });
+
+        expect(defender.getAttribute(AttributeKind.Health)).toBe(
+            healthBefore - 1
+        );
+    });
+
+    it('brakes a member that leaves the active battle and lets it rejoin', () => {
+        const stub = createStubKingdom(stubBattleScenario());
+        const { world, control, physics, positions } = stub;
 
         const installs: { unitId: number; ai: IUnitAI; minute: number }[] = [];
         const originalSetUnitAI = control.setUnitAI.bind(control);
@@ -417,31 +501,43 @@ describe('battle — real Rapier trigger, membership, damage and end', () => {
         };
 
         let battle: IBattle | null = null;
-        for (let tick = 0; tick < 500 && battle === null; tick += 1) {
+        for (let tick = 0; tick < 20 && battle === null; tick += 1) {
             world.tick();
-            battle = world.getBattleSystem().listActiveBattles()[0] ?? null;
+            const active = world.getBattleSystem().listActiveBattles()[0];
+            if (active !== undefined && active.getMemberUnitIds().length > 0) {
+                battle = active;
+            }
         }
-        expect(battle).not.toBeNull();
-        battle = tickUntilMembers(world, 20);
         expect(battle).not.toBeNull();
         if (battle === null) {
+            world.dispose();
+            control.dispose();
+            physics.dispose();
             return;
         }
 
-        const leaverFaction = world.getArmy(1)?.getFactionId() ?? 1;
-        const leavers = livingMembersOf(battle, control, leaverFaction);
-        expect(leavers.length).toBeGreaterThan(0);
-        const leaver = leavers[0];
-        const leaverUnit = control.getUnit(leaver);
-        expect(leaverUnit).not.toBeNull();
-        if (leaverUnit === null) {
+        const leaver = battle
+            .getMemberUnitIds()
+            .find(unitId => control.getTeam(unitId) === 1);
+        expect(leaver).toBeDefined();
+        if (leaver === undefined) {
+            world.dispose();
+            control.dispose();
+            physics.dispose();
             return;
         }
 
-        // Push the unit far outside the square (physics has no set-position).
-        teleportUnit(physics, leaver, leaverUnit, 900, 900);
+        // Move the leaver out by writing the stub position directly: control and the
+        // world's mode map stay in sync, and no damage can end the battle.
+        positions.set(leaver, {
+            x: 900,
+            y: 900,
+            angle: 0,
+            vx: 0,
+            vy: 0,
+            angularVelocity: 0
+        });
         world.tick();
-
         expect(world.getBattleSystem().getBattleForUnit(leaver)).toBeNull();
         expect(
             installs.some(
@@ -450,12 +546,18 @@ describe('battle — real Rapier trigger, membership, damage and end', () => {
         ).toBe(true);
 
         const leftAt = world.getTime().getGameMinutes();
-
-        // Braking arithmetic is pinned by the BrakeAI unit test below; re-registering the
-        // body resets its velocity, so this suite only pins the mode window and the rejoin.
-        const now = world.getTime().getGameMinutes();
-        if (now < leftAt + BRAKE_MIN_MINUTES) {
-            expect(
+        let sawPrematureMarch = false;
+        let sawMarch = false;
+        for (
+            let step = 0;
+            step < BRAKE_MIN_MINUTES + 10 && !sawMarch;
+            step += 1
+        ) {
+            if (!world.getBattleSystem().hasActiveBattle()) {
+                break;
+            }
+            world.tick();
+            if (
                 installs.some(
                     entry =>
                         entry.unitId === leaver &&
@@ -463,14 +565,41 @@ describe('battle — real Rapier trigger, membership, damage and end', () => {
                         entry.minute >= leftAt &&
                         entry.minute < leftAt + BRAKE_MIN_MINUTES
                 )
-            ).toBe(false);
+            ) {
+                sawPrematureMarch = true;
+            }
+            const march = installs.find(
+                entry =>
+                    entry.unitId === leaver &&
+                    entry.ai instanceof MarchAI &&
+                    entry.minute >= leftAt
+            );
+            if (march !== undefined) {
+                sawMarch = true;
+                expect(march.minute).toBeGreaterThanOrEqual(
+                    leftAt + BRAKE_MIN_MINUTES
+                );
+            }
         }
+        expect(sawPrematureMarch).toBe(false);
+        expect(sawMarch).toBe(true);
 
         // Move it back inside the square: the join pass re-adds it.
         const center = battle.getCenter();
-        teleportUnit(physics, leaver, leaverUnit, center.x, center.y);
+        positions.set(leaver, {
+            x: center.x,
+            y: center.y,
+            angle: 0,
+            vx: 0,
+            vy: 0,
+            angularVelocity: 0
+        });
         world.tick();
         expect(world.getBattleSystem().getBattleForUnit(leaver)).not.toBeNull();
+
+        world.dispose();
+        control.dispose();
+        physics.dispose();
     });
 
     it('keeps one battle per army pair and never emits a duplicate Started', () => {
@@ -592,6 +721,8 @@ describe('battle — real Rapier trigger, membership, damage and end', () => {
 class StubPhysics implements IPhysicsWorld {
     /** unitId → 运动读数。 */
     private readonly positions: Map<number, IUnitState>;
+    /** 下一个静态障碍 id（桩不模拟几何，仅满足接缝）。 */
+    private nextObstacleId = 1;
 
     /**
      * 构造桩物理世界。
@@ -670,11 +801,116 @@ class StubPhysics implements IPhysicsWorld {
     }
 
     /**
+     * 添加静态障碍：桩不模拟几何，只返回递增 id。
+     * @param _spec 静态障碍规格。
+     * @returns 障碍 id。
+     */
+    addStaticObstacle(_spec: IStaticObstacleSpec): number {
+        const id = this.nextObstacleId;
+        this.nextObstacleId += 1;
+        return id;
+    }
+
+    /**
+     * 移除静态障碍：桩无几何，空操作。
+     * @param _obstacleId 障碍 id。
+     */
+    removeStaticObstacle(_obstacleId: number): void {
+        // 无几何。
+    }
+
+    /**
      * 清空位置表。
      */
     dispose(): void {
         this.positions.clear();
     }
+}
+
+/**
+ * 桩物理王国测试用的双势力场景：两队各 3 单位，中心相距 40 m（< 80 m 触发距离），
+ * 单位出生在 4 m 环上，全部落在以中点为心的战斗正方形内。
+ * @returns 场景表。
+ */
+function stubBattleScenario(): IScenario {
+    return {
+        width: 1000,
+        height: 1000,
+        factions: [
+            { id: 1, name: 'Red' },
+            { id: 2, name: 'Blue' }
+        ],
+        cities: [],
+        armies: [
+            {
+                id: 1,
+                factionId: 1,
+                x: 480,
+                y: 500,
+                heading: 0,
+                units: [{ classKind: ClassKind.Swordsman, count: 3 }]
+            },
+            {
+                id: 2,
+                factionId: 2,
+                x: 520,
+                y: 500,
+                heading: Math.PI,
+                units: [{ classKind: ClassKind.Swordsman, count: 3 }]
+            }
+        ],
+        terrain: []
+    };
+}
+
+/**
+ * 用桩物理装配一套王国夹具：位置静止、无伤害，因此战斗在测试期间不会自行结束。
+ * @param scenario 场景表。
+ * @returns 世界、控制、桩物理与共享位置表。
+ */
+function createStubKingdom(scenario: IScenario): {
+    world: KingdomWorld;
+    control: ControlSystem;
+    physics: StubPhysics;
+    positions: Map<number, IUnitState>;
+} {
+    const positions = new Map<number, IUnitState>();
+    const physics = new StubPhysics(positions);
+    const sensing = new KingdomSensingWorld(
+        scenario.width,
+        scenario.height,
+        scenario.terrain
+    );
+    let worldRef: KingdomWorld | null = null;
+    const sink = new BattleDamageSink(
+        physics,
+        () => worldRef?.getBattleSystem() ?? null
+    );
+    const provider: IUnitAIProvider = {
+        /**
+         * 注册时创建待命 AI；World 在第一个子步按模式替换它。
+         * @returns 新的待命 AI。
+         */
+        create(): IUnitAI {
+            return new IdleAI();
+        },
+        /**
+         * 无内部状态。
+         */
+        destroy(): void {
+            // 无状态。
+        }
+    };
+    const control = new ControlSystem(physics, sensing, provider, sink);
+    const world = new KingdomWorld(
+        physics,
+        control,
+        mulberry32(7),
+        scenario,
+        createDefaultKingdomConfig(() => ({ decide: () => [] }))
+    );
+    worldRef = world;
+    return { world, control, physics, positions };
 }
 
 /**
@@ -729,6 +965,7 @@ function makeArmy(
  * @param teams 阵营表。
  * @param weight 权重函数。
  * @param ended 结束回调记录。
+ * @param merged 合并通知记录（可选）。
  * @returns 战斗系统。
  */
 function makeBattles(
@@ -737,7 +974,8 @@ function makeBattles(
     units: Map<number, IUnit>,
     teams: Map<number, number>,
     weight: UnitWeight,
-    ended: IBattle[]
+    ended: IBattle[],
+    merged: { absorbed: IBattle; survivor: IBattle }[] = []
 ): BattleSystem {
     let minute = 0;
     return new BattleSystem(
@@ -750,7 +988,10 @@ function makeBattles(
         BATTLE_AREA_HALF_EXTENT,
         BATTLE_TRIGGER_DISTANCE,
         BATTLE_AREA_HYSTERESIS,
-        battle => ended.push(battle)
+        battle => ended.push(battle),
+        () => [],
+        () => null,
+        (absorbed, survivor) => merged.push({ absorbed, survivor })
     );
 }
 
@@ -777,13 +1018,15 @@ describe('BattleSystem — membership, merge, locks and weighting (stub physics)
             makeArmy(3, 1, 200, 100, [3])
         ];
         const ended: IBattle[] = [];
+        const merged: { absorbed: IBattle; survivor: IBattle }[] = [];
         const battles = makeBattles(
             positions,
             armies,
             units,
             teams,
             () => 1,
-            ended
+            ended,
+            merged
         );
 
         battles.tick();
@@ -805,8 +1048,12 @@ describe('BattleSystem — membership, merge, locks and weighting (stub physics)
                 event.kind === BattleLifecycleKind.Ended && event.battleId === 2
         );
         expect(mergedEvent?.mergedIntoBattleId).toBe(1);
-        // Merge must not trigger the settlement callback.
+        // Merge must not trigger the settlement callback, but it must notify the World
+        // so participant ledgers can be folded (WR-05).
         expect(ended).toHaveLength(0);
+        expect(merged).toHaveLength(1);
+        expect(merged[0].absorbed.getId()).toBe(2);
+        expect(merged[0].survivor.getId()).toBe(1);
 
         // The surviving battle absorbs the members on the next join pass.
         battles.tick();
@@ -1006,6 +1253,199 @@ describe('BattleSystem — membership, merge, locks and weighting (stub physics)
         expect(
             battles.listActiveBattles()[0].getMemberUnitIds().length
         ).toBeGreaterThan(0);
+    });
+
+    it('ends a battle when every member dies (mutual annihilation)', () => {
+        const positions = new Map<number, IUnitState>();
+        const units = new Map<number, IUnit>();
+        const teams = new Map<number, number>();
+        for (const [unitId, team, x, y] of [
+            [1, 1, 100, 100],
+            [2, 2, 140, 100],
+            [3, 1, 110, 110],
+            [4, 2, 130, 110]
+        ] as const) {
+            units.set(
+                unitId,
+                spawnUnit(ClassKind.Swordsman, mulberry32(unitId))
+            );
+            teams.set(unitId, team);
+            place(positions, unitId, x, y);
+        }
+        const armies = [
+            makeArmy(1, 1, 100, 100, [1, 3]),
+            makeArmy(2, 2, 140, 100, [2, 4])
+        ];
+        const ended: IBattle[] = [];
+        const battles = makeBattles(
+            positions,
+            armies,
+            units,
+            teams,
+            () => 1,
+            ended
+        );
+
+        battles.tick();
+        battles.tick();
+        expect(battles.listActiveBattles()).toHaveLength(1);
+        expect(
+            battles.listActiveBattles()[0].getMemberUnitIds().length
+        ).toBeGreaterThan(0);
+
+        for (const unit of units.values()) {
+            unit.takeDamage(unit.getAttribute(AttributeKind.MaxHealth) * 2);
+        }
+        battles.tick();
+
+        expect(battles.listActiveBattles()).toHaveLength(0);
+        expect(battles.listCompletedBattles()).toHaveLength(1);
+        expect(ended).toHaveLength(1);
+    });
+
+    it('ends a battle when every member leaves the square', () => {
+        const positions = new Map<number, IUnitState>();
+        const units = new Map<number, IUnit>();
+        const teams = new Map<number, number>();
+        for (const [unitId, team, x, y] of [
+            [1, 1, 100, 100],
+            [2, 2, 140, 100],
+            [3, 1, 110, 110],
+            [4, 2, 130, 110]
+        ] as const) {
+            units.set(
+                unitId,
+                spawnUnit(ClassKind.Swordsman, mulberry32(unitId))
+            );
+            teams.set(unitId, team);
+            place(positions, unitId, x, y);
+        }
+        const armies = [
+            makeArmy(1, 1, 100, 100, [1, 3]),
+            makeArmy(2, 2, 140, 100, [2, 4])
+        ];
+        const ended: IBattle[] = [];
+        const battles = makeBattles(
+            positions,
+            armies,
+            units,
+            teams,
+            () => 1,
+            ended
+        );
+
+        battles.tick();
+        battles.tick();
+        expect(battles.listActiveBattles()).toHaveLength(1);
+
+        for (const unitId of [1, 2, 3, 4]) {
+            place(positions, unitId, 800, 800);
+        }
+        battles.tick();
+
+        expect(battles.listActiveBattles()).toHaveLength(0);
+        expect(battles.listCompletedBattles()).toHaveLength(1);
+        expect(ended).toHaveLength(1);
+    });
+
+    it('does not settle a one-sided battle before the other side joins', () => {
+        const positions = new Map<number, IUnitState>();
+        const units = new Map<number, IUnit>();
+        const teams = new Map<number, number>();
+        units.set(1, spawnUnit(ClassKind.Swordsman, mulberry32(11)));
+        units.set(2, spawnUnit(ClassKind.Swordsman, mulberry32(12)));
+        units.set(3, spawnUnit(ClassKind.Swordsman, mulberry32(13)));
+        units.set(4, spawnUnit(ClassKind.Swordsman, mulberry32(14)));
+        teams.set(1, 1);
+        teams.set(3, 1);
+        teams.set(2, 2);
+        teams.set(4, 2);
+        // Army centres 60 m apart trigger, but only faction 1 has units in the square.
+        place(positions, 1, 130, 100);
+        place(positions, 3, 125, 100);
+        place(positions, 2, 600, 100);
+        place(positions, 4, 600, 110);
+        const armies = [
+            makeArmy(1, 1, 100, 100, [1, 3]),
+            makeArmy(2, 2, 160, 100, [2, 4])
+        ];
+        const ended: IBattle[] = [];
+        const battles = makeBattles(
+            positions,
+            armies,
+            units,
+            teams,
+            () => 1,
+            ended
+        );
+
+        battles.tick();
+        battles.tick();
+        expect(battles.listActiveBattles()).toHaveLength(1);
+        expect(ended).toHaveLength(0);
+
+        // Still inside the join grace: one-sided membership must not end or settle.
+        for (let tick = 0; tick < 5; tick += 1) {
+            battles.tick();
+        }
+        expect(battles.listActiveBattles()).toHaveLength(1);
+        expect(ended).toHaveLength(0);
+
+        // Contact: the missing side enters, then dies — a legitimate end/settlement.
+        place(positions, 2, 130, 105);
+        place(positions, 4, 130, 115);
+        battles.tick();
+        for (const unitId of [2, 4]) {
+            const unit = units.get(unitId);
+            unit?.takeDamage(
+                (unit?.getAttribute(AttributeKind.MaxHealth) ?? 0) * 2
+            );
+        }
+        battles.tick();
+
+        expect(battles.listActiveBattles()).toHaveLength(0);
+        expect(ended).toHaveLength(1);
+    });
+
+    it('ends a stale one-sided battle after the join grace without settling it', () => {
+        const positions = new Map<number, IUnitState>();
+        const units = new Map<number, IUnit>();
+        const teams = new Map<number, number>();
+        units.set(1, spawnUnit(ClassKind.Swordsman, mulberry32(21)));
+        units.set(2, spawnUnit(ClassKind.Swordsman, mulberry32(22)));
+        teams.set(1, 1);
+        teams.set(2, 2);
+        place(positions, 1, 130, 100);
+        place(positions, 2, 600, 100);
+        const armies = [
+            makeArmy(1, 1, 100, 100, [1]),
+            makeArmy(2, 2, 160, 100, [2])
+        ];
+        const ended: IBattle[] = [];
+        const battles = makeBattles(
+            positions,
+            armies,
+            units,
+            teams,
+            () => 1,
+            ended
+        );
+
+        let endedEvents = 0;
+        for (let tick = 0; tick < BATTLE_JOIN_GRACE_TICKS + 5; tick += 1) {
+            battles.tick();
+            endedEvents += battles
+                .drainEvents()
+                .filter(
+                    event => event.kind === BattleLifecycleKind.Ended
+                ).length;
+        }
+
+        expect(battles.listActiveBattles()).toHaveLength(0);
+        expect(battles.listCompletedBattles()).toHaveLength(1);
+        expect(endedEvents).toBe(1);
+        // Ended as stale/unsettled: the settlement callback still fires but contested=false.
+        expect(ended).toHaveLength(1);
     });
 });
 

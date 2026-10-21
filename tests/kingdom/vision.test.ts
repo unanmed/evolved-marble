@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import RAPIER from '@dimforge/rapier2d-compat';
-import { createKingdom } from './harness';
+import { createKingdom, teleportUnitPhysics } from './harness';
 import type { IKingdomFixture } from './harness';
 import { ARMY_VISION_RADIUS, CITY_VISION_RADIUS } from '@/kingdom/constants';
 import { CityKind } from '@/kingdom/types';
@@ -124,7 +124,7 @@ function disposeFixture(target: IKingdomFixture): void {
 }
 
 /**
- * 以「移除 + 同 id 重新注册」把单位传送到新位置（物理层没有 set-position）。
+ * 把单位传送到新位置：只经物理层移除/重注册，保持控制系统与王国模式映射同步。
  * @param target 夹具。
  * @param unitId 单位 id。
  * @param x 新位置 x。
@@ -136,13 +136,7 @@ function teleport(
     x: number,
     y: number
 ): void {
-    const unit = target.control.getUnit(unitId);
-    const teamId = target.control.getTeam(unitId);
-    if (unit === null || teamId === undefined) {
-        throw new Error(`unit ${unitId} is not registered`);
-    }
-    target.control.unregisterUnit(unitId);
-    target.control.registerUnit({ unitId, unit, teamId, x, y });
+    teleportUnitPhysics(target, unitId, x, y);
 }
 
 /**
