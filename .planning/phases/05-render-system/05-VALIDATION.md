@@ -53,7 +53,7 @@ created: "2026-10-21"
 ## Wave 0 Requirements
 
 - [ ] `pixi.js@8.22.0` installed with exact pin (`pnpm add -E`), preceded by `checkpoint:human-verify` (supply-chain SUS signal).
-- [ ] `tests/render/` directory + `tests/render/fakes.ts` — fake `IUnit`, `IUnitState`, `IDamageSink`, narrow `IPhysicsWorld`.
+- [ ] `tests/render/` directory (Round 2: `tests/render/fakes.ts` — fake `IUnit`, `IUnitState`, `IDamageSink`, narrow `IPhysicsWorld`).
 - [ ] `tests/render/types.test.ts` — Round 1 enum pins + `expectTypeOf` contract assertions.
 - [ ] `tests/demo/` — Round 2 runner + composition tests.
 - [ ] `package.json` gains `dev` (and optionally `build`) scripts — Round 2.

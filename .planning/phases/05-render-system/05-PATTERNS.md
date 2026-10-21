@@ -131,7 +131,7 @@ export interface IUnitCatalog {
 }
 ```
 
-Apply it to the render contract: `ICamera.getBattleTarget(): number | null`, `IUnitViewSpec.weapon: WeaponKind | undefined`, `IRenderDamageEvent.armorKind: ArmorKind | undefined`.
+Apply it to the render contract: `ICamera.getBattleTarget(): number | undefined`, `IUnitViewSpec.weapon: WeaponKind | undefined`, `IRenderDamageEvent.armorKind: ArmorKind | undefined`.
 
 **Upstream contracts to re-export/reference (do not restate):**
 
@@ -235,7 +235,7 @@ Apply to:
 expectTypeOf<IRenderer['renderFrame']>().returns.toEqualTypeOf<void>();
 expectTypeOf<IRenderer['getCanvas']>().returns.toEqualTypeOf<HTMLCanvasElement>();
 expectTypeOf<IRenderer['getCamera']>().returns.toEqualTypeOf<ICamera>();
-expectTypeOf<ICamera['setBattleTarget']>().parameter(0).toEqualTypeOf<number | null>();
+expectTypeOf<ICamera['setBattleTarget']>().parameter(0).toEqualTypeOf<number | undefined>();
 expectTypeOf<ICamera['update']>().parameter(0).toEqualTypeOf<ICameraUpdateInput>();
 expectTypeOf<IUnitView['getRoot']>().returns.toEqualTypeOf<Container>();
 expectTypeOf<IDamageFeed['drain']>().returns.toEqualTypeOf<readonly IRenderDamageEvent[]>();

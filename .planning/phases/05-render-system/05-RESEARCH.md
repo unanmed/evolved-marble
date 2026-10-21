@@ -99,7 +99,7 @@ Phase 5 是**只读渲染层**：它把 Phase 1–4 已经冻结的「单位 + �
 | REND-01 | 使用 PixiJS 实现 2D 顶视渲染 | PixiJS `8.22.0`（钉版）、WebGL renderer、`await app.init({width:1920,height:1080,autoStart:false,resolution:1,preserveDrawingBuffer:true})`、`app.render()` 同步手动渲染、`app.canvas` 暴露给 Phase 6；`IRenderer` 只画一帧（D-18） |
 | REND-02 | 单位、武器、防具、阵营在画面上可辨 | `IUnitViewFactory` + `GeometryUnitView`；本体白底 `tint = factionColor`；6 武器按“局部 x≈0.7 的竖直轮廓 + 不同头部/长度/弧度”区分；2 防具按“中心内环（头盔）/前向厚弧（盾牌）”区分；共享 `GraphicsContext` 控成本。**注意：`DEFAULT_SCENARIO` 不含 Hammer/Knight，需 demo 变体才能目视验证全部 6 武器 / 2 防具**（见 §Open Questions OQ-2） |
 | REND-03 | HUD 显示每个单位的 HP / 等级 / 阵营 | `IHud`：头顶血条（颜色=阵营色、无文字）、本体等级数字（不旋转、世界尺寸）、`15 × outputFps` 帧显隐、总单位少于 6 时常亮、近景屏幕恒定/远景世界尺寸的平滑混合（D-07/D-08/D-09）；数据来自 `IUnit.getAttribute(Health/MaxHealth/Level)` + `IUnitCatalog.getTeam` |
-| REND-04 | 自动镜头跟拍激烈战斗区域 | `ICamera` 两态（`BattleFocus` / `Strategic`）；`setBattleTarget(id \| null)`（D-15）；中位数 + 第 90 百分位切比雪夫半径保证 ≥90% 成员在画面内；指数平滑 + 定时缓动切换（禁止瞬移）；strategic 全景画军队箭头/城池标志、不画单位（D-14） |
+| REND-04 | 自动镜头跟拍激烈战斗区域 | `ICamera` 两态（`BattleFocus` / `Strategic`）；`setBattleTarget(id \| undefined)`（D-15）；中位数 + 第 90 百分位切比雪夫半径保证 ≥90% 成员在画面内；指数平滑 + 定时缓动切换（禁止瞬移）；strategic 全景画军队箭头/城池标志、不画单位（D-14） |
 | REND-05 | Chrome-only；数十单位混战下维持可交互帧率 | **按 D-01 放宽**：不追求实时帧率；验收改为“Chrome 能跑、不崩、逐帧推进并输出 canvas”。基本优化：共享 `GraphicsContext`、视口裁剪、Text 不逐帧改字、粒子/伤害数字池化上限、`resolution:1`、无 per-unit filter/mask；不做 LOD/分区网格 |
 
 </phase_requirements>
@@ -116,7 +116,7 @@ Phase 5 是**只读渲染层**：它把 Phase 1–4 已经冻结的「单位 + �
 | 4 | 接口成员/方法必须 JSDoc；私有成员/方法必须 JSDoc；所有顶层 `const` 必须 JSDoc | 契约提案已逐成员写 JSDoc；Round 2 的 `DEFAULT_RENDER_CONFIG`、调色板、历法常量、私有字段全部写 JSDoc |
 | 5 | 不允许出现不在 interface 中的公共成员 | 所有 class 的公共方法都在其 `implements` 的接口里；Pixi `Application` 的创建用**模块级函数** `createRenderer(...)`，不新增 class 静态公共方法 |
 | 6 | 禁止 `get`/`set` 访问器；只读成员优先 `readonly`；`getXxx()` 用于计算/查找 | 不写访问器；`getCanvas()`/`getCamera()`/`getMode()`/`getTransform()`/`getBattleTarget()` 都是方法；配置字段用 `readonly` |
-| 7 | 缺失对象用 `null`，缺失字面量用 `undefined` | `IUnitCatalog.getUnit`/`IPhysicsWorld.getUnitState` → `null`；`weapon`/`armorKind`/`weaponKind` → `undefined`；`getBattleTarget()` → `number \| null` |
+| 7 | 缺失对象用 `null`，缺失字面量用 `undefined` | `IUnitCatalog.getUnit`/`IPhysicsWorld.getUnitState` → `null`；`weapon`/`armorKind`/`weaponKind` → `undefined`；`getBattleTarget()` → `number \| undefined` |
 | 8 | 通用可复用抽象放 `src/common/` | demo 复用 `MathRng`（`src/common/rng.ts`）；不为渲染新建通用随机/数学抽象。`mulberry32` 继续留在 `tests/helpers/`（不是生产依赖） |
 | 9 | 私有成员用 `private`，禁止 `#` 与 `_` 前缀 | 所有实现类字段/方法用 `private`，命名与公共成员一致 |
 | 10 | 多参数优先对象参数；禁止内联对象类型 | `ICameraUpdateInput`、`IHudFrame`、`IRenderServices`、`IUnitViewSpec`、`IUnitViewState`、`IRenderDamageEvent` 等显式 `I*`；不写 `{ x: number; y: number }` 内联参数 |
@@ -1233,7 +1233,7 @@ private schedule(): void {
 ```ts
 /**
  * 镜头的两种状态（D-14）。
- * 目标只由 `ICamera.setBattleTarget()` 驱动（`null` = 切向全景，非 `null` = 跟拍）；
+ * 目标只由 `ICamera.setBattleTarget()` 驱动（`undefined` = 切向全景，有值 = 跟拍）；
  * `getMode()` 返回**当前渲染模式**：切向全景的过渡完成前仍是 `BattleFocus`，
  * 这样单位不会在镜头还在拉远时瞬间消失。不提供独立的 `setMode()`。
  */
@@ -1311,9 +1311,9 @@ export interface ICameraUpdateInput {
  */
 export interface ICamera {
     /** 指定跟拍目标；`null` 切到全景。只改变目标，不改变当前 transform（不瞬移）。 */
-    setBattleTarget(battleId: number | null): void;
-    /** 当前跟拍目标；`null` 表示全景（目标，不等于当前渲染模式）。 */
-    getBattleTarget(): number | null;
+    setBattleTarget(battleId: number | undefined): void;
+    /** 当前跟拍目标；`undefined` 表示全景（目标，不等于当前渲染模式）。 */
+    getBattleTarget(): number | undefined;
     /** 当前**渲染**模式：切向全景的过渡完成前仍为 `BattleFocus`。 */
     getMode(): CameraMode;
     /** 推进一帧的镜头状态并返回本帧 transform；每个输出帧恰好调用一次。 */
@@ -1675,7 +1675,7 @@ export interface IRenderConfig {
   - `IRenderer['renderFrame']` = `() => void`
   - `IRenderer['getCanvas']` 返回 `HTMLCanvasElement`
   - `IRenderer['getCamera']` 返回 `ICamera`
-  - `ICamera['setBattleTarget']` 接受 `number | null`
+  - `ICamera['setBattleTarget']` 接受 `number | undefined`
   - `ICamera['update']` 接受 `ICameraUpdateInput`
   - `IUnitView['getRoot']` 返回 `Container`
   - `IDamageFeed['drain']` 返回 `readonly IRenderDamageEvent[]`
@@ -2641,7 +2641,18 @@ html, body { margin: 0; height: 100%; background: #0b0d10; color: #e8edf2; }
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+| OQ | Resolution |
+|----|------------|
+| OQ-1 | Resolved by CONTEXT D-21: the ≥90% coverage is a property of the target composition; the current transform may lag during a smooth switch. |
+| OQ-2 | Resolved by CONTEXT D-22: the demo may add a `?classes=all` variant for REND-02 visual verification. |
+| OQ-3 | Resolved by CONTEXT D-23: the level number is drawn at the body center. |
+| OQ-4 | Deferred to Round-2 discretion: default `outputFps` / `frameDelayMs` are config values, not type-gate decisions. |
+| OQ-5 | Deferred to Round-2 discretion: `preserveDrawingBuffer` is a renderer-initialization detail. |
+| OQ-6 | Deferred to Round-2 discretion: the demo runner may keep the current battle or fall back to `listActiveBattles()[0]`. |
+| OQ-7 | Resolved by CONTEXT D-24: MoveTo uses canvas click picking (`screenToWorld`). |
+| OQ-8 | Resolved by the plan: exact pin `pixi.js@8.22.0`, gated by `checkpoint:human-verify`. |
 
 ### OQ-1: “≥90% 在画面内”是否要求过渡期间也成立？
 - **What we know:** D-14 同时要求“≥90%”和“禁止瞬移”；从远处战斗切到近处战斗时，二者在过渡瞬间必然冲突。
