@@ -10,7 +10,8 @@ import {
     MAP_HEIGHT,
     MAP_WIDTH,
     MAX_SCENARIO_ARMIES,
-    MAX_SCENARIO_UNITS
+    MAX_SCENARIO_UNITS,
+    SPAWN_RING_RADIUS
 } from '@/kingdom/constants';
 import { CityKind } from '@/kingdom/types';
 import type { IScenario, ITerrainRect } from '@/kingdom/types';
@@ -35,51 +36,83 @@ function isFiniteInteger(value: number): boolean {
 }
 
 /**
- * 是否为已知的 `CityKind` 成员。
- * @param value 数值。
- * @returns 是否合法。
+ * 是否为已知的 `CityKind` 成员：数字枚举的反向映射同时暴露名称键，
+ * 因此必须同时要求数字且为整数，否则 `'Capital'`/`'0'` 会绕过校验。
+ * @param value 运行期值。
+ * @returns 是否为合法数字枚举成员。
  */
-function isKnownCityKind(value: number): boolean {
-    return CityKind[value] !== undefined;
+function isKnownCityKind(value: unknown): value is CityKind {
+    return (
+        typeof value === 'number' &&
+        Number.isInteger(value) &&
+        CityKind[value] !== undefined
+    );
 }
 
 /**
- * 是否为已知的 `ClassKind` 成员。
- * @param value 数值。
- * @returns 是否合法。
+ * 是否为已知的 `ClassKind` 成员（同样要求数字整数，拒绝反向映射名称）。
+ * @param value 运行期值。
+ * @returns 是否为合法数字枚举成员。
  */
-function isKnownClassKind(value: number): boolean {
-    return ClassKind[value] !== undefined;
+function isKnownClassKind(value: unknown): value is ClassKind {
+    return (
+        typeof value === 'number' &&
+        Number.isInteger(value) &&
+        ClassKind[value] !== undefined
+    );
 }
 
 /**
- * 点是否严格位于某个地形矩形内部（边界上不算）。
+ * 出生环圆盘是否完整位于地图内（单位在点周围 `SPAWN_RING_RADIUS` 米环上生成）。
+ * @param width 地图宽度。
+ * @param height 地图高度。
+ * @param x 中心 x。
+ * @param y 中心 y。
+ * @returns 是否完整在界内。
+ */
+function spawnDiskInsideMap(
+    width: number,
+    height: number,
+    x: number,
+    y: number
+): boolean {
+    return (
+        x - SPAWN_RING_RADIUS >= 0 &&
+        x + SPAWN_RING_RADIUS <= width &&
+        y - SPAWN_RING_RADIUS >= 0 &&
+        y + SPAWN_RING_RADIUS <= height
+    );
+}
+
+/**
+ * 出生环圆盘是否与任一地形矩形相交（保守用外扩 `SPAWN_RING_RADIUS` 的 AABB 判定）。
  * @param terrain 已校验的地形表。
- * @param x 点 x。
- * @param y 点 y。
- * @returns 是否在任一矩形内部。
+ * @param x 中心 x。
+ * @param y 中心 y。
+ * @returns 是否完全不压地形。
  */
-function isStrictlyInsideTerrain(
+function spawnDiskClearOfTerrain(
     terrain: readonly ITerrainRect[],
     x: number,
     y: number
 ): boolean {
     for (const rect of terrain) {
         if (
-            Math.abs(x - rect.x) < rect.halfWidth &&
-            Math.abs(y - rect.y) < rect.halfHeight
+            Math.abs(x - rect.x) < rect.halfWidth + SPAWN_RING_RADIUS &&
+            Math.abs(y - rect.y) < rect.halfHeight + SPAWN_RING_RADIUS
         ) {
-            return true;
+            return false;
         }
     }
-    return false;
+    return true;
 }
 
 /**
  * 校验一张场景表（ASVS V5）：在构造任何势力/军队/城池或注册任何单位之前，
  * 拒绝非有限或非正的尺寸、重复或非整数 id、空名字、未知势力引用、越界位置、
- * 非正或非有限的几何、非法枚举成员、非正单位数量、单位/军队上限，以及落在
- * 地形矩形内部的军队出生点或城池点。绝不静默钳制或强制转换。
+ * 非正或非有限的几何、非法枚举成员（含数字枚举反向映射字符串）、非正单位数量、
+ * 单位/军队上限，以及出生环圆盘越界或压住地形的军队出生点/城池点。
+ * 绝不静默钳制或强制转换。
  * @param scenario 待校验的场景表。
  */
 export function validateScenario(scenario: IScenario): void {
@@ -174,8 +207,11 @@ export function validateScenario(scenario: IScenario): void {
         if (!isKnownClassKind(city.trainingClass)) {
             fail(`city ${city.id} has an unknown training class`);
         }
-        if (isStrictlyInsideTerrain(terrain, city.x, city.y)) {
-            fail(`city ${city.id} point lies inside terrain`);
+        if (!spawnDiskInsideMap(width, height, city.x, city.y)) {
+            fail(`city ${city.id} spawn ring must lie inside the map`);
+        }
+        if (!spawnDiskClearOfTerrain(terrain, city.x, city.y)) {
+            fail(`city ${city.id} spawn ring overlaps terrain`);
         }
     }
 
@@ -224,8 +260,11 @@ export function validateScenario(scenario: IScenario): void {
         if (armyIds.size > MAX_SCENARIO_ARMIES) {
             fail(`armies exceed MAX_SCENARIO_ARMIES (${MAX_SCENARIO_ARMIES})`);
         }
-        if (isStrictlyInsideTerrain(terrain, army.x, army.y)) {
-            fail(`army ${army.id} spawn point lies inside terrain`);
+        if (!spawnDiskInsideMap(width, height, army.x, army.y)) {
+            fail(`army ${army.id} spawn ring must lie inside the map`);
+        }
+        if (!spawnDiskClearOfTerrain(terrain, army.x, army.y)) {
+            fail(`army ${army.id} spawn ring overlaps terrain`);
         }
     }
 }
