@@ -30,7 +30,7 @@
     {"decision": "Approved types stay frozen: src/kingdom/types.ts and the additive seams in units/physics/control.", "rationale": "Round-1 type gate approved; Round 2 implemented without contract drift.", "phase": "04"},
     {"decision": "Three army orders only: MoveTo/Garrison/Hold; afterMinutes is relative; control owns AI lifecycle via setUnitAI.", "rationale": "User revisions at the Round-1 gate.", "phase": "04"},
     {"decision": "Armies reinforce as an Engaging 25m formation, never frozen; unit-level battle membership; numeric time 1/24.", "rationale": "User revisions at the Round-1 gate.", "phase": "04"},
-    {"decision": "Code style: forbid get/set accessor syntax; expose readonly members on public interfaces, mutate via explicit setX methods; internal class fields need not be readonly.", "rationale": "User clarification 2026-10-20: dislikes `get value()/set value()`, not readonly properties; readonly interface + setValue is preferred.", "phase": "04"},
+    {"decision": "Code style: forbid get/set accessor syntax; prefer direct readonly members on public interfaces when a value can simply be a member; getXxx() remains allowed for computed/lookup logic; mutate via explicit setX methods; internal class fields need not be readonly.", "rationale": "User clarification 2026-10-21: getXxx is not forbidden, but direct readonly members are preferred for simplicity; accessor syntax remains banned.", "phase": "04"},
     {"decision": "Code style: prefer object parameters for multi-parameter methods; define an explicit I* interface; no inline object types.", "rationale": "User clarification 2026-10-20: positional parameter lists are unpleasant; inline object types should be zero.", "phase": "04"}
   ],
   "uncommitted_files": [

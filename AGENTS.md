@@ -36,7 +36,7 @@
 8. **缺失值约定**：缺失的**对象**引用用 `null`；缺失的**字面量**（数字/枚举/布尔/字符串）用 `undefined`（即可选字段）。
 9. **通用可复用抽象**放在 `src/common/`（如 `IRng`），供各系统共享；系统自身的类型留在各自文件夹的 `types.ts`。
 10. **私有成员用 `private` 关键字**（`private name: T` / `private foo(): T`）——**禁止 `#` 私有字段**，也**不要 `_` 前缀**；私有成员的命名与普通成员一致。
-11. **禁止 `get`/`set` 访问器语法**（`get value() {}` / `set value() {}`）。需要只读成员时，**对外接口直接声明 `readonly value`**；类内部字段是否 `readonly` 不限，修改通过显式 `setValue(...)` 方法。不要用 `getValue()` 替代只读属性。
+11. **禁止 `get`/`set` 访问器语法**（`get value() {}` / `set value() {}`）。需要只读成员时，**能直接做成成员的优先在对外接口声明 `readonly value`**（更简洁）；`getValue()` 在需要计算、查找或封装逻辑时可以使用，不强制改成员。类内部字段是否 `readonly` 不限，修改通过显式 `setValue(...)` 方法。
 12. **多参数方法优先用对象参数**：参数较多时定义显式 `I*` interface 作为单一参数；**禁止内联对象类型**（如 `{ x: number; y: number }`），必须显式声明 `IObject` 并复用。
 
 <!-- GSD:project-end -->
