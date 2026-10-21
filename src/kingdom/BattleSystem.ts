@@ -20,6 +20,7 @@ import type {
     IMutableBattle,
     UnitWeight
 } from '@/kingdom/types';
+import { BATTLE_JOIN_GRACE_TICKS } from '@/kingdom/constants';
 import {
     BattleLifecycleKind,
     BattleState,
@@ -212,8 +213,10 @@ export class BattleSystem implements IBattleSystem {
     private readonly triggerDistance: number;
     /** 离区迟滞（米）。 */
     private readonly hysteresis: number;
-    /** 战斗结束回调（World 负责重组/结算）。 */
-    private readonly onEnded: (battle: IBattle) => void;
+    /** 战斗结束回调；`contested` 为 `false` 表示尚未接触/无幸存者，不得结算城池。 */
+    private readonly onEnded: (battle: IBattle, contested: boolean) => void;
+    /** 合并通知回调（World 负责把被吸收战斗的参与者账本折叠进存活者）。 */
+    private readonly onMerged: (absorbed: IBattle, survivor: IBattle) => void;
     /** 全部城池（城池触发与军队对抑制）；默认空表。 */
     private readonly citiesOf: () => readonly ICity[];
     /** armyId → 军队（解析城池驻军）；默认恒为 `null`。 */
@@ -245,6 +248,16 @@ export class BattleSystem implements IBattleSystem {
     private events: IBattleLifecycleEvent[] = [];
     /** 下一个战斗 id（单调递增，永不重用）。 */
     private nextBattleId = 1;
+    /** battleId → 期望参战的阵营 id 集合（触发时确定，合并时取并集）。 */
+    private expectedTeams = new Map<number, Set<number>>();
+    /** battleId → 曾经加入过该战斗的阵营 id 集合（结算前置条件）。 */
+    private everJoinedTeams = new Map<number, Set<number>>();
+    /** battleId → 创建时的内部 tick 计数（新触发宽限期判定）。 */
+    private battleCreatedTick = new Map<number, number>();
+    /** pair 键 → 重新武装后允许再次触发的内部 tick 计数（防止同 tick 抖动）。 */
+    private retriggerCooldown = new Map<string, number>();
+    /** 内部子步计数：仅用于宽限期与重新触发冷却，不进入任何对外读取面。 */
+    private tickCounter = 0;
 
     /**
      * 构造战斗容器。
@@ -257,9 +270,10 @@ export class BattleSystem implements IBattleSystem {
      * @param halfExtent 战斗区半边长（米）。
      * @param triggerDistance 军队对触发距离（米）。
      * @param hysteresis 离区迟滞（米）。
-     * @param onEnded 战斗结束回调（合并时不调用）。
+     * @param onEnded 战斗结束回调（合并时不调用）；第二参数表示是否发生过真实接触。
      * @param citiesOf 全部城池的只读快照来源（城池触发与军队对抑制）；省略时无城池。
      * @param armyOf 按 id 读取军队（解析城池驻军）；省略时恒为 `null`。
+     * @param onMerged 合并通知回调（被吸收战斗，存活战斗）；省略时无操作。
      */
     constructor(
         physics: IPhysicsWorld,
@@ -271,9 +285,12 @@ export class BattleSystem implements IBattleSystem {
         halfExtent: number,
         triggerDistance: number,
         hysteresis: number,
-        onEnded: (battle: IBattle) => void,
+        onEnded: (battle: IBattle, contested: boolean) => void,
         citiesOf: () => readonly ICity[] = () => [],
-        armyOf: (armyId: number) => IArmy | null = () => null
+        armyOf: (armyId: number) => IArmy | null = () => null,
+        onMerged: (absorbed: IBattle, survivor: IBattle) => void = () => {
+            // 默认无操作：独立使用 BattleSystem 的调用方不需要合并账本。
+        }
     ) {
         this.physics = physics;
         this.teamOf = teamOf;
@@ -285,6 +302,7 @@ export class BattleSystem implements IBattleSystem {
         this.triggerDistance = triggerDistance;
         this.hysteresis = hysteresis;
         this.onEnded = onEnded;
+        this.onMerged = onMerged;
         this.citiesOf = citiesOf;
         this.armyOf = armyOf;
     }
@@ -303,6 +321,7 @@ export class BattleSystem implements IBattleSystem {
         this.recomputeWeightedCenters();
         this.endBattles();
         this.exited.clear();
+        this.tickCounter += 1;
     }
 
     /**
@@ -446,6 +465,15 @@ export class BattleSystem implements IBattleSystem {
                         continue;
                     }
                     this.membership.set(unitId, battle.getId());
+                    const team = this.teamOf(unitId);
+                    if (team !== undefined) {
+                        let joined = this.everJoinedTeams.get(battle.getId());
+                        if (joined === undefined) {
+                            joined = new Set<number>();
+                            this.everJoinedTeams.set(battle.getId(), joined);
+                        }
+                        joined.add(team);
+                    }
                     members.push(unitId);
                     changed = true;
                 }
@@ -582,6 +610,7 @@ export class BattleSystem implements IBattleSystem {
                         otherArmyId: undefined,
                         cityId
                     },
+                    [factionId, ownerFactionId],
                     () =>
                         new Battle(
                             this.nextBattleId++,
@@ -684,6 +713,7 @@ export class BattleSystem implements IBattleSystem {
                 this.createBattle(
                     key,
                     { armyId: lowId, otherArmyId: highId, cityId: undefined },
+                    [first.getFactionId(), second.getFactionId()],
                     () =>
                         new Battle(
                             this.nextBattleId++,
@@ -705,6 +735,7 @@ export class BattleSystem implements IBattleSystem {
      * 取得 pair 锁（早于 `Started` 事件），再发出 `Started`。
      * @param key pair 键。
      * @param identity 该对的身份（军队/城池）。
+     * @param expectedTeams 期望参战的阵营 id（结算前置条件）。
      * @param create 创建战斗的工厂。
      */
     private createBattle(
@@ -714,10 +745,18 @@ export class BattleSystem implements IBattleSystem {
             otherArmyId: number | undefined;
             cityId: number | undefined;
         },
+        expectedTeams: readonly number[],
         create: () => Battle
     ): void {
         if (this.pairLocks.has(key)) {
             return;
+        }
+        const cooldownUntil = this.retriggerCooldown.get(key);
+        if (cooldownUntil !== undefined) {
+            if (this.tickCounter < cooldownUntil) {
+                return;
+            }
+            this.retriggerCooldown.delete(key);
         }
         for (const battle of this.active) {
             if (this.battleTriggerKeys.get(battle.getId()) === key) {
@@ -729,6 +768,9 @@ export class BattleSystem implements IBattleSystem {
         this.active.push(battle);
         this.battleTriggerKeys.set(battle.getId(), key);
         this.pairLocks.set(key, identity);
+        this.expectedTeams.set(battle.getId(), new Set(expectedTeams));
+        this.everJoinedTeams.set(battle.getId(), new Set());
+        this.battleCreatedTick.set(battle.getId(), this.tickCounter);
         this.events.push({
             kind: BattleLifecycleKind.Started,
             battleId: battle.getId(),
@@ -836,6 +878,8 @@ export class BattleSystem implements IBattleSystem {
             this.membership.set(unitId, survivor.getId());
         }
 
+        this.foldTeamSets(survivor, absorbed);
+
         const now = this.gameMinutes();
         absorbed.setState(BattleState.Ended);
         absorbed.setEndedAtMinutes(now);
@@ -849,6 +893,45 @@ export class BattleSystem implements IBattleSystem {
         this.active = this.active.filter(battle => battle !== absorbed);
         this.completed.push(absorbed);
         this.battleTriggerKeys.delete(absorbed.getId());
+        this.onMerged(absorbed, survivor);
+    }
+
+    /**
+     * 把被吸收战斗的期望/已加入阵营集合折叠进存活者，并清理被吸收者的内部账本。
+     * @param survivor 存活战斗。
+     * @param absorbed 被吸收战斗。
+     */
+    private foldTeamSets(survivor: Battle, absorbed: Battle): void {
+        const survivorId = survivor.getId();
+        const absorbedId = absorbed.getId();
+
+        const absorbedExpected = this.expectedTeams.get(absorbedId);
+        if (absorbedExpected !== undefined) {
+            let expected = this.expectedTeams.get(survivorId);
+            if (expected === undefined) {
+                expected = new Set<number>();
+                this.expectedTeams.set(survivorId, expected);
+            }
+            for (const team of absorbedExpected) {
+                expected.add(team);
+            }
+        }
+
+        const absorbedJoined = this.everJoinedTeams.get(absorbedId);
+        if (absorbedJoined !== undefined) {
+            let joined = this.everJoinedTeams.get(survivorId);
+            if (joined === undefined) {
+                joined = new Set<number>();
+                this.everJoinedTeams.set(survivorId, joined);
+            }
+            for (const team of absorbedJoined) {
+                joined.add(team);
+            }
+        }
+
+        this.expectedTeams.delete(absorbedId);
+        this.everJoinedTeams.delete(absorbedId);
+        this.battleCreatedTick.delete(absorbedId);
     }
 
     /**
@@ -900,18 +983,29 @@ export class BattleSystem implements IBattleSystem {
     }
 
     /**
-     * 结束：区内只剩至多一个势力时结束战斗、发 `Ended`、调用回调并移入完成队列。
-     * 零成员战斗（本子步刚触发）与全部成员已不可见的战斗都保留到下一子步。
+     * 结束判定（D-03/D-05/D-17）：
+     * - 全新触发但尚无成员的战斗只保留到参与宽限期结束（避免把“本 tick 刚触发”误判为幽灵）；
+     * - 曾经有成员、如今成员为零的战斗必须结束（相互歼灭或全员离区），否则会永久钉住 1×；
+     * - 区内只剩至多一个阵营时，仅当**全部期望阵营都曾加入过**才结算（防止 80 m 触发 /
+     *   40 m 成员差导致单边提前结束、城池被未接触的攻方接管）；
+     * - 单边战斗宽限期耗尽后结束但**不结算**，并重新武装该 pair 锁，避免城市被永久免疫。
      * 结束**不**写重战锁：锁在创建时已取得，只由分离流程释放（D-05）。
      */
     private endBattles(): void {
-        const now = this.gameMinutes();
         for (const battle of [...this.active]) {
-            const members = battle.getMemberUnitIds();
-            if (members.length === 0) {
-                continue;
-            }
+            const battleId = battle.getId();
+            const createdTick =
+                this.battleCreatedTick.get(battleId) ?? this.tickCounter;
+            const age = this.tickCounter - createdTick;
+            const expected = this.expectedTeams.get(battleId);
+            const joined = this.everJoinedTeams.get(battleId);
+            const allExpectedJoined =
+                expected !== undefined &&
+                expected.size > 0 &&
+                [...expected].every(team => joined?.has(team) === true);
+            const hadMembers = joined !== undefined && joined.size > 0;
 
+            const members = battle.getMemberUnitIds();
             const teams = new Set<number>();
             let living = 0;
             for (const unitId of members) {
@@ -927,22 +1021,69 @@ export class BattleSystem implements IBattleSystem {
                 living += 1;
             }
 
-            if (living === 0 || teams.size > 1) {
+            if (members.length === 0 || living === 0) {
+                // 曾经参战过就必须结束（相互歼灭/全员离区）；全新触发则给宽限期。
+                if (hadMembers || age >= BATTLE_JOIN_GRACE_TICKS) {
+                    this.endUnsettled(battle, !allExpectedJoined);
+                }
                 continue;
             }
 
-            battle.setState(BattleState.Ended);
-            battle.setEndedAtMinutes(now);
-            this.events.push({
-                kind: BattleLifecycleKind.Ended,
-                battleId: battle.getId(),
-                gameMinutes: now
-            });
-            this.active = this.active.filter(item => item !== battle);
-            this.completed.push(battle);
-            this.battleTriggerKeys.delete(battle.getId());
-            this.onEnded(battle);
+            if (teams.size > 1) {
+                continue;
+            }
+
+            if (allExpectedJoined) {
+                this.finishBattle(battle, true);
+                continue;
+            }
+
+            // 单边成员：宽限期内等待另一方进入，耗尽后结束但不结算并重新武装锁。
+            if (age >= BATTLE_JOIN_GRACE_TICKS) {
+                this.endUnsettled(battle, true);
+            }
         }
+    }
+
+    /**
+     * 结束一场尚未真实接触（或没有幸存者）的战斗：不结算城池；需要时重新武装 pair 锁。
+     * @param battle 待结束战斗。
+     * @param rearm 是否重新武装该 pair 锁（单边参与时）。
+     */
+    private endUnsettled(battle: Battle, rearm: boolean): void {
+        const key = this.battleTriggerKeys.get(battle.getId());
+        this.finishBattle(battle, false);
+        if (rearm && key !== undefined) {
+            this.pairLocks.delete(key);
+            this.retriggerCooldown.set(
+                key,
+                this.tickCounter + BATTLE_JOIN_GRACE_TICKS
+            );
+        }
+    }
+
+    /**
+     * 结束一场活跃战斗：写 `Ended`、移入完成队列、清理内部账本并通知 World。
+     * @param battle 待结束战斗。
+     * @param contested 是否发生过双方参与的接触（决定 World 是否可结算城池）。
+     */
+    private finishBattle(battle: Battle, contested: boolean): void {
+        const battleId = battle.getId();
+        const now = this.gameMinutes();
+        battle.setState(BattleState.Ended);
+        battle.setEndedAtMinutes(now);
+        this.events.push({
+            kind: BattleLifecycleKind.Ended,
+            battleId,
+            gameMinutes: now
+        });
+        this.active = this.active.filter(item => item !== battle);
+        this.completed.push(battle);
+        this.battleTriggerKeys.delete(battleId);
+        this.expectedTeams.delete(battleId);
+        this.everJoinedTeams.delete(battleId);
+        this.battleCreatedTick.delete(battleId);
+        this.onEnded(battle, contested);
     }
 
     /**

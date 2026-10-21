@@ -28,9 +28,11 @@ import {
     CITY_VISION_RADIUS,
     GARRISON_HEAL_PER_HOUR,
     MARCH_HEAL_PER_HOUR,
+    MAX_SCENARIO_ARMIES,
     MAX_SCENARIO_UNITS,
     MINUTES_PER_HOUR,
     PEACE_TICK_MINUTES,
+    SPAWN_RING_RADIUS,
     TRAINING_HOURS_CAPITAL,
     TRAINING_HOURS_NORMAL
 } from '@/kingdom/constants';
@@ -76,11 +78,6 @@ import type { IRng } from '@/common/types';
 import { spawnUnit } from '@/units/spawn';
 import { AttributeKind } from '@/units/types';
 import type { IHealableUnit } from '@/units/types';
-
-/**
- * 单位初始聚集环半径（米）：让同军单位出生时不重叠；远小于阵型半径。
- */
-const SPAWN_RING_RADIUS = 4;
 
 /**
  * 行军抵达容差（米）：一个游戏分钟的行军距离。中心每个子步恰好前进该距离，
@@ -245,9 +242,10 @@ export class KingdomWorld implements IWorld {
             BATTLE_AREA_HALF_EXTENT,
             BATTLE_TRIGGER_DISTANCE,
             BATTLE_AREA_HYSTERESIS,
-            battle => this.handleBattleEnded(battle),
+            (battle, contested) => this.handleBattleEnded(battle, contested),
             () => [...this.cities.values()],
-            armyId => this.armies.get(armyId) ?? null
+            armyId => this.armies.get(armyId) ?? null,
+            (absorbed, survivor) => this.handleBattlesMerged(absorbed, survivor)
         );
 
         this.addStaticGeometry();
@@ -561,7 +559,11 @@ export class KingdomWorld implements IWorld {
         if (!this.armies.has(order.armyId)) {
             return;
         }
-        if (ArmyOrderKind[order.kind] === undefined) {
+        if (
+            typeof order.kind !== 'number' ||
+            !Number.isInteger(order.kind) ||
+            ArmyOrderKind[order.kind] === undefined
+        ) {
             return;
         }
         if (
@@ -626,7 +628,11 @@ export class KingdomWorld implements IWorld {
             if (order === null) {
                 continue;
             }
-            if (ArmyOrderKind[order.kind] === undefined) {
+            if (
+                typeof order.kind !== 'number' ||
+                !Number.isInteger(order.kind) ||
+                ArmyOrderKind[order.kind] === undefined
+            ) {
                 army.setOrder(null);
                 continue;
             }
@@ -683,8 +689,15 @@ export class KingdomWorld implements IWorld {
             if (!Array.isArray(orders)) {
                 continue;
             }
-            for (const order of orders) {
-                this.applyCommanderOrder(order);
+            // 不可信接缝（T-04-04）：限制每 tick 处理量，并逐条隔离读取/应用异常，
+            // 使恶意 getter 或超长数组都不能中断 world.tick()。
+            const limit = Math.min(orders.length, MAX_SCENARIO_ARMIES);
+            for (let index = 0; index < limit; index += 1) {
+                try {
+                    this.applyCommanderOrder(orders[index], factionId);
+                } catch {
+                    // 单条指令畸形：丢弃它，继续处理其余指令。
+                }
             }
         }
     }
@@ -754,16 +767,33 @@ export class KingdomWorld implements IWorld {
     }
 
     /**
-     * 校验并应用一条指挥官指令：军队存在、名册非空、当前无未完成指令，
-     * 其余字段交由 `issueOrder` 的同一套校验（T-04-04）。不满足时静默丢弃。
+     * 校验并应用一条指挥官指令：军队存在、名册非空、**属于下达决策的势力**、
+     * 当前无未完成指令，其余字段交由 `issueOrder` 的同一套校验（T-04-04）。
+     * 跨势力指令一律拒绝——`ICommander` 是不可信接缝，不能挪动他国军队。
      * @param order 指挥官返回的指令。
+     * @param factionId 返回该指令的势力 id。
      */
-    private applyCommanderOrder(order: IArmyOrder): void {
+    private applyCommanderOrder(order: IArmyOrder, factionId: number): void {
         if (order === null || typeof order !== 'object') {
             return;
         }
-        const army = this.armies.get(order.armyId);
-        if (army === undefined || army.getUnitIds().length === 0) {
+        const armyId = order.armyId;
+        if (typeof armyId !== 'number' || !Number.isInteger(armyId)) {
+            return;
+        }
+        const army = this.armies.get(armyId);
+        if (
+            army === undefined ||
+            army.getUnitIds().length === 0 ||
+            army.getFactionId() !== factionId
+        ) {
+            return;
+        }
+        if (
+            typeof order.kind !== 'number' ||
+            !Number.isInteger(order.kind) ||
+            ArmyOrderKind[order.kind] === undefined
+        ) {
             return;
         }
         if (army.getOrder() !== null) {
@@ -1100,6 +1130,15 @@ export class KingdomWorld implements IWorld {
         this.armyBattle.clear();
         for (const army of this.armies.values()) {
             if (army.getUnitIds().length === 0) {
+                // 空名册军队保留身份但必须惰性：清掉临时的 Reorganizing 标记与陈旧指令，
+                // 否则驻扎选择器抽空一支军队后它会永远卡在过渡状态。
+                this.reorganizingArmies.delete(army.getId());
+                army.setOrder(null);
+                army.setState(
+                    army.getGarrisonedCityId() !== undefined
+                        ? ArmyState.Garrisoned
+                        : ArmyState.Marching
+                );
                 continue;
             }
 
@@ -1195,8 +1234,12 @@ export class KingdomWorld implements IWorld {
                 .listActiveBattles()
                 .some(battle => battle.getId() === recorded);
             if (stillActive) {
-                return UnitControlMode.Brake;
+                const until = this.brakeUntilMinutes.get(unitId);
+                if (until !== undefined && this.time.getGameMinutes() < until) {
+                    return UnitControlMode.Brake;
+                }
             }
+            // 窗口已过期（或战斗已结束）：删除两处记录并落入正常 March/Idle 判定。
             this.lastBattleOfUnit.delete(unitId);
             this.brakeUntilMinutes.delete(unitId);
         }
@@ -1352,13 +1395,15 @@ export class KingdomWorld implements IWorld {
      * 1) 先对**所有**受影响军队做通用清理：删除指向该战斗的增援记录，
      *    用幸存成员重算中心并给出确定状态（仍驻守 → `Garrisoned`，否则 `Reorganizing`）。
      * 2) 军队战到此结束。
-     * 3) 城池战：存活方接管城池（共享转移 helper 清空败方驻军链接、更新双方城池列表，
-     *    从不调用 `updateTeam`），按净化后的 `GarrisonSelector` 结果新建一支 World 分配的
-     *    驻军军队并清空获胜野战军对该城的 `Garrison` 指令；最后让败方幸存军队重组。
-     *    防守方获胜时只做通用清理，不转移、不新建驻军、不改动既有链接。
+     * 3) 城池战且真实接触（`contested`）：存活方若为攻方则接管城池（共享转移 helper
+     *    清空败方驻军链接、更新双方城池列表，从不调用 `updateTeam`），按净化后的
+     *    `GarrisonSelector` 结果新建驻军军队并清空获胜野战军的 `Garrison` 指令。
+     *    无论攻守谁胜，败方幸存军队都重组并向后方行军，从而离开触发半径、释放重战锁。
+     *    未真实接触（单边参与/无幸存者）不做任何城池结算。
      * @param battle 已结束的战斗。
+     * @param contested 是否发生过双方参与的接触。
      */
-    private handleBattleEnded(battle: IBattle): void {
+    private handleBattleEnded(battle: IBattle, contested: boolean): void {
         const battleId = battle.getId();
         for (const [armyId, engagedBattleId] of [...this.armyBattle]) {
             if (engagedBattleId === battleId) {
@@ -1408,24 +1453,72 @@ export class KingdomWorld implements IWorld {
         }
 
         const cityId = battle.getCityId();
-        if (cityId === undefined) {
-            return;
-        }
-        const city = this.cities.get(cityId);
-        if (city === undefined || survivingIds.length === 0) {
-            return;
+        const city = cityId === undefined ? undefined : this.cities.get(cityId);
+        if (city !== undefined && survivingIds.length > 0) {
+            survivingIds.sort((first, second) => first - second);
+            const winnerOwner = this.unitArmy.get(survivingIds[0]);
+            if (winnerOwner !== undefined) {
+                const winnerFactionId = winnerOwner.factionId;
+                const capturesCity =
+                    contested && city.getFactionId() !== winnerFactionId;
+
+                if (capturesCity) {
+                    this.resolveCityCapture(
+                        city,
+                        cityId as number,
+                        winnerFactionId,
+                        survivingIds,
+                        survivorsByArmy
+                    );
+                }
+
+                if (contested) {
+                    // 进攻方被击退（城市未被攻占）与攻占成功都要重组败方：
+                    // 只做通用清理会让败方保留 Garrison 指令并停在触发半径内，
+                    // 使同一 army/city pair 因重战锁而永久无法再次交战（WR-03）。
+                    const regrouped = new Set<number>();
+                    for (const unitId of participants) {
+                        const owner = this.unitArmy.get(unitId);
+                        if (
+                            owner === undefined ||
+                            owner.factionId === winnerFactionId
+                        ) {
+                            continue;
+                        }
+                        if (regrouped.has(owner.armyId)) {
+                            continue;
+                        }
+                        regrouped.add(owner.armyId);
+                        this.regroupLosingArmy(owner.armyId);
+                    }
+                }
+            }
         }
 
-        survivingIds.sort((first, second) => first - second);
-        const winnerOwner = this.unitArmy.get(survivingIds[0]);
-        if (winnerOwner === undefined) {
-            return;
+        for (const army of this.armies.values()) {
+            if (army.getUnitIds().length === 0) {
+                army.setOrder(null);
+            }
         }
-        const winnerFactionId = winnerOwner.factionId;
-        if (city.getFactionId() === winnerFactionId) {
-            return;
-        }
+    }
 
+    /**
+     * 结算一次城池攻占：转移归属、清空获胜野战军对该城的 `Garrison` 指令与链接，
+     * 再按净化后的 `GarrisonSelector` 新建驻军军队。仅由 `handleBattleEnded` 在
+     * 双方真实接触且获胜方不是原主时调用。
+     * @param city 被攻占城池。
+     * @param cityId 城池 id。
+     * @param winnerFactionId 获胜势力 id。
+     * @param survivingIds 存活获胜单位 id（升序）。
+     * @param survivorsByArmy 军队 id → 存活单位 id。
+     */
+    private resolveCityCapture(
+        city: IMutableCity,
+        cityId: number,
+        winnerFactionId: number,
+        survivingIds: readonly number[],
+        survivorsByArmy: ReadonlyMap<number, number[]>
+    ): void {
         const garrisonHeading = this.garrisonHeading(city);
         this.transferCityOwnership(city, winnerFactionId);
 
@@ -1456,25 +1549,32 @@ export class KingdomWorld implements IWorld {
                 garrisonHeading
             );
         }
+    }
 
-        const regrouped = new Set<number>();
-        for (const unitId of participants) {
-            const owner = this.unitArmy.get(unitId);
-            if (owner === undefined || owner.factionId === winnerFactionId) {
-                continue;
-            }
-            if (regrouped.has(owner.armyId)) {
-                continue;
-            }
-            regrouped.add(owner.armyId);
-            this.regroupLosingArmy(owner.armyId);
+    /**
+     * 合并通知：把被吸收战斗的参与者集合折叠进存活战斗的账本，避免每次合并泄漏
+     * 一个集合并让只在被吸收战斗中参战的单位逃过败方重组（WR-05）。
+     * @param absorbed 被吸收战斗。
+     * @param survivor 存活战斗。
+     */
+    private handleBattlesMerged(absorbed: IBattle, survivor: IBattle): void {
+        const absorbedParticipants = this.battleParticipants.get(
+            absorbed.getId()
+        );
+        if (absorbedParticipants === undefined) {
+            return;
         }
-
-        for (const army of this.armies.values()) {
-            if (army.getUnitIds().length === 0) {
-                army.setOrder(null);
-            }
+        let survivorParticipants = this.battleParticipants.get(
+            survivor.getId()
+        );
+        if (survivorParticipants === undefined) {
+            survivorParticipants = new Set<number>();
+            this.battleParticipants.set(survivor.getId(), survivorParticipants);
         }
+        for (const unitId of absorbedParticipants) {
+            survivorParticipants.add(unitId);
+        }
+        this.battleParticipants.delete(absorbed.getId());
     }
 
     /**
