@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 5
 current_phase_name: 渲染系统
 status: executing
-stopped_at: Phase 5 context gathered
-last_updated: "2026-10-21T11:05:26.158Z"
+stopped_at: 05-01 (Round 1 type contract) approved — Round 2 not planned
+last_updated: "2026-10-21T12:21:30.000Z"
 last_activity: 2026-10-21
-last_activity_desc: Phase 5 planning complete
-state_head: dfd9b55d2411037ba42891cd41a499f15b85b392
+last_activity_desc: Phase 5 Round 1 type contract approved; 05-01 complete
+state_head: dd2251cb33e54dfe31ab15ae5ba0cb4df06ec569
 progress:
   total_phases: 8
-  completed_phases: 1
+  completed_phases: 0
   total_plans: 21
-  completed_plans: 20
+  completed_plans: 21
   percent: 0
 ---
 
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-10-21)
 
 ## Current Position
 
-Phase: 5 (渲染系统) — READY TO EXECUTE
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-10-21 — Phase 5 planning complete
+Phase: 5 (渲染系统) — EXECUTING
+Plan: 1 of 1 planned (05-01 Round 1 complete; Round 2 not yet planned)
+Status: Executing Phase 5 — type contract APPROVED
+Last activity: 2026-10-21 — Round 1 type contract approved by the user; 05-01 complete
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -38,7 +38,7 @@ Progress: [░░░░░░░░░░] 0%
 
 **Velocity:**
 
-- Total plans completed: 20
+- Total plans completed: 21
 - Average duration: -
 - Total execution time: 0.0 hours
 
@@ -82,6 +82,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P03 | 12 min | 3 tasks | 7 files |
 | Phase 04 P04 | ~35min | 3 tasks | 6 files |
 | Phase 04 P05 | ~52min | 3 tasks | 10 files |
+| Phase 05 P01 | ~40min | 4 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -156,6 +157,13 @@ Recent decisions affecting current work:
 - [Phase 04]: 04-05: PlaceholderCommander runs once per outer tick after expiry, reads only reduced vision briefs, and is isolated at factory/decide/order validation
 - [Phase 04]: 04-05: frozen GarrisonSelector id gap bridged by a WeakMap identity registry populated at unit registration; World still sanitises all ids
 - [Phase 04]: 04-05: validateScenario is the constructor's first statement so invalid tables never touch physics or control
+- [Phase 05]: 05-01 Round 1 type gate APPROVED — render contract frozen: 1 numeric enum (CameraMode), 2 function type aliases, 28 I* interfaces, declarations only
+- [Phase 05]: PixiJS exact-pinned `pixi.js@8.22.0` (`pnpm add -E`) after a blocking-human supply-chain approval; `Container` is the only Pixi symbol in the contract and only in type position
+- [Phase 05]: G-1..G-6 approved as written — type-only Container, IRenderServices+provider, damage feed + Round-2 decorator, mode derived from target, factory-owned shared geometry, visual spec snapshotted at first appearance
+- [Phase 05]: CameraMode is derived from setBattleTarget(number|undefined) with NO independent mode setter; reset() clears the target so getMode() is Strategic
+- [Phase 05]: ICameraUpdateInput.shakeImpulsePx is the declared writer for shakeX/shakeY, so the D-06 shake chain is reachable through interfaces rather than a hidden mutation
+- [Phase 05]: requirements-completed stays empty — REND-01..05 are Round-2 behaviour; Phase 5 is NOT complete
+- [Phase 05]: Round 2 pending (05-02 not planned): constants/calendar/cameraMath/hudModel/frameModel, DamageTap, GeometryUnitView/UnitViewFactory, Camera, Hud, Renderer, src/demo/*, src/main.ts, index.html, style.css, dev/build scripts, Chrome UAT
 
 ### Pending Todos
 
@@ -180,6 +188,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-21T08:53:06.454Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-render-system/05-CONTEXT.md
+Last session: 2026-10-21T12:21:30.000Z
+Stopped at: 05-01 (Round 1 type contract) approved — Round 2 not planned
+Resume file: .planning/phases/05-render-system/05-01-SUMMARY.md

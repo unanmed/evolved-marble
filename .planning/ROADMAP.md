@@ -189,10 +189,10 @@ Plans:
   4. 镜头自动跟拍激烈战斗区域，无需人工控制。
   5. Chrome-only 下数十单位混战维持可交互帧率。
 
-**Plans**: 1 plan (round 1: type gate)
+**Plans**: 1/1 round-1 plans complete (round 2 not planned)
 Plans:
-- [ ] 05-01-PLAN.md — Wave 0 exact-pinned `pixi.js@8.22.0` install + `src/render/types.ts` contract + `tests/render/types.test.ts`; stops at the blocking type-design review
-**Type-first gate**: Wave 1 writes the render folder's `types.ts` + `IRenderer`/`IHud`/`ICamera`/`IUnitView` interfaces; **user reviews and approves before implementation**.
+- [x] 05-01-PLAN.md — Wave 0 exact-pinned `pixi.js@8.22.0` install + `src/render/types.ts` contract + `tests/render/types.test.ts`; **type-design gate APPROVED (G-1..G-6)** — Round 2 (implementation + Chrome UAT) not planned yet
+**Type-first gate**: Wave 1 writes the render folder's `types.ts` + `IRenderer`/`IHud`/`ICamera`/`IUnitView` interfaces; **user reviews and approves before implementation**. ✅ Approved 2026-10-21.
 **UI hint**: yes
 
 ### Phase 6: 录制系统
@@ -249,7 +249,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 2. 物理模拟系统 | 7/7 | Complete    | 2026-10-19 |
 | 3. 操控系统 | 3/3 | Complete    | 2026-10-20 |
 | 4. 王国系统 | 5/5 | Complete    | 2026-10-21 |
-| 5. 渲染系统 | 0/0 | Not started | - |
+| 5. 渲染系统 | 1/1 (round 1) | In progress — round 2 pending | - |
 | 6. 录制系统 | 0/0 | Not started | - |
 | 7. AI 接入系统 | 0/0 | Not started | - |
 | 8. 统计与精彩回放系统 | 0/0 | Not started | - |
