@@ -8,14 +8,17 @@
  * 3. 世界尚未装配（晚绑定 accessor 返回 `null`）；
  * 4. 攻方不在任何活跃战斗；
  * 5. 守方不在**同一**战斗；
- * 6. 任一方的物理读数缺失；
- * 7. 任一方不在该战斗的正方形内。
- * 通过后才照搬 Phase 3 测试胶合层：`takeDamage` + 攻击/防御/击杀经验 + 存活守卫。
+ * 6. 任一方的物理读数缺失。
+ *
+ * 成员资格由 `BattleSystem` 在**本子步物理推进之前**判定；这里不再用推进后的位置
+ * 重新比对战斗区（中心也是推进前的快照），否则被同一次碰撞推出 40 m 的合法命中会被
+ * 静默丢弃（WR-02）。通过后才照搬 Phase 3 测试胶合层：`takeDamage` + 攻击/防御/击杀
+ * 经验 + 存活守卫。
  * 绝不调用 `physics.removeUnit`——死亡注销由 `ControlSystem` 统一负责。
  */
 
 import type { IDamageContext, IDamageSink } from '@/control/types';
-import type { IUnitState, IPhysicsWorld } from '@/physics/types';
+import type { IPhysicsWorld } from '@/physics/types';
 import type { IBattleSystem } from '@/kingdom/types';
 import { AttributeKind } from '@/units/types';
 
@@ -71,21 +74,9 @@ export class BattleDamageSink implements IDamageSink {
             return;
         }
 
-        const attackerState = this.physics.getUnitState(
-            context.event.attackerId
-        );
-        const defenderState = this.physics.getUnitState(
-            context.event.defenderId
-        );
-        if (attackerState === null || defenderState === null) {
-            return;
-        }
-
-        const center = attackerBattle.getCenter();
-        const halfExtent = attackerBattle.getHalfExtent();
         if (
-            !insideArea(center.x, center.y, halfExtent, attackerState) ||
-            !insideArea(center.x, center.y, halfExtent, defenderState)
+            this.physics.getUnitState(context.event.attackerId) === null ||
+            this.physics.getUnitState(context.event.defenderId) === null
         ) {
             return;
         }
@@ -107,24 +98,4 @@ export class BattleDamageSink implements IDamageSink {
             );
         }
     }
-}
-
-/**
- * 判断一个运动读数是否位于战斗正方形内（含边界）。
- * @param centerX 战斗区中心 x 坐标（米）。
- * @param centerY 战斗区中心 y 坐标（米）。
- * @param halfExtent 半边长（米）。
- * @param state 单位运动读数。
- * @returns 是否在区内。
- */
-function insideArea(
-    centerX: number,
-    centerY: number,
-    halfExtent: number,
-    state: IUnitState
-): boolean {
-    return (
-        Math.abs(state.x - centerX) <= halfExtent &&
-        Math.abs(state.y - centerY) <= halfExtent
-    );
 }
