@@ -189,7 +189,9 @@ Plans:
   4. 镜头自动跟拍激烈战斗区域，无需人工控制。
   5. Chrome-only 下数十单位混战维持可交互帧率。
 
-**Plans**: TBD
+**Plans**: 1 plan (round 1: type gate)
+Plans:
+- [ ] 05-01-PLAN.md — Wave 0 exact-pinned `pixi.js@8.22.0` install + `src/render/types.ts` contract + `tests/render/types.test.ts`; stops at the blocking type-design review
 **Type-first gate**: Wave 1 writes the render folder's `types.ts` + `IRenderer`/`IHud`/`ICamera`/`IUnitView` interfaces; **user reviews and approves before implementation**.
 **UI hint**: yes
 

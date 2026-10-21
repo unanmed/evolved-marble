@@ -54,6 +54,13 @@
 - **D-19:** demo/未来应用使用**真实组合根**接线（参照 `tests/kingdom/harness.ts` 的顺序：物理 → 感知 → 伤害接收方 → 控制 → 王国世界），不伪造单位/战斗数据；`RAPIER.init()` 必须在构造世界前完成。 — **Reversibility:** reversible — 接线细节可重构。
 - **D-20:** 所有视觉/时序可调项集中到渲染层常量或配置（阵营色表、分辨率、输出帧率、HUD 阈值、伤害数字阈值、镜头平滑参数、每帧延时的默认值），不在各处写魔法数。 — **Reversibility:** reversible — 调参入口可整理。
 
+### Research 后补充决策（2026-10-21）
+
+- **D-21:** 镜头“≥90% 参战单位在画面内”按**目标构图**验收；切换过渡中的当前 transform 允许短暂不足，但全程必须平滑、禁止瞬移。 — **Reversibility:** reversible — 只影响镜头过渡策略与验收口径。
+- **D-22:** 允许 demo 增加 `?classes=all` 变体（默认仍用 `DEFAULT_SCENARIO`；变体每军加 Hammer/Knight），仅用于目视验证全部 6 武器 + 2 防具；不改 Phase 4 场景表。 — **Reversibility:** reversible — demo 配置可移除。
+- **D-23:** 等级数字画在**本体中心**（约 0.7m 高、白字黑描边），不旋转，永远跟随视角缩放。 — **Reversibility:** reversible — 位置可调。
+- **D-24:** 操作者面板的 `MoveTo` 用 **canvas 点击拾取**（`screenToWorld`，排除镜头震动）：选中军队 → 点 MoveTo → 在 canvas 上点目标点。 — **Reversibility:** reversible — 交互方式可替换。
+
 ### Research Flags（不是用户决策，供 research/planner 解决）
 
 - **REND-05 文档同步：** REQUIREMENTS.md / ROADMAP.md 仍写着“可交互帧率”，与本阶段 D-01 冲突。规划/验收必须以 CONTEXT 的 D-01 为准；是否在 transition 时同步修订文档由后续流程决定。
