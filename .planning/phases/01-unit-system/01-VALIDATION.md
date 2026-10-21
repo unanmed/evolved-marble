@@ -1,9 +1,9 @@
 ---
 phase: "1"
 slug: "unit-system"
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: validated
+nyquist_compliant: true
+wave_0_complete: true
 created: "2026-10-17"
 ---
 
@@ -18,16 +18,16 @@ created: "2026-10-17"
 | Property | Value |
 |----------|-------|
 | **Framework** | Vitest 5.0.4 (`environment: 'node'`) |
-| **Config file** | `vitest.config.ts` — **needs Wave 0 repair** (stale `setupFiles` → non-existent `tests/helpers/physics-setup.ts`; missing `resolve.alias` for `@`) |
-| **Quick run command** | `pnpm test` |
-| **Full suite command** | `pnpm test` |
-| **Estimated runtime** | ~5–15 seconds (pure data/domain) |
+| **Config file** | `vitest.config.ts` — repaired in Wave 0: stale `setupFiles` removed, `resolve.alias['@']` → `src/` added, `include: ['tests/**/*.test.ts']`; `tsconfig.json` includes `src` + `tests` with `strict: true` |
+| **Quick run command** | `pnpm test -- tests/units` |
+| **Full suite command** | `pnpm test` (currently 33 files / 332 tests, ~6 s) |
+| **Estimated runtime** | ~3 seconds for the Phase 1 unit suite |
 
 ---
 
 ## Sampling Rate
 
-- **After every task commit:** Run `pnpm test`
+- **After every task commit:** Run `pnpm test -- tests/units`
 - **After every plan wave:** Run `pnpm test` + `pnpm typecheck`
 - **Before `/gsd-verify-work`:** Full suite must be green
 - **Max feedback latency:** ~30 seconds
@@ -38,26 +38,29 @@ created: "2026-10-17"
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 01-02-01 | 01-02 | 1 | UNIT-01 | — | Attribute reads never return NaN/Infinity; enum args validated | unit | `pnpm test -- tests/units/types.test.ts` | ❌ W0 | ⬜ pending |
-| 01-03-01 | 01-03 | 2 | UNIT-02 | — | Class table complete for all 7 kinds | unit | `pnpm test -- tests/units/data-classes.test.ts` | ❌ W0 | ⬜ pending |
-| 01-03-02 | 01-03 | 2 | UNIT-03 | — | Weapon table complete; `penetration[ArmorKind]` exhaustive | unit | `pnpm test -- tests/units/data-weapons-armors.test.ts` | ❌ W0 | ⬜ pending |
-| 01-03-02 | 01-03 | 2 | UNIT-04 | — | Armor table complete for both kinds | unit | `pnpm test -- tests/units/data-weapons-armors.test.ts` | ❌ W0 | ⬜ pending |
-| 01-05-01 | 01-05 | 4 | UNIT-05 | — | RNG output guarded (`u1>0`); attributes clamped ≥ 0 | unit | `pnpm test -- tests/units/rng.test.ts` | ❌ W0 | ⬜ pending |
-| 01-05-02 | 01-05 | 4 | UNIT-05 | — | Normal spawn mean/σ within tolerance; all attributes ≥ 0 | unit | `pnpm test -- tests/units/spawn-normal.test.ts` | ❌ W0 | ⬜ pending |
-| 01-04-01 | 01-04 | 3 | UNIT-01 | — | Rolled bases, not class constants; all reads finite | unit | `pnpm test -- tests/units/attributes.test.ts` | ❌ W0 | ⬜ pending |
-| 01-04-02 | 01-04 | 3 | UNIT-06 | — | Level-up state transitions deterministic | unit | `pnpm test -- tests/units/leveling.test.ts` | ❌ W0 | ⬜ pending |
+| 01-01-01 | 01-01 | 0 | UNIT-01..06 | T-01-01 / T-01-02 | Config resolves `@` alias, includes `tests/**`, no stale `setupFiles`; `strict` retained | infra | `pnpm test` + `pnpm typecheck` | ✓ | green |
+| 01-01-02 | 01-01 | 0 | UNIT-01..06 | T-01-02 | Vitest runner loads under `environment: 'node'` | unit | `pnpm test -- tests/units/harness.test.ts` | ✓ | green |
+| 01-01-03 | 01-01 | 0 | UNIT-01..06 | T-01-03 / T-01-SC | `pnpm lint` works via vetted TS alias, no rule disabled | infra | `pnpm lint` | ✓ | green |
+| 01-02-01 | 01-02 | 1 | UNIT-01..06 | T-01-04 | Type module is declaration-only and gate-approved | static | `pnpm typecheck` | ✓ | green |
+| 01-02-02 | 01-02 | 1 | UNIT-01..06 | T-01-05 | Numeric enum ordinals pinned; shared `IRng` re-export | unit | `pnpm test -- tests/units/types.test.ts` | ✓ | green |
+| 01-03-01 | 01-03 | 2 | UNIT-02 | T-01-06 | All 7 class definitions complete; growth/unlock tables and calibration constants pinned | unit | `pnpm test -- tests/units/data-classes.test.ts` | ✓ | green |
+| 01-03-02 | 01-03 | 2 | UNIT-03, UNIT-04 | T-01-06 / T-01-07 | 6 weapons + 2 armors complete; every weapon has both armor penetrations | unit | `pnpm test -- tests/units/data-weapons-armors.test.ts` | ✓ | green |
+| 01-04-01 | 01-04 | 3 | UNIT-01 | T-01-08 / T-01-09 | All 13 attribute reads finite; invalid damage ignored; modifiers apply | unit | `pnpm test -- tests/units/attributes.test.ts` | ✓ | green |
+| 01-04-02 | 01-04 | 3 | UNIT-06 | T-01-09 / T-01-10 | Exp gates, `100·(1+R_E)^L` thresholds, per-class growth, health-restore cap, multi-level grant, L3 unlock | unit | `pnpm test -- tests/units/leveling.test.ts` | ✓ | green |
+| 01-05-01 | 01-05 | 4 | UNIT-05 | T-01-11 | Box–Muller guards `u1 <= 0`, clamps to ≥ 0, always finite | unit | `pnpm test -- tests/units/rng.test.ts` | ✓ | green |
+| 01-05-02 | 01-05 | 4 | UNIT-05 | T-01-12 | Normal spawn mean/σ within tolerance; all 7 attributes non-negative and finite; unique names | unit | `pnpm test -- tests/units/spawn-normal.test.ts` | ✓ | green |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: pending · green · red · flaky*
 
 ---
 
 ## Wave 0 Requirements
 
-- [ ] `tests/units/` + at least one test file — the Vitest `include` glob currently matches nothing → `vitest run` exits 1.
-- [ ] `vitest.config.ts` repair — remove/replace `setupFiles: ['tests/helpers/physics-setup.ts']` (file absent → hard failure) **and** add `resolve.alias` for `@` (else `@/units/...` imports fail under Vitest).
-- [ ] `tsconfig.json` — decide whether to add `"tests"` to `include` so tests are typechecked; remove dangling `tsconfig.sim.json` comment reference.
-- [ ] Toolchain decision for `pnpm lint` (typescript-eslint 8.71.2 refuses TS 7) — OQ-5.
-- [ ] Framework install: none (Vitest already present).
+- [x] `tests/units/` exists with a harness smoke test — the Vitest `include` glob now matches files.
+- [x] `vitest.config.ts` repaired — stale `setupFiles` removed and `resolve.alias` for `@` added.
+- [x] `tsconfig.json` includes `src` + `tests` and keeps `strict: true`.
+- [x] `pnpm lint` toolchain repaired via the vetted `@typescript/typescript6@6.0.2` alias.
+- [x] Framework install: none needed (Vitest already present).
 
 ---
 
@@ -71,11 +74,23 @@ created: "2026-10-17"
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-10-21
+
+---
+
+## Validation Audit 2026-10-21
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 0 |
+| Resolved | 0 |
+| Escalated | 0 |
+
+All six requirements (UNIT-01..UNIT-06) map to green automated tests: `tests/units` — 9 files / 87 tests passing.
