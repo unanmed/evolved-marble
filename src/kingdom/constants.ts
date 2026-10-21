@@ -74,6 +74,20 @@ export const BATTLE_AREA_HALF_EXTENT = 40;
 export const BATTLE_AREA_HYSTERESIS = 1;
 
 /**
+ * 新战斗的参与宽限期（战斗子步数，战斗中一个子步恰为一游戏分钟）：
+ * 触发距离（80 m）与成员正方形（40 m）不同，任一方可能晚几个子步才进入区内。
+ * 战斗只有在**全部期望阵营**都加入过、或宽限期耗尽后才可能结算；
+ * 宽限期内的零成员触发不会被误判为幽灵战斗。可校准。
+ */
+export const BATTLE_JOIN_GRACE_TICKS = 15;
+
+/**
+ * 单位初始聚集环半径（米）：让同军单位出生时不重叠；远小于阵型半径。
+ * 场景校验要求每个出生点/城池点的该半径圆盘完整位于地图内且不压地形。
+ */
+export const SPAWN_RING_RADIUS = 4;
+
+/**
  * 行军回血速度（点/小时）：按游戏时间累计（D-13/KING-03）；可校准。
  * 实际回血由 plan 04-04 经 G-1 的 `IHealableUnit.heal` 接入。
  */
