@@ -189,9 +189,42 @@ Plans:
   4. 镜头自动跟拍激烈战斗区域，无需人工控制。
   5. Chrome-only 下数十单位混战维持可交互帧率。
 
-**Plans**: 1/1 round-1 plans complete (round 2 not planned)
+**Plans**: 10 plans (05-01 complete; 05-02..05-10 round 2 planned)
 Plans:
-- [x] 05-01-PLAN.md — Wave 0 exact-pinned `pixi.js@8.22.0` install + `src/render/types.ts` contract + `tests/render/types.test.ts`; **type-design gate APPROVED (G-1..G-6)** — Round 2 (implementation + Chrome UAT) not planned yet
+
+**Wave 1** *(round 1 — type gate, complete)*
+
+- [x] 05-01-PLAN.md — Wave 0 exact-pinned `pixi.js@8.22.0` install + `src/render/types.ts` contract + `tests/render/types.test.ts`; **type-design gate APPROVED (G-1..G-6)**
+
+**Wave 2**
+
+- [ ] 05-02-PLAN.md — `src/render/constants.ts`（唯一调参入口 + `validateRenderConfig`）+ `calendar.ts`（360 天简化历与信息条格式化）+ 测试
+
+**Wave 3**
+
+- [ ] 05-03-PLAN.md — `cameraMath.ts`（中位数 + 第 90 百分位拟合盒、平滑、切换、世界↔屏幕）+ `Camera.ts`（两态状态机、震动、reset）+ 测试
+- [ ] 05-04-PLAN.md — `frameModel.ts`（阵营色/视觉 spec/参战点集/视口裁剪）+ 共享 fakes + 6 武器/2 防具覆盖测试
+
+**Wave 4**
+
+- [ ] 05-05-PLAN.md — `hudModel.ts`（血量比、15×帧计时、<6 常亮、混合缩放、震动冲量）+ `DamageTap.ts`（伤害/死亡旁路装饰器）+ 测试
+- [ ] 05-06-PLAN.md — `UnitViewFactory.ts`（共享几何：本体 + 6 武器 + 2 防具 + 闪白）+ `GeometryUnitView.ts` + Pixi 导入边界测试
+
+**Wave 5**
+
+- [ ] 05-07-PLAN.md — `Hud.ts`（血条/等级/伤害数字/粒子/死亡特效/信息条，池化上限）+ `Renderer.ts` / `createRenderer`（图层、镜头、单位调和、全景标记、每帧一次 `app.render()`）
+
+**Wave 6**
+
+- [ ] 05-08-PLAN.md — `src/demo/{types,scenario,composition,runner}.ts`：真实组合根（物理→感知→sink→tap→控制→王国）+ setTimeout 逐帧 runner（自动跟拍战斗）+ 真实 Rapier 与 fake-timer 测试
+
+**Wave 7**
+
+- [ ] 05-09-PLAN.md — `src/demo/panel.ts`（canvas 外 HTML 操作台：暂停/单步/重置/镜头/延时/MoveTo 拾取/Garrison/Hold）+ `src/main.ts` + `index.html` + `src/style.css` + `dev`/`build` scripts
+
+**Wave 8**
+
+- [ ] 05-10-PLAN.md — Chrome 手动 UAT（REND-01..05、D-06/D-12/D-21/D-22/D-23）+ 仅经 `DEFAULT_RENDER_CONFIG` 校准 + REND-05 文档对齐 D-01 + `05-UAT.md` 证据
 **Type-first gate**: Wave 1 writes the render folder's `types.ts` + `IRenderer`/`IHud`/`ICamera`/`IUnitView` interfaces; **user reviews and approves before implementation**. ✅ Approved 2026-10-21.
 **UI hint**: yes
 
@@ -249,7 +282,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 2. 物理模拟系统 | 7/7 | Complete    | 2026-10-19 |
 | 3. 操控系统 | 3/3 | Complete    | 2026-10-20 |
 | 4. 王国系统 | 5/5 | Complete    | 2026-10-21 |
-| 5. 渲染系统 | 1/1 (round 1) | In progress — round 2 pending | - |
+| 5. 渲染系统 | 1/10 | In progress — round 2 planned | - |
 | 6. 录制系统 | 0/0 | Not started | - |
 | 7. AI 接入系统 | 0/0 | Not started | - |
 | 8. 统计与精彩回放系统 | 0/0 | Not started | - |
