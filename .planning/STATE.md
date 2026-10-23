@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: 渲染系统
 status: executing
-stopped_at: Completed 05-02-PLAN.md (render constants + calendar)
-last_updated: "2026-10-23T15:03:00.150Z"
+stopped_at: Completed 05-03-PLAN.md (camera math + Camera)
+last_updated: "2026-10-23T15:17:47.574Z"
 last_activity: 2026-10-23
 last_activity_desc: Phase 05 execution started
-state_head: e2aded0735a861fb2f101a04897d454cb44eec73
+state_head: b98a0346e5c587927b41fccdaa6b3340c4070a24
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 30
-  completed_plans: 22
+  completed_plans: 23
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-21)
 ## Current Position
 
 Phase: 05 (渲染系统) — EXECUTING
-Plan: 2 of 10
+Plan: 3 of 10
 Status: Ready to execute
 Last activity: 2026-10-23 — Phase 05 execution started
 
@@ -84,6 +84,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P05 | ~52min | 3 tasks | 10 files |
 | Phase 05 P01 | ~40min | 4 tasks | 4 files |
 | Phase 05 P02 | ~16min | 2 tasks | 4 files |
+| Phase 05 P03 | ~11min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -169,6 +170,9 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-02: validateRenderConfig is the pre-Pixi gate; every failure names the dotted field and the shipped default passes unchanged (T-05-01/T-05-09/T-05-11)
 - [Phase 05]: 05-02: CULL_MARGIN_METERS (4 m) and FLASH_RING_OFFSET_METERS (0.08 m) are exported named constants instead of new IRenderConfig fields, so the frozen contract stays untouched
 - [Phase 05]: 05-02: calendar.ts is pure integer arithmetic with no Date/locale; the info bar is exactly 第 Y 年 M 月 D 日 HH:MM / N× and clamps non-finite input
+- [Phase 05]: 05-03: fitBox uses a median centre + coverage-percentile Chebyshev radius, so >= ceil(coverage*n) points inside is a theorem (n=16 -> 15, n=100 -> 90), and one outlier cannot drag the composition
+- [Phase 05]: 05-03: Camera's transition uses an elapsed-frame fraction with exact interpolation endpoints plus a completion snap, so the first update is exactly t=0 and the switchFrames-th update lands exactly on fitTransform (no teleport)
+- [Phase 05]: 05-03: effective minScale = min(config.minScale, panoramic scale) keeps the >=90% guarantee on small viewports (Pitfall 22); shake shares one irrational phase step so the emitted vector magnitude equals the amplitude exactly and decays monotonically (D-06/T-05-14)
 
 ### Pending Todos
 
@@ -193,6 +197,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-23T15:02:59.916Z
-Stopped at: Completed 05-02-PLAN.md (render constants + calendar)
+Last session: 2026-10-23T15:17:47.372Z
+Stopped at: Completed 05-03-PLAN.md (camera math + Camera)
 Resume file: None
