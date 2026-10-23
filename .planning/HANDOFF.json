@@ -1,0 +1,46 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-10-23T16:23:23.569Z",
+  "phase": "05",
+  "phase_name": "render-system",
+  "phase_dir": ".planning/phases/05-render-system",
+  "plan": 8,
+  "task": 0,
+  "total_tasks": 2,
+  "status": "paused",
+  "completed_tasks": [
+    { "id": 1, "name": "05-02 constants + calendar", "status": "done", "commit": "532cf86" },
+    { "id": 2, "name": "05-03 cameraMath + Camera", "status": "done", "commit": "3607e15" },
+    { "id": 3, "name": "05-04 frameModel + fakes", "status": "done", "commit": "cf31dd9" },
+    { "id": 4, "name": "05-05 hudModel + DamageTap", "status": "done", "commit": "e304378" },
+    { "id": 5, "name": "05-06 UnitViewFactory + GeometryUnitView + import boundary", "status": "done", "commit": "81a446b" },
+    { "id": 6, "name": "05-07 Hud + Renderer + createRenderer", "status": "done", "commit": "885eec0" }
+  ],
+  "remaining_tasks": [
+    { "id": 7, "name": "05-08 demo/types + scenario + composition + runner", "status": "not_started" },
+    { "id": 8, "name": "05-09 panel + main.ts + index.html + style.css + scripts", "status": "not_started" },
+    { "id": 9, "name": "05-10 Chrome UAT + requirement alignment (autonomous: false, human gate)", "status": "not_started" }
+  ],
+  "blockers": [],
+  "async_jobs": [],
+  "human_actions_pending": [
+    {
+      "action": "Chrome manual UAT for phase 5",
+      "context": "05-10 is autonomous: false; REND-01..REND-05 acceptance is observed in Chrome via pnpm dev",
+      "blocking": true
+    }
+  ],
+  "decisions": [
+    { "decision": "Worktrees disabled / parallelization false — execute plans sequentially on the main tree", "rationale": "project config workflow.use_worktrees=false, parallelization=false", "phase": "05" },
+    { "decision": "TYPE CONTRACT FROZEN — executors must not modify src/render/types.ts", "rationale": "Round-1 type-first gate approved by user; 05-01 is the contract", "phase": "05" },
+    { "decision": "Renderer takes (app, provider, config) in its constructor; presentation-only numbers are documented module consts", "rationale": "frozen types.ts carries no fields for them and AGENTS §12 forbids many-param constructors", "phase": "05" }
+  ],
+  "uncommitted_files": [
+    "?? .gsd/",
+    "?? .planning/milestone.lock",
+    "?? .planning/state.json",
+    "?? .planning/v1-MILESTONE-AUDIT.md"
+  ],
+  "next_action": "Run /gsd-execute-phase 5 to resume at Wave 7 (05-08); all plans 05-01..05-07 are summarized and will be skipped.",
+  "context_notes": "Phase 5 executing wave-by-wave via gsd-executor subagents. Suite baseline after 05-07: 43 files / 476 tests, typecheck+lint clean. 05-06 and 05-07 executors could not resolve gsd_run and hand-edited STATE.md/ROADMAP.md — verify tracking consistency on resume. Remaining waves: 7=05-08 (demo composition+runner), 8=05-09 (panel+bootstrap), 9=05-10 (Chrome UAT, human checkpoint)."
+}
