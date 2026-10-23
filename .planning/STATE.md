@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: 渲染系统
 status: executing
-stopped_at: Completed 05-05-PLAN.md (HUD model + damage tap)
-last_updated: "2026-10-23T15:48:19.467Z"
-last_activity: 2026-10-23
-last_activity_desc: Phase 05 execution started
-state_head: 5740f3ab7b666920dcc6eecc93d179c98f58d1b2
+stopped_at: Completed 05-06-PLAN.md (shared geometry views + Pixi import boundary)
+last_updated: "2026-10-23T16:01:00.000Z"
+last_activity: 2026-10-24
+last_activity_desc: Phase 05 plan 06 executed
+state_head: d524319980650d5c97e19444d721508bd65b06c4
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 30
-  completed_plans: 25
+  completed_plans: 26
   percent: 0
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-10-21)
 ## Current Position
 
 Phase: 05 (渲染系统) — EXECUTING
-Plan: 5 of 10
+Plan: 6 of 10
 Status: Ready to execute
-Last activity: 2026-10-23 — Phase 05 execution started
+Last activity: 2026-10-24 — 05-06 (shared geometry views + Pixi import boundary) completed
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -87,6 +87,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P03 | ~11min | 2 tasks | 4 files |
 | Phase 05 P04 | ~9min | 2 tasks | 4 files |
 | Phase 05 P05 | ~7min | 2 tasks | 4 files |
+| Phase 05 P06 | ~8min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -181,6 +182,10 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-05: registerDamage guards non-finite fps/seconds to 0 and clamps frames to >=1, so a malformed config cannot write NaN deadlines that silently hide every health bar (T-05-25)
 - [Phase 05]: 05-05: computeHudScale's raw factor is deliberately non-monotonic; D-09 is asserted on barWorldWidth x cameraScale x factor (14 px at worldScaleAt, 36 px at screenScaleAt, non-decreasing between)
 - [Phase 05]: 05-05: RenderDamageTap records appliedDamage = max(0, healthBefore - healthAfter) (overkill excluded), snapshots the death position before ControlSystem unregisters the body, and caps its buffer at MAX_BUFFERED_DAMAGE_EVENTS
+- [Phase 05]: 05-06: UnitViewFactory owns exactly 10 shared GraphicsContexts (body, flash, 6 weapons, 2 armours) and keeps a single ownership list so dispose() destroys each once and is idempotent; views only ever destroy their own root
+- [Phase 05]: 05-06: every weapon silhouette is drawn on the Rapier capsule footprint (local x = geometry.weaponOffsetX, long axis y, extent geometry.weaponHalfLength) with a grip back to the body, so the picture cannot disagree with collisions (Pitfall 15)
+- [Phase 05]: 05-06: GeometryUnitView roots at a Container with a rotating child and writes only position/rotation/visible/tint/flash-ring visibility; level and health bar stay out of the view for the HUD layer
+- [Phase 05]: 05-06: tests/render/import-boundary.test.ts permanently enforces the Pixi boundary (pure modules Pixi-free, only types.ts + *View/*ViewFactory/*Hud/*Renderer may import it), the declaration-only contract anchors, and no eval extension / string-evaluated code
 
 ### Pending Todos
 
@@ -205,6 +210,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-23T15:48:19.241Z
-Stopped at: Completed 05-05-PLAN.md (HUD model + damage tap)
+Last session: 2026-10-23T16:01:00.000Z
+Stopped at: Completed 05-06-PLAN.md (shared geometry views + Pixi import boundary)
 Resume file: None

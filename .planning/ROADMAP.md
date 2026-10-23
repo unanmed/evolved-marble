@@ -189,7 +189,7 @@ Plans:
   4. 镜头自动跟拍激烈战斗区域，无需人工控制。
   5. Chrome-only 下数十单位混战维持可交互帧率。
 
-**Plans**: 5/10 plans executed (05-01 complete; 05-02..05-10 round 2 planned)
+**Plans**: 6/10 plans executed (05-01..05-06 complete; 05-07..05-10 round 2 planned)
 Plans:
 
 **Wave 1** *(round 1 — type gate, complete)*
@@ -208,7 +208,7 @@ Plans:
 **Wave 4**
 
 - [x] 05-05-PLAN.md — `hudModel.ts`（血量比、15×帧计时、<6 常亮、混合缩放、震动冲量）+ `DamageTap.ts`（伤害/死亡旁路装饰器）+ 测试
-- [ ] 05-06-PLAN.md — `UnitViewFactory.ts`（共享几何：本体 + 6 武器 + 2 防具 + 闪白）+ `GeometryUnitView.ts` + Pixi 导入边界测试
+- [x] 05-06-PLAN.md — `UnitViewFactory.ts`（共享几何：本体 + 6 武器 + 2 防具 + 闪白）+ `GeometryUnitView.ts` + Pixi 导入边界测试
 
 **Wave 5**
 
