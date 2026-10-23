@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: 渲染系统
 status: executing
-stopped_at: Completed 05-06-PLAN.md (shared geometry views + Pixi import boundary)
-last_updated: "2026-10-23T16:01:00.000Z"
+stopped_at: Completed 05-07-PLAN.md (pooled HUD + per-frame Renderer)
+last_updated: "2026-10-23T16:20:02.542Z"
 last_activity: 2026-10-24
-last_activity_desc: Phase 05 plan 06 executed
-state_head: d524319980650d5c97e19444d721508bd65b06c4
+last_activity_desc: Phase 05 plan 07 executed
+state_head: 5833a3967f54c477b7ef3ee594a447903efd2196
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 30
-  completed_plans: 26
+  completed_plans: 27
   percent: 0
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-10-21)
 ## Current Position
 
 Phase: 05 (渲染系统) — EXECUTING
-Plan: 6 of 10
+Plan: 7 of 10
 Status: Ready to execute
-Last activity: 2026-10-24 — 05-06 (shared geometry views + Pixi import boundary) completed
+Last activity: 2026-10-24 — 05-07 (pooled HUD + per-frame Renderer) completed
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -88,6 +88,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P04 | ~9min | 2 tasks | 4 files |
 | Phase 05 P05 | ~7min | 2 tasks | 4 files |
 | Phase 05 P06 | ~8min | 2 tasks | 3 files |
+| Phase 05 P07 | 16min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -186,6 +187,9 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-06: every weapon silhouette is drawn on the Rapier capsule footprint (local x = geometry.weaponOffsetX, long axis y, extent geometry.weaponHalfLength) with a grip back to the body, so the picture cannot disagree with collisions (Pitfall 15)
 - [Phase 05]: 05-06: GeometryUnitView roots at a Container with a rotating child and writes only position/rotation/visible/tint/flash-ring visibility; level and health bar stay out of the view for the HUD layer
 - [Phase 05]: 05-06: tests/render/import-boundary.test.ts permanently enforces the Pixi boundary (pure modules Pixi-free, only types.ts + *View/*ViewFactory/*Hud/*Renderer may import it), the declaration-only contract anchors, and no eval extension / string-evaluated code
+- [Phase 05]: 05-07: Hud reads only pre-resolved IHudFrame values (healthRatio/hudScale/healthVisible/level) and keeps bars/levels/effects in age-recycled pools capped by IEffectsConfig; sparks fan deterministically from shot index + frame index, so no random source exists in src/render
+- [Phase 05]: 05-07: Renderer builds its layer graph, Camera, UnitViewFactory and Hud inside a 3-arg constructor (app, provider, config) because types.ts is frozen and AGENTS 12 forbids a 9-param constructor; createRenderer only validates, awaits app.init and constructs
+- [Phase 05]: 05-07: strategic mode is a visibility switch — unit views are hidden, never destroyed, so a focus/strategic round trip re-reads no getEquipment and an in-place upgrade cannot re-snapshot a frozen collider (G-6); buildStrategicFrame is the only producer of IStrategicFrame
 
 ### Pending Todos
 
@@ -210,6 +214,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-23T16:01:00.000Z
-Stopped at: Completed 05-06-PLAN.md (shared geometry views + Pixi import boundary)
+Last session: 2026-10-23T16:20:02.316Z
+Stopped at: Completed 05-07-PLAN.md (pooled HUD + per-frame Renderer)
 Resume file: None

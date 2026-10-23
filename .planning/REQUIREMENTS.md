@@ -45,7 +45,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### REND — 渲染系统
 
-- [ ] **REND-01**: 使用 PixiJS 实现 2D 顶视渲染
+- [x] **REND-01**: 使用 PixiJS 实现 2D 顶视渲染
 - [x] **REND-02**: 单位、武器、防具、阵营在画面上可辨
 - [x] **REND-03**: HUD 显示每个单位的 HP / 等级 / 阵营
 - [x] **REND-04**: 自动镜头跟拍激烈战斗区域（无需人工控制）
@@ -128,7 +128,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | KING-06 | Phase 4 — 王国系统 | Complete |
 | KING-07 | Phase 4 — 王国系统 | Complete |
 | KING-08 | Phase 4 — 王国系统 | Complete |
-| REND-01 | Phase 5 — 渲染系统 | Pending |
+| REND-01 | Phase 5 — 渲染系统 | Complete |
 | REND-02 | Phase 5 — 渲染系统 | Complete |
 | REND-03 | Phase 5 — 渲染系统 | Complete |
 | REND-04 | Phase 5 — 渲染系统 | Complete |
