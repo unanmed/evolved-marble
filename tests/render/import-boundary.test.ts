@@ -190,3 +190,43 @@ describe('render/import-boundary — one types.ts per folder', () => {
         expect(typeFiles).toEqual(['types.ts']);
     });
 });
+
+describe('render/import-boundary — renderer initialisation', () => {
+    it('initialises Pixi manually, preserves the drawing buffer and validates first', () => {
+        const source = readSource('src/render/Renderer.ts');
+        expect(
+            source,
+            '渲染器必须以手动渲染启动，否则隐藏的 ticker 会与 Phase 6 逐帧取图竞争（T-05-32）'
+        ).toContain('autoStart: false');
+        expect(
+            source,
+            '必须保留绘制缓冲，否则 Phase 6 取到的 canvas 可能是空帧（T-05-35）'
+        ).toContain('preserveDrawingBuffer: true');
+        expect(
+            source,
+            '应用必须经异步 init 创建（v8 起构造函数不再接受选项）'
+        ).toContain('await app.init(');
+        expect(
+            source,
+            '每帧恰好一次 app.render()：画一帧就返回（D-17/D-18）'
+        ).toContain('app.render()');
+        expect(
+            source,
+            '配置校验必须先于任何 Pixi 分配（T-05-01/T-05-09）'
+        ).toContain('validateRenderConfig(');
+    });
+
+    it('owns no loop: the renderer schedules nothing', () => {
+        const source = readSource('src/render/Renderer.ts');
+        const scheduling: readonly string[] = [
+            'requestAnimationFrame',
+            'setInterval',
+            'setTimeout'
+        ];
+        const found = scheduling.filter(token => source.includes(token));
+        expect(
+            found,
+            `渲染器不得调度任何东西（D-17/D-18）：${found.join(' | ')}`
+        ).toEqual([]);
+    });
+});
