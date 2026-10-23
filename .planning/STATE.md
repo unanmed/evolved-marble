@@ -1,18 +1,18 @@
 ---
 gsd_state_version: "1.0"
-current_phase: 5
+current_phase: 05
 current_phase_name: 渲染系统
 status: executing
-stopped_at: 05-01 (Round 1 type contract) approved — Round 2 not planned
-last_updated: "2026-10-21T15:04:08.828Z"
-last_activity: 2026-10-21
-last_activity_desc: Phase 5 Round 1 type contract approved; 05-01 complete
-state_head: aca218779fe0f51bdebfb033d65099b48c602e6e
+stopped_at: Completed 05-02-PLAN.md (render constants + calendar)
+last_updated: "2026-10-23T15:03:00.150Z"
+last_activity: 2026-10-23
+last_activity_desc: Phase 05 execution started
+state_head: e2aded0735a861fb2f101a04897d454cb44eec73
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 30
-  completed_plans: 21
+  completed_plans: 22
   percent: 0
 ---
 
@@ -23,14 +23,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-10-21)
 
 **Core value:** 战斗必须激烈好看。
-**Current focus:** Phase 5 — 渲染系统
+**Current focus:** Phase 05 — 渲染系统
 
 ## Current Position
 
-Phase: 5 (渲染系统) — READY TO EXECUTE
-Plan: 1 of 1 planned (05-01 Round 1 complete; Round 2 not yet planned)
+Phase: 05 (渲染系统) — EXECUTING
+Plan: 2 of 10
 Status: Ready to execute
-Last activity: 2026-10-21 — Round 1 type contract approved by the user; 05-01 complete
+Last activity: 2026-10-23 — Phase 05 execution started
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -83,6 +83,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 04 P04 | ~35min | 3 tasks | 6 files |
 | Phase 04 P05 | ~52min | 3 tasks | 10 files |
 | Phase 05 P01 | ~40min | 4 tasks | 4 files |
+| Phase 05 P02 | ~16min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -164,6 +165,10 @@ Recent decisions affecting current work:
 - [Phase 05]: ICameraUpdateInput.shakeImpulsePx is the declared writer for shakeX/shakeY, so the D-06 shake chain is reachable through interfaces rather than a hidden mutation
 - [Phase 05]: requirements-completed stays empty — REND-01..05 are Round-2 behaviour; Phase 5 is NOT complete
 - [Phase 05]: Round 2 pending (05-02 not planned): constants/calendar/cameraMath/hudModel/frameModel, DamageTap, GeometryUnitView/UnitViewFactory, Camera, Hud, Renderer, src/demo/*, src/main.ts, index.html, style.css, dev/build scripts, Chrome UAT
+- [Phase 05]: 05-02: DEFAULT_RENDER_CONFIG reuses DEFAULT_GEOMETRY by identity (asserted with toBe), so the drawn weapon/armour footprint cannot drift from the Rapier capsule
+- [Phase 05]: 05-02: validateRenderConfig is the pre-Pixi gate; every failure names the dotted field and the shipped default passes unchanged (T-05-01/T-05-09/T-05-11)
+- [Phase 05]: 05-02: CULL_MARGIN_METERS (4 m) and FLASH_RING_OFFSET_METERS (0.08 m) are exported named constants instead of new IRenderConfig fields, so the frozen contract stays untouched
+- [Phase 05]: 05-02: calendar.ts is pure integer arithmetic with no Date/locale; the info bar is exactly 第 Y 年 M 月 D 日 HH:MM / N× and clamps non-finite input
 
 ### Pending Todos
 
@@ -188,6 +193,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-21T12:21:30.000Z
-Stopped at: 05-01 (Round 1 type contract) approved — Round 2 not planned
-Resume file: .planning/phases/05-render-system/05-01-SUMMARY.md
+Last session: 2026-10-23T15:02:59.916Z
+Stopped at: Completed 05-02-PLAN.md (render constants + calendar)
+Resume file: None

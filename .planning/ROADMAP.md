@@ -189,7 +189,7 @@ Plans:
   4. 镜头自动跟拍激烈战斗区域，无需人工控制。
   5. Chrome-only 下数十单位混战维持可交互帧率。
 
-**Plans**: 10 plans (05-01 complete; 05-02..05-10 round 2 planned)
+**Plans**: 2/10 plans executed (05-01 complete; 05-02..05-10 round 2 planned)
 Plans:
 
 **Wave 1** *(round 1 — type gate, complete)*
@@ -198,7 +198,7 @@ Plans:
 
 **Wave 2**
 
-- [ ] 05-02-PLAN.md — `src/render/constants.ts`（唯一调参入口 + `validateRenderConfig`）+ `calendar.ts`（360 天简化历与信息条格式化）+ 测试
+- [x] 05-02-PLAN.md — `src/render/constants.ts`（唯一调参入口 + `validateRenderConfig`）+ `calendar.ts`（360 天简化历与信息条格式化）+ 测试
 
 **Wave 3**
 
@@ -225,6 +225,7 @@ Plans:
 **Wave 8**
 
 - [ ] 05-10-PLAN.md — Chrome 手动 UAT（REND-01..05、D-06/D-12/D-21/D-22/D-23）+ 仅经 `DEFAULT_RENDER_CONFIG` 校准 + REND-05 文档对齐 D-01 + `05-UAT.md` 证据
+
 **Type-first gate**: Wave 1 writes the render folder's `types.ts` + `IRenderer`/`IHud`/`ICamera`/`IUnitView` interfaces; **user reviews and approves before implementation**. ✅ Approved 2026-10-21.
 **UI hint**: yes
 
@@ -282,7 +283,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 2. 物理模拟系统 | 7/7 | Complete    | 2026-10-19 |
 | 3. 操控系统 | 3/3 | Complete    | 2026-10-20 |
 | 4. 王国系统 | 5/5 | Complete    | 2026-10-21 |
-| 5. 渲染系统 | 1/10 | In progress — round 2 planned | - |
+| 5. 渲染系统 | 2/10 | In Progress|  |
 | 6. 录制系统 | 0/0 | Not started | - |
 | 7. AI 接入系统 | 0/0 | Not started | - |
 | 8. 统计与精彩回放系统 | 0/0 | Not started | - |
