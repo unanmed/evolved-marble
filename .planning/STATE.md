@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: 渲染系统
 status: executing
-stopped_at: Completed 05-04-PLAN.md (frame model + visual spec)
-last_updated: "2026-10-23T15:34:31.610Z"
+stopped_at: Completed 05-05-PLAN.md (HUD model + damage tap)
+last_updated: "2026-10-23T15:48:19.467Z"
 last_activity: 2026-10-23
 last_activity_desc: Phase 05 execution started
-state_head: fb6a885a555d6b3c00f6a7853b275b20c1dfe305
+state_head: 5740f3ab7b666920dcc6eecc93d179c98f58d1b2
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 30
-  completed_plans: 24
+  completed_plans: 25
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-21)
 ## Current Position
 
 Phase: 05 (渲染系统) — EXECUTING
-Plan: 4 of 10
+Plan: 5 of 10
 Status: Ready to execute
 Last activity: 2026-10-23 — Phase 05 execution started
 
@@ -86,6 +86,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P02 | ~16min | 2 tasks | 4 files |
 | Phase 05 P03 | ~11min | 2 tasks | 4 files |
 | Phase 05 P04 | ~9min | 2 tasks | 4 files |
+| Phase 05 P05 | ~7min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -177,6 +178,9 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-04: resolveFactionColor is total — validated configured colour, deterministic abs/trunc fallback, neutral for absent/malformed/empty, never undefined (T-05-17)
 - [Phase 05]: 05-04: frameModel projects real Phase 1 equipment into the frozen IUnitVisualSpec (first weapon + all armours in order, classKind data only); 7 classes provably cover 6 weapons and 2 armours (REND-02/D-04/D-22)
 - [Phase 05]: 05-04: resolveTargetPoints preserves member order and skips null/non-finite states; isUnitVisible is boundary-inclusive and fails closed on non-finite/non-positive inputs (T-05-18/T-05-19)
+- [Phase 05]: 05-05: registerDamage guards non-finite fps/seconds to 0 and clamps frames to >=1, so a malformed config cannot write NaN deadlines that silently hide every health bar (T-05-25)
+- [Phase 05]: 05-05: computeHudScale's raw factor is deliberately non-monotonic; D-09 is asserted on barWorldWidth x cameraScale x factor (14 px at worldScaleAt, 36 px at screenScaleAt, non-decreasing between)
+- [Phase 05]: 05-05: RenderDamageTap records appliedDamage = max(0, healthBefore - healthAfter) (overkill excluded), snapshots the death position before ControlSystem unregisters the body, and caps its buffer at MAX_BUFFERED_DAMAGE_EVENTS
 
 ### Pending Todos
 
@@ -201,6 +205,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-23T15:34:31.405Z
-Stopped at: Completed 05-04-PLAN.md (frame model + visual spec)
+Last session: 2026-10-23T15:48:19.241Z
+Stopped at: Completed 05-05-PLAN.md (HUD model + damage tap)
 Resume file: None

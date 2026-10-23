@@ -189,7 +189,7 @@ Plans:
   4. 镜头自动跟拍激烈战斗区域，无需人工控制。
   5. Chrome-only 下数十单位混战维持可交互帧率。
 
-**Plans**: 4/10 plans executed (05-01 complete; 05-02..05-10 round 2 planned)
+**Plans**: 5/10 plans executed (05-01 complete; 05-02..05-10 round 2 planned)
 Plans:
 
 **Wave 1** *(round 1 — type gate, complete)*
@@ -207,7 +207,7 @@ Plans:
 
 **Wave 4**
 
-- [ ] 05-05-PLAN.md — `hudModel.ts`（血量比、15×帧计时、<6 常亮、混合缩放、震动冲量）+ `DamageTap.ts`（伤害/死亡旁路装饰器）+ 测试
+- [x] 05-05-PLAN.md — `hudModel.ts`（血量比、15×帧计时、<6 常亮、混合缩放、震动冲量）+ `DamageTap.ts`（伤害/死亡旁路装饰器）+ 测试
 - [ ] 05-06-PLAN.md — `UnitViewFactory.ts`（共享几何：本体 + 6 武器 + 2 防具 + 闪白）+ `GeometryUnitView.ts` + Pixi 导入边界测试
 
 **Wave 5**
@@ -283,7 +283,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 2. 物理模拟系统 | 7/7 | Complete    | 2026-10-19 |
 | 3. 操控系统 | 3/3 | Complete    | 2026-10-20 |
 | 4. 王国系统 | 5/5 | Complete    | 2026-10-21 |
-| 5. 渲染系统 | 4/10 | In Progress|  |
+| 5. 渲染系统 | 5/10 | In Progress|  |
 | 6. 录制系统 | 0/0 | Not started | - |
 | 7. AI 接入系统 | 0/0 | Not started | - |
 | 8. 统计与精彩回放系统 | 0/0 | Not started | - |
