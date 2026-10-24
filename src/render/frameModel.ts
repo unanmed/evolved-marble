@@ -1,5 +1,6 @@
 /**
- * 渲染层的纯逐帧投影：阵营色解析、单位视觉/视图规格快照、参战点位提取与视口裁剪。
+ * 渲染层的纯逐帧投影：阵营色解析、单位视觉/视图规格快照、参战点位提取、
+ * 战斗权重汇总与视口裁剪。
  * 本文件无 Pixi、无 Rapier、无类、无模块状态，只把冻结的上游契约读成
  * `@/render/types` 的词表，使渲染器不再包含“长什么样 / 是否在画面内”的分支
  * （D-01/D-04/D-14）。所有函数都只读入参，绝不修改单位或战斗对象。
@@ -13,7 +14,7 @@ import type {
     UnitStateLookup
 } from '@/render/types';
 import type { IBattle, IVec2 } from '@/kingdom/types';
-import { EquipmentKind } from '@/units/types';
+import { AttributeKind, EquipmentKind } from '@/units/types';
 import type { ArmorKind, IUnit, WeaponKind } from '@/units/types';
 
 /**
@@ -136,6 +137,36 @@ export function resolveTargetPoints(
     }
 
     return points;
+}
+
+/**
+ * 汇总一场战斗的权重 W：存活成员等级之和（REND-04）。
+ * 缺失（`null`）、已死亡、等级非有限或为负的成员被跳过；
+ * 一个可用成员都没有时返回 0（合法的“无权重”输入，绝不产生 NaN）。
+ * 纯函数：只读战斗与单位目录，不缓存，重复调用同输入同输出。
+ * @param battle 目标战斗（只读）。
+ * @param getUnit 单位查询；不存在时返回 `null`（缺失对象 → `null`）。
+ * @returns 存活成员等级之和，非负有限。
+ */
+export function resolveBattleWeight(
+    battle: IBattle,
+    getUnit: (unitId: number) => IUnit | null
+): number {
+    let weight = 0;
+
+    for (const unitId of battle.getMemberUnitIds()) {
+        const unit = getUnit(unitId);
+        if (unit === null || !unit.isAlive()) {
+            continue;
+        }
+        const level = unit.getAttribute(AttributeKind.Level);
+        if (!Number.isFinite(level) || level < 0) {
+            continue;
+        }
+        weight += level;
+    }
+
+    return weight;
 }
 
 /**

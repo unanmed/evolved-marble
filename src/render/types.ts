@@ -112,6 +112,11 @@ export interface ICameraUpdateInput {
     readonly points: readonly IVec2[];
     /** 本输出帧请求的屏幕震动冲量（像素）；无震动时为 0。 */
     readonly shakeImpulsePx: number;
+    /**
+     * 当前战斗权重：目标战斗存活成员的等级之和；无目标战斗时为 0。
+     * 只缩短**战斗内稳态跟随**的追赶时间，绝不改变进入/退出过渡的时长。
+     */
+    readonly battleWeight: number;
 }
 
 /** 镜头可调参数（D-06/D-14/D-15/D-20/D-21）。 */
@@ -126,12 +131,14 @@ export interface ICameraConfig {
     readonly minScale: number;
     /** 允许的最大缩放（像素/米）。 */
     readonly maxScale: number;
-    /** 跟踪的时间常数（输出帧）：指数平滑越远越慢，永不瞬移。 */
+    /** 跟踪的时间常数（输出帧）：指数平滑越远越慢，永不瞬移；战斗中按 `weightScale` 缩短。 */
     readonly smoothingFrames: number;
     /** 两段式过渡的第一段：以**当前缩放**平移中心到目标中心所需的输出帧数。 */
     readonly panFrames: number;
     /** 两段式过渡的第二段：平移结束后推拉到目标缩放所需的输出帧数。 */
     readonly zoomFrames: number;
+    /** 权重标度：等级和达到此值时稳态跟随的平滑帧数减半（默认 20），必须为正。 */
+    readonly weightScale: number;
     /** 震动振幅上限（屏幕像素）：冲量与累计振幅都钳制到此值。 */
     readonly shakeAmplitudePx: number;
     /** 每帧振幅衰减乘数：震动以输出帧计，不用 wall-clock。 */

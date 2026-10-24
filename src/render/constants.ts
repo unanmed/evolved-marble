@@ -87,7 +87,7 @@ const PALETTE: IRenderPalette = {
 
 /**
  * 镜头参数（D-06/D-14/D-21）：拟合边距、目标构图比例、缩放下限/上限、
- * 平滑与两段式过渡（先平移、后推拉）的帧数、震动幅度与衰减。
+ * 平滑与两段式过渡（先平移、后推拉）的帧数、战斗权重标度、震动幅度与衰减。
  * `minScale` 不超过全景拟合缩放，实际下限由 `Camera` 推导。
  * `shakeAmplitudePx` 为 0：受击震动已按 UAT 反馈关闭，代码路径保留以便随时恢复。
  */
@@ -100,6 +100,7 @@ const CAMERA: ICameraConfig = {
     smoothingFrames: 10,
     panFrames: 24,
     zoomFrames: 6,
+    weightScale: 20,
     shakeAmplitudePx: 0,
     shakeDecayPerFrame: 0.86
 };
@@ -302,6 +303,7 @@ export function validateRenderConfig(config: IRenderConfig): void {
     assertAtLeast('camera.smoothingFrames', camera.smoothingFrames, 1);
     assertAtLeast('camera.panFrames', camera.panFrames, 1);
     assertAtLeast('camera.zoomFrames', camera.zoomFrames, 1);
+    assertAbove('camera.weightScale', camera.weightScale, 0);
     assertAtLeast('camera.shakeAmplitudePx', camera.shakeAmplitudePx, 0);
     if (
         !Number.isFinite(camera.shakeDecayPerFrame) ||

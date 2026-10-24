@@ -302,7 +302,8 @@ export class Renderer implements IRenderer {
             viewport: this.viewport,
             bounds: services.world.getBounds(),
             points,
-            shakeImpulsePx
+            shakeImpulsePx,
+            battleWeight: 0
         });
         this.applyTransform(transform);
 

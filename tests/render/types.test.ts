@@ -113,6 +113,7 @@ function makeCameraConfig(): ICameraConfig {
         smoothingFrames: 12,
         panFrames: 20,
         zoomFrames: 10,
+        weightScale: 20,
         shakeAmplitudePx: 6,
         shakeDecayPerFrame: 0.85
     };
@@ -250,10 +251,13 @@ describe('render types — ICamera derives its mode from the target', () => {
 
     it('pins the update input and the declared shake writer', () => {
         expectTypeOf<keyof ICameraUpdateInput>().toEqualTypeOf<
-            'viewport' | 'bounds' | 'points' | 'shakeImpulsePx'
+            'viewport' | 'bounds' | 'points' | 'shakeImpulsePx' | 'battleWeight'
         >();
         expectTypeOf<
             ICameraUpdateInput['shakeImpulsePx']
+        >().toEqualTypeOf<number>();
+        expectTypeOf<
+            ICameraUpdateInput['battleWeight']
         >().toEqualTypeOf<number>();
         expectTypeOf<ICameraTransform['shakeX']>().toEqualTypeOf<number>();
         expectTypeOf<ICameraTransform['shakeY']>().toEqualTypeOf<number>();
@@ -430,6 +434,7 @@ describe('render types — IRenderConfig is the single tuning entry', () => {
 describe('render types — sub-configs and palette', () => {
     it('pins the decision-critical threshold fields', () => {
         expectTypeOf<ICameraConfig['coverage']>().toEqualTypeOf<number>();
+        expectTypeOf<ICameraConfig['weightScale']>().toEqualTypeOf<number>();
         expectTypeOf<IHudConfig['healthBarSeconds']>().toEqualTypeOf<number>();
         expectTypeOf<
             IHudConfig['alwaysVisibleBelowUnits']
@@ -439,6 +444,7 @@ describe('render types — sub-configs and palette', () => {
         >().toEqualTypeOf<number>();
 
         expect(makeCameraConfig().coverage).toBe(0.9);
+        expect(makeCameraConfig().weightScale).toBe(20);
         expect(makeHudConfig().healthBarSeconds).toBe(15);
         expect(makeHudConfig().alwaysVisibleBelowUnits).toBe(6);
         expect(makeEffectsConfig().damageNumberThreshold).toBe(50);
@@ -473,11 +479,13 @@ describe('render types — pure camera and HUD data shapes', () => {
             viewport,
             bounds: { width: 1000, height: 1000 },
             points: [{ x: 450, y: 460 }],
-            shakeImpulsePx: 0
+            shakeImpulsePx: 0,
+            battleWeight: 0
         };
         const shaking: ICameraUpdateInput = {
             ...noShake,
-            shakeImpulsePx: 4
+            shakeImpulsePx: 4,
+            battleWeight: 36
         };
         const cull: ICullQuery = {
             x: 500,
@@ -501,6 +509,8 @@ describe('render types — pure camera and HUD data shapes', () => {
         expect(fitBox.maxX).toBe(600);
         expect(noShake.shakeImpulsePx).toBe(0);
         expect(shaking.shakeImpulsePx).toBe(4);
+        expect(noShake.battleWeight).toBe(0);
+        expect(shaking.battleWeight).toBe(36);
         expect(cull.marginMeters).toBe(8);
         expect(hudFrame.units).toHaveLength(1);
         expect(hudFrame.damage).toHaveLength(1);

@@ -138,6 +138,13 @@ const invalidCases: readonly IInvalidCase[] = [
         field: /camera\.zoomFrames/
     },
     {
+        name: 'weightScale 0',
+        config: withTopLevel({
+            camera: { ...defaultCamera, weightScale: 0 }
+        }),
+        field: /camera\.weightScale/
+    },
+    {
         name: 'flashFrames 0',
         config: withTopLevel({
             effects: { ...defaultEffects, flashFrames: 0 }
@@ -192,6 +199,8 @@ describe('render/constants — shipped default config', () => {
         );
         expect(camera.shakeAmplitudePx).toBe(0);
         expect(camera.shakeDecayPerFrame).toBeGreaterThan(0);
+        // 等级和达到 weightScale 时跟随平滑帧数减半，故它必须为正。
+        expect(camera.weightScale).toBe(20);
     });
 
     it('keeps the faction table configurable rather than baked in', () => {

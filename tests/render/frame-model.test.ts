@@ -3,11 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { FALLBACK_FACTION_COLORS } from '@/render/constants';
 import {
     isUnitVisible,
+    resolveBattleWeight,
     resolveFactionColor,
     resolveTargetPoints
 } from '@/render/frameModel';
 import type { ICameraTransform, ICullQuery, IViewport } from '@/render/types';
 import type { IUnitState } from '@/physics/types';
+import { AttributeKind, ClassKind, SkillKind } from '@/units/types';
+import type { IEquipment, IModifier, IUnit } from '@/units/types';
 
 import { makeBattle, makeLookup, makeUnitState } from './fakes';
 
@@ -49,6 +52,82 @@ function cullQuery(
         marginMeters: MARGIN,
         ...overrides
     };
+}
+
+/**
+ * 测试单位：只把等级与存活状态做成可配置读数，其余接口成员返回稳定常量，
+ * 使 `resolveBattleWeight` 无需真实单位实现即可单测。
+ */
+class FakeUnit implements IUnit {
+    /** 单位等级：`getAttribute(Level)` 的返回值。 */
+    private readonly level: number;
+    /** 存活标记：`isAlive()` 的返回值。 */
+    private alive: boolean;
+
+    /**
+     * 构造测试单位。
+     * @param level 等级。
+     * @param alive 初始存活状态。
+     */
+    constructor(level: number, alive = true) {
+        this.level = level;
+        this.alive = alive;
+    }
+
+    getAttribute(kind: AttributeKind): number {
+        return kind === AttributeKind.Level ? this.level : 0;
+    }
+
+    getName(): string {
+        return 'fake-unit';
+    }
+
+    getClass(): ClassKind {
+        return ClassKind.Swordsman;
+    }
+
+    getEquipment(): readonly IEquipment[] {
+        return [];
+    }
+
+    getModifiers(): readonly IModifier[] {
+        return [];
+    }
+
+    getSkills(): readonly SkillKind[] {
+        return [];
+    }
+
+    takeDamage(_amount: number): void {
+        this.alive = false;
+    }
+
+    isAlive(): boolean {
+        return this.alive;
+    }
+
+    gainAttackExperience(_damageDealt: number): void {
+        // 测试夹具不累积经验。
+    }
+
+    gainDefenseExperience(_damageReduced: number): void {
+        // 测试夹具不累积经验。
+    }
+
+    gainKillExperience(_enemyLevel: number): void {
+        // 测试夹具不累积经验。
+    }
+}
+
+/**
+ * 以只读映射构造单位查询；未知 id 返回 `null`（缺失对象 → `null`）。
+ * @param units unitId → 单位。
+ * @returns 单位查询闭包。
+ */
+function makeUnitLookup(
+    units: ReadonlyMap<number, IUnit>
+): (unitId: number) => IUnit | null {
+    return (unitId: number): IUnit | null => units.get(unitId) ?? null;
 }
 
 describe('render/frame-model — resolveTargetPoints', () => {
@@ -112,6 +191,73 @@ describe('render/frame-model — resolveTargetPoints', () => {
 
         expect(first).not.toBe(second);
         expect(second).toEqual(first);
+    });
+});
+
+describe('render/frame-model — resolveBattleWeight', () => {
+    it('sums the levels of the living members', () => {
+        const units = new Map<number, IUnit>([
+            [4, new FakeUnit(3)],
+            [9, new FakeUnit(7)]
+        ]);
+
+        expect(
+            resolveBattleWeight(makeBattle([4, 9]), makeUnitLookup(units))
+        ).toBe(10);
+    });
+
+    it('skips missing, dead, non-finite and negative levels', () => {
+        const units = new Map<number, IUnit>([
+            [1, new FakeUnit(5)],
+            [2, new FakeUnit(4, false)],
+            [3, new FakeUnit(Number.NaN)],
+            [4, new FakeUnit(Number.POSITIVE_INFINITY)],
+            [5, new FakeUnit(-2)]
+        ]);
+
+        expect(
+            resolveBattleWeight(
+                makeBattle([1, 2, 3, 4, 5, 6]),
+                makeUnitLookup(units)
+            )
+        ).toBe(5);
+    });
+
+    it('returns 0 for an empty battle or when no member resolves', () => {
+        const units = new Map<number, IUnit>([[1, new FakeUnit(6, false)]]);
+
+        expect(resolveBattleWeight(makeBattle([]), makeUnitLookup(units))).toBe(
+            0
+        );
+        expect(
+            resolveBattleWeight(makeBattle([1, 2]), makeUnitLookup(units))
+        ).toBe(0);
+        expect(
+            resolveBattleWeight(makeBattle([7]), makeUnitLookup(units))
+        ).toBe(0);
+    });
+
+    it('keeps the sum deterministic across member order and repeated calls', () => {
+        const units = new Map<number, IUnit>([
+            [1, new FakeUnit(2)],
+            [2, new FakeUnit(3)],
+            [3, new FakeUnit(4)]
+        ]);
+
+        const forward = resolveBattleWeight(
+            makeBattle([1, 2, 3]),
+            makeUnitLookup(units)
+        );
+        const backward = resolveBattleWeight(
+            makeBattle([3, 2, 1]),
+            makeUnitLookup(units)
+        );
+
+        expect(forward).toBe(9);
+        expect(backward).toBe(forward);
+        expect(
+            resolveBattleWeight(makeBattle([1, 2, 3]), makeUnitLookup(units))
+        ).toBe(forward);
     });
 });
 

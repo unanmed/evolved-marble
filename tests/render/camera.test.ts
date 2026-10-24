@@ -54,17 +54,20 @@ function makeConfig(): ICameraConfig {
  * 构造一次更新输入。
  * @param points 拟合点（空数组 = 全景）。
  * @param shakeImpulsePx 本帧震动冲量（像素）。
+ * @param battleWeight 本帧战斗权重（存活成员等级和），默认 0。
  * @returns 镜头输入。
  */
 function makeInput(
     points: readonly IVec2[],
-    shakeImpulsePx = 0
+    shakeImpulsePx = 0,
+    battleWeight = 0
 ): ICameraUpdateInput {
     return {
         viewport: VIEWPORT,
         bounds: BOUNDS,
         points,
-        shakeImpulsePx
+        shakeImpulsePx,
+        battleWeight
     };
 }
 
@@ -410,19 +413,22 @@ describe('render/Camera — degenerate input stays finite', () => {
                 viewport: VIEWPORT,
                 bounds: BOUNDS,
                 points: [{ x: Number.NaN, y: Number.NaN }],
-                shakeImpulsePx: Number.NaN
+                shakeImpulsePx: Number.NaN,
+                battleWeight: Number.NaN
             },
             {
                 viewport: { width: 0, height: 0 },
                 bounds: BOUNDS,
                 points: [],
-                shakeImpulsePx: 0
+                shakeImpulsePx: 0,
+                battleWeight: -5
             },
             {
                 viewport: VIEWPORT,
                 bounds: { width: 0, height: 0 },
                 points: [{ x: 1, y: 1 }],
-                shakeImpulsePx: Number.POSITIVE_INFINITY
+                shakeImpulsePx: Number.POSITIVE_INFINITY,
+                battleWeight: Number.POSITIVE_INFINITY
             }
         ];
 
