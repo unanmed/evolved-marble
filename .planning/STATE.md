@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: 渲染系统
 status: executing
-stopped_at: Completed 05-08-PLAN.md
-last_updated: "2026-10-24T06:05:15.279Z"
+stopped_at: Completed 05-09-PLAN.md
+last_updated: "2026-10-24T06:33:42.311Z"
 last_activity: 2026-10-24
-last_activity_desc: Phase 05 plan 08 executed
-state_head: bfe3f7ac2a5accd85bbdb404b9b8f28ea9d8bffe
+last_activity_desc: Phase 05 plan 09 executed
+state_head: 338376f3749f8ae20f86f60672542693fb14a643
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 30
-  completed_plans: 28
+  completed_plans: 29
   percent: 0
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-10-21)
 ## Current Position
 
 Phase: 05 (渲染系统) — EXECUTING
-Plan: 8 of 10
+Plan: 9 of 10
 Status: Ready to execute
-Last activity: 2026-10-24 — 05-08 (demo composition + frame runner) completed
+Last activity: 2026-10-24 — 05-09 (operator panel + demo bootstrap) completed
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -90,6 +90,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P06 | ~8min | 2 tasks | 3 files |
 | Phase 05 P07 | 16min | 2 tasks | 3 files |
 | Phase 5 P8 | 11min | 2 tasks | 6 files |
+| Phase 05 P09 | 20min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -195,6 +196,9 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-08: issueInitialEngagementOrders feeds real IWorld.issueOrder MoveTo orders toward the nearest opposing army; the PlaceholderCommander leaves them alone since it only orders armies whose getOrder() is null
 - [Phase 05]: 05-08: ManualRunner.setAutoFollow(false) never writes camera.setBattleTarget, so an operator panorama survives; the panel clears or selects the target in the same action
 - [Phase 05]: 05-08: stepOnce reuses runOneFrame(false), making a single step provably one tick + one target update + one render without scheduling
+- [Phase 05]: Operator panel drives only declared seams; 全景 disables auto-follow before clearing the target so an operator panorama survives a live battle (D-12/REND-04)
+- [Phase 05]: MoveTo picking zeroes shakeX/shakeY before screenToWorld and rejects non-finite or out-of-bounds points before issueOrder (D-24/T-05-43)
+- [Phase 05]: Demo page: async main() with no top-level await, canvas appended directly to #stage-host, letters by CSS only; reset keeps IManualRunner pause semantics
 
 ### Pending Todos
 
@@ -219,6 +223,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-24T06:05:14.921Z
-Stopped at: Completed 05-08-PLAN.md
+Last session: 2026-10-24T06:33:28.286Z
+Stopped at: Completed 05-09-PLAN.md
 Resume file: None
