@@ -17,9 +17,9 @@ provides:
 affects: [06-recording, demo]
 
 actuals:
-  tokens: 5600
+  tokens: 6200
   tasks: 2
-  commits: 3
+  commits: 6
 plan_head_before: d1ec45dd9dd0cc0e2de59940b0bdc9aff0dafedb
 
 tech-stack:
@@ -77,6 +77,9 @@ coverage:
       - kind: unit
         ref: "tests/demo/runner.test.ts#clears a pending freeze on reset"
         status: pass
+      - kind: unit
+        ref: "tests/demo/runner.test.ts#drops a freeze that is in flight when auto-follow is turned off"
+        status: pass
     human_judgment: false
   - id: D3
     description: "panFrames/zoomFrames keep their names and types; only their JSDoc meaning sharpens (panFrames = exit, zoomFrames = entry)"
@@ -117,7 +120,7 @@ status: complete
 - `ManualRunner` now freezes **before** it owns a target: `pendingBattleId` is stored, `camera.setBattleTarget` is deferred, so the renderer's existing "no target → empty points → Strategic" path draws the panoramic layer for all 24 hold frames.
 - Release happens on the frame after the hold: the target is applied, `world.tick()` runs on that same frame, and `updateTarget` then keeps the just-set target because it is still active.
 - `ICameraConfig` semantics sharpened with no shape change: `panFrames` = exit pull-back, `zoomFrames` = entry push-in.
-- `reset()`/`dispose()` drop a pending target; battle-to-battle switches, target clearing and auto-follow-off keep their no-freeze behaviour; the single-timer/no-leak guarantees are unchanged.
+- `reset()`/`dispose()` drop a pending target; battle-to-battle switches, target clearing and auto-follow-off keep their no-freeze behaviour; turning auto-follow off mid-hold also drops the in-flight freeze; the single-timer/no-leak guarantees are unchanged.
 
 ## Task Commits
 
@@ -126,8 +129,10 @@ Each task was committed atomically:
 1. **Task 1: Camera entry becomes a single push-in** - `73acf49` (fix)
 2. **Task 1 repair: UTF-8 restore of the camera tests** - `10f227c` (fix)
 3. **Task 2: Freeze in panoramic, then set the target** - `f4385c7` (fix)
+4. **Plan metadata: complete summary** - `713be4a` (docs)
+5. **Task 2 refinement: drop an in-flight freeze when auto-follow is off** - `c572f66` (fix)
 
-_Commit count is measured from the plan ledger: `git rev-list --count d1ec45d..HEAD` = 3._
+_Commit count is measured from the plan ledger: `git rev-list --count d1ec45d..HEAD`, which reaches 6 including the follow-up summary refresh commit._
 
 ## Files Created/Modified
 - `src/render/Camera.ts` - Entry branch is now a single `entryTransform` over `zoomFrames`; `panTransform`/`zoomTransform` removed; the class/`update()` JSDoc describes two single-segment transitions.
@@ -154,18 +159,26 @@ _Commit count is measured from the plan ledger: `git rev-list --count d1ec45d..H
 - **Verification:** `pnpm vitest run tests/render/camera.test.ts` (20 passed), `pnpm lint` clean (only the two pre-existing `no-console` warnings in `src/main.ts`), and the file reads back with intact Chinese JSDoc.
 - **Committed in:** `10f227c` (separate repair commit, no history rewrite)
 
-**2. [Rule 1 - Bug] Dead identity branch in the first draft of the release path**
+**2. [Rule 2 - Missing Critical] Auto-follow could be turned off mid-freeze and still seize the camera**
+- **Found during:** Post-Task-2 self-review of the class guarantee "when auto-follow is off this class never writes the camera target"
+- **Issue:** `setAutoFollow(false)` left `pendingBattleId` and `freezeFramesRemaining` intact, so the next ordinary frame would release the pending target into the camera and override the operator's panorama — a direct contradiction of the documented invariant. It would also keep ticking frozen for the rest of the hold even though "no freeze while auto-follow is off" is the stated policy.
+- **Fix:** `setAutoFollow(false)` clears the remaining freeze frames and the pending id; `releasePendingTarget` re-checks `autoFollow` before applying. Turning auto-follow off mid-hold resumes ticking immediately and leaves the target undefined.
+- **Files modified:** `src/demo/runner.ts`, `tests/demo/runner.test.ts`
+- **Verification:** new test `drops a freeze that is in flight when auto-follow is turned off`; full suite 524 passed, typecheck and lint clean.
+- **Committed in:** `c572f66`
+
+**3. [Rule 1 - Bug] Dead identity branch in the first draft of the release path**
 - **Found during:** Task 2 implementation
 - **Issue:** Calling `releasePendingTarget` unconditionally on ordinary frames required a guard; the first draft cleared `pendingBattleId` before checking liveness, which would have dropped an id that `updateTarget` had just armed in the same frame ordering.
 - **Fix:** Final ordering is `getWorld → releasePendingTarget (only when pending is set, checks liveness before applying) → world.tick() → updateTarget(world)`, so the freeze is armed after the release check and can never be consumed in the frame it was armed.
 - **Files modified:** `src/demo/runner.ts`
-- **Verification:** `tests/demo/runner.test.ts` (16 passed), full suite 523 passed.
+- **Verification:** `tests/demo/runner.test.ts` (17 passed), full suite 524 passed.
 - **Committed in:** `f4385c7` (part of Task 2 commit)
 
 ---
 
-**Total deviations:** 2 auto-fixed (2 bugs)
-**Impact on plan:** Both were execution defects, not scope changes. The plan's 5-file surface, its no-shape-change prohibition and its freeze/push-in timings are all honoured exactly.
+**Total deviations:** 3 auto-fixed (2 bugs, 1 missing critical guard)
+**Impact on plan:** All three were execution defects, not scope changes. The plan's 5-file surface, its no-shape-change prohibition and its freeze/push-in timings are all honoured exactly.
 
 ## Issues Encountered
 - PowerShell 5.1's `Set-Content` defaults to the ANSI code page, so it must never be used to rewrite files containing Chinese text in this repo. All subsequent edits used the edit tool.
@@ -190,5 +203,6 @@ None - no external service configuration required.
 - FOUND: 73acf49 (Task 1)
 - FOUND: 10f227c (Task 1 encoding repair)
 - FOUND: f4385c7 (Task 2)
+- FOUND: c572f66 (Task 2 auto-follow refinement)
 - FOUND: src/render/Camera.ts, src/render/types.ts, src/demo/runner.ts, tests/render/camera.test.ts, tests/demo/runner.test.ts
-- `pnpm test` 523 passed / 46 files · `pnpm typecheck` exit 0 · `pnpm lint` exit 0 (2 pre-existing `no-console` warnings in `src/main.ts`)
+- `pnpm test` 524 passed / 46 files · `pnpm typecheck` exit 0 · `pnpm lint` exit 0 (2 pre-existing `no-console` warnings in `src/main.ts`)

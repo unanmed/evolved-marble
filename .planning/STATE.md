@@ -4,10 +4,10 @@ current_phase: 05
 current_phase_name: 渲染系统
 status: executing
 stopped_at: Completed 05-17-PLAN.md
-last_updated: "2026-10-24T16:00:15.205Z"
+last_updated: "2026-10-24T16:05:12.412Z"
 last_activity: 2026-10-24
 last_activity_desc: Phase 05 plan 15 executed (single-phase pull-back, weight-aware in-battle follow)
-state_head: f4385c75dfa18706be0c676e612f88a86abadcb5
+state_head: c572f66e81d308870121c7758a1fc104b34f4c32
 progress:
   total_phases: 8
   completed_phases: 0
@@ -225,6 +225,7 @@ Recent decisions affecting current work:
 - [Phase 05]: Battle entry freezes the simulation for 24 frame-counted output frames (matching Camera.panFrames), rendering every frame but calling no world.tick(); the freeze is armed only on undefined -> defined targets with auto-follow on and is cleared by reset()/dispose()
 - [Phase 05]: 05-17: camera entry is a single push-in over zoomFrames (progress (elapsed+1)/zoomFrames, first frame moves, 6th lands); panFrames now means exit duration only
 - [Phase 05]: 05-17: the battle-entry freeze renders the strategic panorama by leaving camera.getBattleTarget() undefined, then releases pendingBattleId on the frame after the 24-frame hold and resumes ticking on that same frame
+- [Phase 05]: 05-17: turning auto-follow off drops an in-flight entry freeze and its pending target, so the class never writes the camera target while auto-follow is off
 
 ### Pending Todos
 
