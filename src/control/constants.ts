@@ -113,6 +113,34 @@ export const DEFAULT_AI_SKILL_RANGE = 20;
 export const DEFAULT_AI_LOW_HEALTH_RATIO = 0.25;
 
 /**
+ * 默认 AI 的「僵持」判定速度阈值（米/秒）：进入攻击距离后，朝目标的接近速度
+ * （`v · 单位方向`）低于该值即视为被顶住、无法继续靠近。可校准。
+ */
+export const DEFAULT_AI_STALL_SPEED_THRESHOLD = 0.5;
+
+/**
+ * 默认 AI 触发脱离所需的连续僵持决策数（决策数，非 tick）：连续这么多次决策都
+ * 判定为僵持才后退。按决策计数（约 24 tick），绝不使用 wall-clock。可校准。
+ */
+export const DEFAULT_AI_STALL_DECISIONS = 4;
+
+/**
+ * 默认 AI 的脱离持续 tick 数：后退窗口长度，窗口内不再冲撞。可校准。
+ */
+export const DEFAULT_AI_DISENGAGE_TICKS = 30;
+
+/**
+ * 默认 AI 的脱离期望速度（米/秒）：后退窗口内远离目标的期望线速度。可校准。
+ */
+export const DEFAULT_AI_DISENGAGE_SPEED = 8;
+
+/**
+ * 默认 AI 的脱离横向权重：后退方向 = 远离目标 + 该权重 × 横向单位向量，
+ * 使单位不会笔直贴着障碍磨蹭。可校准。
+ */
+export const DEFAULT_AI_DISENGAGE_LATERAL_WEIGHT = 0.6;
+
+/**
  * 弓箭射击间隔（控制 tick 数）：规格的 1 s 对应 60 tick（D-17）。
  * 本计划只声明常量，冷却逻辑在 03-03 完成；可校准。
  */

@@ -6,8 +6,13 @@ import {
     CHARGE_COOLDOWN_TICKS,
     DEFAULT_AI_APPROACH_SPEED,
     DEFAULT_AI_ATTACK_SPEED,
+    DEFAULT_AI_DISENGAGE_LATERAL_WEIGHT,
+    DEFAULT_AI_DISENGAGE_SPEED,
+    DEFAULT_AI_DISENGAGE_TICKS,
     DEFAULT_AI_LINEAR_GAIN,
     DEFAULT_AI_RETREAT_SPEED,
+    DEFAULT_AI_STALL_DECISIONS,
+    DECISION_INTERVAL_TICKS,
     RAY_COUNT,
     SENSING_MAX_DISTANCE,
     SPIN_COOLDOWN_TICKS
@@ -363,5 +368,173 @@ describe('DefaultUnitAI — baseline behaviour tree', () => {
             'torqueCounterClockwise'
         ]);
         expect(action.skillIntent).not.toBeNull();
+    });
+});
+
+describe('DefaultUnitAI — stall detection and disengage cycle', () => {
+    /**
+     * 连续在攻击距离内、与目标距离不变的决策（被顶住的典型读数）。
+     * @param ai 被测 AI 实例。
+     * @param unitId 自身单位 id（决定横向符号）。
+     * @param decisions 追加的决策次数。
+     * @param startTick 首个决策 tick。
+     * @returns 每个决策的返回动作。
+     */
+    function blockedDecisions(
+        ai: DefaultUnitAI,
+        unitId: number,
+        decisions: number,
+        startTick = 0
+    ): IUnitAction[] {
+        const actions: IUnitAction[] = [];
+        for (let index = 0; index < decisions; index += 1) {
+            actions.push(
+                ai.decide(
+                    makeObservation({
+                        unitId,
+                        tick: startTick + index * DECISION_INTERVAL_TICKS,
+                        enemies: [enemyAt(9, 1, 0)]
+                    })
+                )
+            );
+        }
+        return actions;
+    }
+
+    it('keeps charging while the target distance still shrinks', () => {
+        const ai = new DefaultUnitAI();
+        const actions: IUnitAction[] = [];
+        for (let index = 0; index < 6; index += 1) {
+            actions.push(
+                ai.decide(
+                    makeObservation({
+                        unitId: 1,
+                        tick: index * DECISION_INTERVAL_TICKS,
+                        enemies: [enemyAt(9, 10 - index * 0.5, 0)]
+                    })
+                )
+            );
+        }
+
+        expect(actions.every(action => forceVector(action).x > 0)).toBe(true);
+    });
+
+    it('triggers a back-off after DEFAULT_AI_STALL_DECISIONS blocked decisions', () => {
+        const ai = new DefaultUnitAI();
+        const actions = blockedDecisions(ai, 1, DEFAULT_AI_STALL_DECISIONS + 1);
+        const mass = attributesWith()[AttributeKind.Mass];
+
+        // 前 DEFAULT_AI_STALL_DECISIONS 次仍在冲撞（向 +x）。
+        for (const action of actions.slice(0, DEFAULT_AI_STALL_DECISIONS)) {
+            expect(forceVector(action).x).toBeGreaterThan(0);
+        }
+
+        const backOff = forceVector(actions[DEFAULT_AI_STALL_DECISIONS]);
+        expect(backOff.x).toBeLessThan(0);
+        expect(backOff.y).not.toBe(0);
+        expect(Math.hypot(backOff.x, backOff.y)).toBeCloseTo(
+            mass * DEFAULT_AI_LINEAR_GAIN * DEFAULT_AI_DISENGAGE_SPEED,
+            6
+        );
+    });
+
+    it('mixes the lateral component into the back-off instead of reversing straight', () => {
+        const ai = new DefaultUnitAI();
+        const actions = blockedDecisions(ai, 1, DEFAULT_AI_STALL_DECISIONS + 1);
+        const backOff = forceVector(actions[DEFAULT_AI_STALL_DECISIONS]);
+        const length = Math.hypot(backOff.x, backOff.y);
+        // 目标在 +x：远离分量为 -1，横向量为 ±DEFAULT_AI_DISENGAGE_LATERAL_WEIGHT。
+        expect(Math.abs(backOff.x) / length).toBeCloseTo(
+            1 / Math.hypot(1, DEFAULT_AI_DISENGAGE_LATERAL_WEIGHT),
+            6
+        );
+        expect(Math.abs(backOff.y) / length).toBeCloseTo(
+            DEFAULT_AI_DISENGAGE_LATERAL_WEIGHT /
+                Math.hypot(1, DEFAULT_AI_DISENGAGE_LATERAL_WEIGHT),
+            6
+        );
+    });
+
+    it('picks the lateral sign deterministically from unitId parity', () => {
+        const odd = new DefaultUnitAI();
+        const even = new DefaultUnitAI();
+        const oddActions = blockedDecisions(
+            odd,
+            1,
+            DEFAULT_AI_STALL_DECISIONS + 1
+        );
+        const evenActions = blockedDecisions(
+            even,
+            2,
+            DEFAULT_AI_STALL_DECISIONS + 1
+        );
+
+        const oddY = forceVector(oddActions[DEFAULT_AI_STALL_DECISIONS]).y;
+        const evenY = forceVector(evenActions[DEFAULT_AI_STALL_DECISIONS]).y;
+        expect(Math.sign(oddY)).toBe(-Math.sign(evenY));
+
+        // 同一 unitId 的后续周期保持同一横向符号。
+        const nextCycle = blockedDecisions(
+            odd,
+            1,
+            DEFAULT_AI_STALL_DECISIONS + 1,
+            DEFAULT_AI_DISENGAGE_TICKS + DECISION_INTERVAL_TICKS * 5
+        );
+        expect(
+            Math.sign(forceVector(nextCycle[DEFAULT_AI_STALL_DECISIONS]).y)
+        ).toBe(Math.sign(oddY));
+    });
+
+    it('resumes the normal charge once the disengage window ends', () => {
+        const ai = new DefaultUnitAI();
+        const actions = blockedDecisions(ai, 1, DEFAULT_AI_STALL_DECISIONS + 1);
+        const triggerTick =
+            DEFAULT_AI_STALL_DECISIONS * DECISION_INTERVAL_TICKS;
+        const inWindow = ai.decide(
+            makeObservation({
+                unitId: 1,
+                tick: triggerTick + DECISION_INTERVAL_TICKS,
+                enemies: [enemyAt(9, 1, 0)]
+            })
+        );
+        const afterWindow = ai.decide(
+            makeObservation({
+                unitId: 1,
+                tick: triggerTick + DEFAULT_AI_DISENGAGE_TICKS,
+                enemies: [enemyAt(9, 3, 0)]
+            })
+        );
+
+        expect(forceVector(inWindow).x).toBeLessThan(0);
+        expect(forceVector(actions[DEFAULT_AI_STALL_DECISIONS]).x).toBeLessThan(
+            0
+        );
+        expect(forceVector(afterWindow).x).toBeGreaterThan(0);
+    });
+
+    it('lets low health retreat win over the armed stall logic', () => {
+        const ai = new DefaultUnitAI();
+        blockedDecisions(ai, 1, DEFAULT_AI_STALL_DECISIONS);
+        const retreat = ai.decide(
+            makeObservation({
+                unitId: 1,
+                tick: DEFAULT_AI_STALL_DECISIONS * DECISION_INTERVAL_TICKS,
+                attributes: {
+                    [AttributeKind.Health]: 10,
+                    [AttributeKind.MaxHealth]: 100
+                },
+                enemies: [enemyAt(9, 1, 0)]
+            })
+        );
+        const force = forceVector(retreat);
+        const mass = attributesWith()[AttributeKind.Mass];
+
+        // 撤退是纯反向（无横向分量），速度为 DEFAULT_AI_RETREAT_SPEED 而非脱离速度。
+        expect(force.x).toBeLessThan(0);
+        expect(force.y).toBe(0);
+        expect(Math.hypot(force.x, force.y)).toBeCloseTo(
+            mass * DEFAULT_AI_LINEAR_GAIN * DEFAULT_AI_RETREAT_SPEED,
+            6
+        );
     });
 });
