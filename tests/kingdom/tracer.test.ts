@@ -61,6 +61,9 @@ describe('tracer — scenario → march → battle → damage → end → contin
         fixture = null;
     });
 
+    // End-to-end tracer: ~65 peace ticks (24 substeps each) plus several hundred 1× battle
+    // ticks with real Rapier + sensing. Under a 46-worker full-suite run the default 5 s
+    // budget is not enough, so the budget is explicit rather than load-dependent.
     it('drives two armies into a unit-level battle and keeps ticking afterwards', () => {
         const created = createKingdom({
             scenario: TRACER_SCENARIO,
@@ -172,5 +175,5 @@ describe('tracer — scenario → march → battle → damage → end → contin
             expect(result.gameMinutes).toBe(PEACE_TICK_MINUTES);
         }
         expect(world.getTime().getGameMinutes()).toBeGreaterThan(minutesAtEnd);
-    });
+    }, 30000);
 });
