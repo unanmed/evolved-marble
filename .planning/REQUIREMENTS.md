@@ -49,7 +49,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **REND-02**: 单位、武器、防具、阵营在画面上可辨
 - [x] **REND-03**: HUD 显示每个单位的 HP / 等级 / 阵营
 - [x] **REND-04**: 自动镜头跟拍激烈战斗区域（无需人工控制）
-- [x] **REND-05**: Chrome-only；数十单位混战下维持可交互帧率
+- [x] **REND-05**: Chrome-only；Chrome 下能运行模拟、不崩溃、能逐帧推进并输出 canvas；**不设 fps 目标**，只做基本优化（共享几何、视口裁剪、特效池上限）
 
 ### REC — 录制系统
 

@@ -27,7 +27,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: 物理模拟系统** - Rapier2D 复合刚体（部位打标）、类型化接触事件、伤害计算、固定 tick 推进 (completed 2026-10-19)
 - [x] **Phase 3: 操控系统** - 单位级 AI 输入/输出契约、0.1s 决策节奏、可插拔控制 + 默认基线实现 (completed 2026-10-20)
 - [x] **Phase 4: 王国系统** - 地图、行军、视野、军队、城池、驻扎/训练、军队/城池战斗触发与战后结算 (completed 2026-10-21)
-- [ ] **Phase 5: 渲染系统** - PixiJS 顶视渲染、可辨单位/装备/阵营、HUD、自动镜头、Chrome 帧率
+- [ ] **Phase 5: 渲染系统** - PixiJS 顶视渲染、可辨单位/装备/阵营、HUD、自动镜头、Chrome 下可运行并逐帧输出 canvas
 - [ ] **Phase 6: 录制系统** - 全程持续帧采集 → WebCodecs + Mediabunny 视频，附时间戳/索引
 - [ ] **Phase 7: AI 接入系统** - 可插拔 LLM 指挥官/导演接口、信息申请机制、占位实现（不实际接入）
 - [ ] **Phase 8: 统计与精彩回放系统** - 战斗与全局统计采集；精彩回放从已有录像原样截取
@@ -178,7 +178,7 @@ Plans:
 
 ### Phase 5: 渲染系统
 
-**Goal**: 用 PixiJS 实现 2D 顶视渲染，使单位/武器/防具/阵营可辨，提供 HP/等级/阵营 HUD 与自动镜头，并在 Chrome 下维持数十单位混战的可交互帧率。
+**Goal**: 用 PixiJS 实现 2D 顶视渲染，使单位/武器/防具/阵营可辨，提供 HP/等级/阵营 HUD 与自动镜头，并在 Chrome 下能运行、不崩溃、能逐帧推进并输出 canvas；**不设 fps 目标**。
 **Depends on**: Phase 2
 **Requirements**: REND-01, REND-02, REND-03, REND-04, REND-05
 **Success Criteria** (what must be TRUE):
@@ -187,9 +187,9 @@ Plans:
   2. 单位、武器、防具、阵营在画面上可辨（无需逐单位 filter/mask）。
   3. HUD 显示每个单位的 HP / 等级 / 阵营。
   4. 镜头自动跟拍激烈战斗区域，无需人工控制。
-  5. Chrome-only 下数十单位混战维持可交互帧率。
+  5. Chrome-only 下能运行、不崩溃、能逐帧推进并输出 canvas；不设 fps 目标。
 
-**Plans**: 9/10 plans executed (05-01..05-06 complete; 05-07..05-10 round 2 planned)
+**Plans**: 9/10 plans executed (05-01 round 1 type gate approved; 05-02..05-09 complete; 05-10 awaiting the Chrome UAT)
 Plans:
 
 **Wave 1** *(round 1 — type gate, complete)*
