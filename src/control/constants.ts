@@ -61,21 +61,23 @@ export const ARENA_DEFAULT_HALF_EXTENT = 50;
 
 /**
  * 默认 AI 的接近目标速度（米/秒）：尚未进入攻击距离时的期望线速度。
- * 可校准；默认 AI 只用于验证自主运行（D-16）。
+ * 调高以加快接敌节奏（UAT：整体战斗偏慢）。可校准；默认 AI 只用于验证自主运行（D-16）。
  */
-export const DEFAULT_AI_APPROACH_SPEED = 6;
+export const DEFAULT_AI_APPROACH_SPEED = 8;
 
 /**
  * 默认 AI 的攻击目标速度（米/秒）：进入攻击距离后加速冲撞的期望线速度。
- * 可校准；伤害来自物理碰撞，而非额外的攻击字段。
+ * 调高以提升冲撞 Δv，从而更早打出高伤害（伤害随 √Δv）。可校准；
+ * 伤害来自物理碰撞，而非额外的攻击字段。
  */
-export const DEFAULT_AI_ATTACK_SPEED = 12;
+export const DEFAULT_AI_ATTACK_SPEED = 16;
 
 /**
  * 默认 AI 的速度误差线性增益：`force = (vDesired − vCurrent) · Mass · gain`。
- * Rapier 无默认阻尼，必须用速度误差控制才能停住（research Pitfall 2）。可校准。
+ * Rapier 无默认阻尼，必须用速度误差控制才能停住（research Pitfall 2）。
+ * 调高使单位更快达到期望速度、加速度更猛（UAT：战斗偏慢）。可校准。
  */
-export const DEFAULT_AI_LINEAR_GAIN = 4;
+export const DEFAULT_AI_LINEAR_GAIN = 8;
 
 /**
  * 默认 AI 的朝向 PD 比例增益：`torque = gain · angleError − damping · ω`。
@@ -118,9 +120,10 @@ export const DEFAULT_AI_STALL_DECISIONS = 4;
 export const DEFAULT_AI_DISENGAGE_TICKS = 30;
 
 /**
- * 默认 AI 的脱离期望速度（米/秒）：后退窗口内远离目标的期望线速度。可校准。
+ * 默认 AI 的脱离期望速度（米/秒）：后退窗口内远离目标的期望线速度。
+ * 调高使「脱离 → 再冲撞」的循环更快闭合（UAT：整体节奏偏慢）。可校准。
  */
-export const DEFAULT_AI_DISENGAGE_SPEED = 8;
+export const DEFAULT_AI_DISENGAGE_SPEED = 10;
 
 /**
  * 默认 AI 的脱离横向权重：后退方向 = 远离目标 + 该权重 × 横向单位向量，
