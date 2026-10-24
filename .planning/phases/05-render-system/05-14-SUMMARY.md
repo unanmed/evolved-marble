@@ -32,9 +32,9 @@ affects:
 # Actuals (#2632) — pairs with the plan's `estimate` to calibrate future estimates.
 # Same estimateTokens scale (chars/4 over the realized diff), never a harness token count.
 actuals:
-    tokens: 5615
+    tokens: 5700
     tasks: 3
-    commits: 3
+    commits: 6
     plan_head_before: 1f9797c0634764f10fb87a938b902f01cf328acd
 
 # Tech tracking
@@ -162,7 +162,7 @@ status: complete
 | `pnpm vitest run tests/kingdom/battle.test.ts tests/control/default-ai.test.ts` | 39 passed |
 | `pnpm vitest run tests/control/default-ai.test.ts tests/control/stalemate.test.ts` | 21 passed |
 | `pnpm vitest run tests/kingdom/city.test.ts` | 19 passed |
-| `pnpm test` | 46 files / 510 tests passed |
+| `pnpm test` | 46 files / 510 tests passed (3 consecutive full runs after the tracer budget fix; one run before it flaked on the tracer timeout, see Deviations #3) |
 | `pnpm typecheck` | clean |
 | `pnpm lint` | 0 errors, 2 pre-existing `no-console` warnings in `src/main.ts` |
 | `git diff --name-only` (all three task commits) | 8 files, all under `src/kingdom`, `src/control`, `tests/kingdom`, `tests/control` — `src/render/**` untouched |
@@ -184,10 +184,11 @@ Each task was committed atomically:
 1. **Task 3: Remove low-health retreat** - `55f7be0` (fix)
 2. **Task 1: Faction-balanced battle centre** - `e88fde2` (fix)
 3. **Task 2: Debounce one-sided battle endings** - `f7d4c04` (fix)
+4. **Post-verification: explicit tracer time budget** - `1e5c08e` (test)
 
-**Plan metadata:** the docs commit that follows this SUMMARY.
+**Plan metadata:** `d63a86d` (docs: complete plan) plus the follow-up docs commit that folds in `1e5c08e`.
 
-_Note: no TDD tasks in this plan. Task 3 was committed first because it is the only one that touches no shared file, which let Tasks 1 and 2 stay atomic on their shared `BattleSystem.ts` / `battle.test.ts` changes; each of the three commits was verified green (`pnpm test`, `pnpm typecheck`, `pnpm lint`) in isolation before committing._
+_Note: no TDD tasks in this plan. Task 3 was committed first because it is the only one that touches no shared file, which let Tasks 1 and 2 stay atomic on their shared `BattleSystem.ts` / `battle.test.ts` changes; each of the three commits was verified green (`pnpm test`, `pnpm typecheck`, `pnpm lint`) in isolation before committing. `1e5c08e` is the one non-plan commit: it hardens an existing end-to-end tracer that the longer battles pushed past its default timeout (Deviations #3)._
 
 ## Files Created/Modified
 
@@ -228,10 +229,18 @@ _Note: no TDD tasks in this plan. Task 3 was committed first because it is the o
 - **Verification:** `pnpm vitest run tests/kingdom/battle.test.ts` green.
 - **Committed in:** `e88fde2` (Task 1 commit)
 
+**3. [Rule 3 - Blocking] The end-to-end tracer flaked on its default 5 s timeout**
+- **Found during:** final full-suite verification (after the docs commit)
+- **Issue:** `tests/kingdom/tracer.test.ts` runs ~65 peace ticks (24 substeps each) plus several hundred 1× battle ticks. With battles now actually lasting, a 46-worker full-suite run pushed it to 5062 ms against vitest's 5000 ms default — it failed 1 of 3 full runs.
+- **Fix:** gave the tracer an explicit `30000` ms budget with a comment explaining why; assertions, tick bounds and scenario are untouched. No other test is near its limit (`battle.test.ts` 2.0 s, `city.test.ts` 2.1 s, tracer 0.8 s standalone).
+- **Files modified:** `tests/kingdom/tracer.test.ts`
+- **Verification:** `pnpm vitest run tests/kingdom/tracer.test.ts` green; then 3 consecutive full `pnpm test` runs, 510/510 each.
+- **Committed in:** `1e5c08e`
+
 ---
 
-**Total deviations:** 2 auto-fixed (1 bug, 1 blocking)
-**Impact on plan:** Both were consequences of the planned behaviour change landing on tests written for the old behaviour. No scope creep: no production file outside the plan's `files_modified` was touched.
+**Total deviations:** 3 auto-fixed (1 bug, 2 blocking)
+**Impact on plan:** All three were consequences of the planned behaviour change landing on code written for the old behaviour (tests asserting immediate one-sided endings, a weight test that could no longer observe weights, an e2e test sized for short battles). No production file outside the plan's `files_modified` was touched.
 
 ## Issues Encountered
 
@@ -270,6 +279,7 @@ No new network, auth, filesystem or schema surface. The only new input path is t
 - commit `55f7be0` — FOUND
 - commit `e88fde2` — FOUND
 - commit `f7d4c04` — FOUND
+- commit `1e5c08e` — FOUND
 
 ---
 
