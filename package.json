@@ -8,6 +8,8 @@
         "node": ">=24"
     },
     "scripts": {
+        "dev": "vite",
+        "build": "vite build",
         "typecheck": "tsc --noEmit -p tsconfig.json",
         "test": "vitest run",
         "lint": "eslint ."
