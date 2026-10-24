@@ -21,6 +21,7 @@ import {
 } from '@/render/constants';
 import {
     isUnitVisible,
+    resolveBattleWeight,
     resolveFactionColor,
     resolveTargetPoints,
     resolveUnitViewSpec
@@ -292,6 +293,7 @@ export class Renderer implements IRenderer {
         this.frameIndex += 1;
 
         const points = this.collectTargetPoints(services);
+        const battleWeight = this.collectBattleWeight(services);
         const events = services.damageFeed.drain();
         const shakeImpulsePx = computeShakeImpulsePx(
             events,
@@ -303,7 +305,7 @@ export class Renderer implements IRenderer {
             bounds: services.world.getBounds(),
             points,
             shakeImpulsePx,
-            battleWeight: 0
+            battleWeight
         });
         this.applyTransform(transform);
 
@@ -411,6 +413,30 @@ export class Renderer implements IRenderer {
         }
         const center = battle.getCenter();
         return [{ x: center.x, y: center.y }];
+    }
+
+    /**
+     * 解析本帧战斗权重：目标战斗存活成员的等级和；无目标或目标已消失时为 0（REND-04）。
+     * 与 `collectTargetPoints` 使用同一目标解析口径，只把单位目录交给纯函数汇总，
+     * 使“镜头该多快跟上”由真实参战规模决定，而渲染器自身不做等级算术。
+     * @param services 本帧只读服务。
+     * @returns 本帧战斗权重（非负有限；无战斗时为 0）。
+     */
+    private collectBattleWeight(services: IRenderServices): number {
+        const targetId = this.camera.getBattleTarget();
+        if (targetId === undefined) {
+            return 0;
+        }
+        const battle = services.world
+            .getBattleSystem()
+            .listActiveBattles()
+            .find(candidate => candidate.getId() === targetId);
+        if (battle === undefined) {
+            return 0;
+        }
+        return resolveBattleWeight(battle, unitId =>
+            services.catalog.getUnit(unitId)
+        );
     }
 
     /**
