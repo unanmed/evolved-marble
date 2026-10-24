@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: 渲染系统
 status: executing
-stopped_at: Completed 05-14-PLAN.md
-last_updated: "2026-10-24T13:34:01.347Z"
+stopped_at: Completed 05-15-PLAN.md
+last_updated: "2026-10-24T13:59:09.801Z"
 last_activity: 2026-10-24
-last_activity_desc: Phase 05 plan 14 executed (battle centre, end debounce, no low-health retreat)
-state_head: 1e5c08e40064e164fd6f29f70a7bb49c58f2101a
+last_activity_desc: Phase 05 plan 15 executed (single-phase pull-back, weight-aware in-battle follow)
+state_head: 3be418a6583d88dbf011259090481744d68c5fc0
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 36
-  completed_plans: 33
+  completed_plans: 34
   percent: 0
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-10-21)
 ## Current Position
 
 Phase: 05 (渲染系统) — EXECUTING
-Plan: 14 of 16
+Plan: 15 of 16
 Status: Ready to execute
-Last activity: 2026-10-24 — 05-14 (battle centre, end debounce, no low-health retreat) completed
+Last activity: 2026-10-24 — 05-15 (direct pull-back, weight-aware in-battle follow) completed
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -95,6 +95,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P12 | 12min | 2 tasks | 7 files |
 | Phase 05 P13 | 6min | 1 tasks | 3 files |
 | Phase 05 P14 | 27min | 3 tasks | 8 files |
+| Phase 05 P15 | 17min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -215,6 +216,10 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-14: the battle centre is the equal-weight mean of each faction's own weighted centroid (two factions -> the midpoint of both centroids), so one boundary casualty cannot drag the 80 m square onto the other side and cascade
 - [Phase 05]: 05-14: one-sided battle endings are debounced by BATTLE_END_DEBOUNCE_TICKS = 10 consecutive battle ticks (any two-team tick resets the streak); zero-living and join-grace endings stay immediate
 - [Phase 05]: 05-14: DefaultUnitAI has no HP-based retreat (isLowHealth and the two retreat constants deleted); low-health units keep attacking and still use the 05-11 stall/disengage cycle
+- [Phase 05]: Exit is a single phase: centre and scale interpolate together over panFrames, so pulling back to the panorama never travels to the map centre at battle zoom; the shipped pull-back is 24 output frames (0.8 s) instead of 29
+- [Phase 05]: Exit progress is (elapsed + 1) / panFrames so the first exit frame already shrinks the scale while still landing at elapsed = panFrames - 1
+- [Phase 05]: In-battle tracking is weight-aware: effective smoothing = clamp(round(smoothingFrames * weightScale / (weightScale + W)), 1, smoothingFrames) with weightScale = 20; entry and exit timing never read the weight
+- [Phase 05]: resolveBattleWeight is a pure frameModel helper (sum of living member levels, 0 when nothing resolves) and the Renderer supplies it to camera.update every frame
 
 ### Pending Todos
 
@@ -239,6 +244,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-24T13:24:42.168Z
-Stopped at: Completed 05-14-PLAN.md
+Last session: 2026-10-24T13:59:09.234Z
+Stopped at: Completed 05-15-PLAN.md
 Resume file: None

@@ -189,11 +189,11 @@ Plans:
   4. 镜头自动跟拍激烈战斗区域，无需人工控制。
   5. Chrome-only 下能运行、不崩溃、能逐帧推进并输出 canvas；不设 fps 目标。
 
-**Plans**: 13/16 plans executed (05-01 round 1 type gate approved; 05-02..05-09 complete; 05-10 awaiting the Chrome UAT)
+**Plans**: 14/16 plans executed (05-01 round 1 type gate approved; 05-02..05-09 complete; 05-10 awaiting the Chrome UAT)
 Plans:
 
 - [x] 05-14-PLAN.md
-- [ ] 05-15-PLAN.md
+- [x] 05-15-PLAN.md
 - [ ] 05-16-PLAN.md
 
 - [x] 05-11-PLAN.md
@@ -291,7 +291,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 2. 物理模拟系统 | 7/7 | Complete    | 2026-10-19 |
 | 3. 操控系统 | 3/3 | Complete    | 2026-10-20 |
 | 4. 王国系统 | 5/5 | Complete    | 2026-10-21 |
-| 5. 渲染系统 | 13/16 | In Progress|  |
+| 5. 渲染系统 | 14/16 | In Progress|  |
 | 6. 录制系统 | 0/0 | Not started | - |
 | 7. AI 接入系统 | 0/0 | Not started | - |
 | 8. 统计与精彩回放系统 | 0/0 | Not started | - |
