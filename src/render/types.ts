@@ -133,9 +133,9 @@ export interface ICameraConfig {
     readonly maxScale: number;
     /** 跟踪的时间常数（输出帧）：指数平滑越远越慢，永不瞬移；战斗中按 `weightScale` 缩短。 */
     readonly smoothingFrames: number;
-    /** 两段式过渡的第一段：以**当前缩放**平移中心到目标中心所需的输出帧数。 */
+    /** **退出**（拉回全景）单段过渡的输出帧数：中心与缩放同时缓动到全景构图。 */
     readonly panFrames: number;
-    /** 两段式过渡的第二段：平移结束后推拉到目标缩放所需的输出帧数。 */
+    /** **进入**（推近战斗）单段过渡的输出帧数：中心与缩放同时从当前构图缓动到目标构图。 */
     readonly zoomFrames: number;
     /** 权重标度：等级和达到此值时稳态跟随的平滑帧数减半（默认 20），必须为正。 */
     readonly weightScale: number;

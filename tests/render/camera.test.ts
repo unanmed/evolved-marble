@@ -17,13 +17,13 @@ import type {
     IViewport
 } from '@/render/types';
 
-/** 测试视口：默认 1920×1080（D-13）。 */
+/** 测试见E���E�默认 1920ÁE080�E�E-13�E�、E*/
 const VIEWPORT: IViewport = { width: 1920, height: 1080 };
 
-/** 测试地图：1000×1000 米。 */
+/** 测试地图�E�E000ÁE000 米、E*/
 const BOUNDS: IMapBounds = { width: 1000, height: 1000 };
 
-/** 一场 40m 见方、位于 (300, 300) 的战斗：目标构图与全景明显不同。 */
+/** 一场 40m 见方、位亁E(300, 300) 皁E�E斗：目栁E��图与�E景明显不同、E*/
 const BATTLE_POINTS: readonly IVec2[] = [
     { x: 280, y: 280 },
     { x: 320, y: 280 },
@@ -32,36 +32,26 @@ const BATTLE_POINTS: readonly IVec2[] = [
 ];
 
 /**
- * 过渡/平滑/震动的固定测试值：`panFrames: 10` + `zoomFrames: 4` 让“平移段恒缩放、
- * 推拉段只占 4 帧、第 13 次更新落地”全部可断言。
- */
+ * 迁E��/平滁E霁E��皁E��定测试值�E�`zoomFrames: 6` 让单段推近“首帧即动、第 6 帧落地”可断言�E�E * `panFrames: 10` 让单段拉回可断言、E */
 const TEST_OVERRIDES = {
     panFrames: 10,
-    zoomFrames: 4,
+    zoomFrames: 6,
     smoothingFrames: 4,
     shakeAmplitudePx: 8,
     shakeDecayPerFrame: 0.5
 };
 
-/** 一次完整两段式过渡的更新次数：`panFrames + zoomFrames - 1`。 */
-const TRANSITION_FRAMES =
-    TEST_OVERRIDES.panFrames + TEST_OVERRIDES.zoomFrames - 1;
+/** 进�E迁E��皁E��新次数�E�单段推近占 `zoomFrames`、E*/
+const ENTRY_FRAMES = TEST_OVERRIDES.zoomFrames;
 
 /**
- * 构造测试用镜头参数：在出厂默认值上钉死过渡、平滑与震动。
- * @returns 镜头参数。
- */
+ * 极E��测试用镜头参数�E�在出厂默认值上钉死迁E��、平滑与震动、E * @returns 镜头参数、E */
 function makeConfig(): ICameraConfig {
     return { ...DEFAULT_RENDER_CONFIG.camera, ...TEST_OVERRIDES };
 }
 
 /**
- * 构造一次更新输入。
- * @param points 拟合点（空数组 = 全景）。
- * @param shakeImpulsePx 本帧震动冲量（像素）。
- * @param battleWeight 本帧战斗权重（存活成员等级和），默认 0。
- * @returns 镜头输入。
- */
+ * 极E��一次更新输�E、E * @param points 拟合点�E�空数绁E= 全景�E�、E * @param shakeImpulsePx 本帧霁E��冲量（像素�E�、E * @param battleWeight 本帧战斗杁E���E�存活成员等级和），默认 0、E * @returns 镜头输�E、E */
 function makeInput(
     points: readonly IVec2[],
     shakeImpulsePx = 0,
@@ -77,11 +67,7 @@ function makeInput(
 }
 
 /**
- * 用与 `Camera` 相同的有效最小缩放口径计算期望的战斗构图（Pitfall 22）。
- * @param config 镜头参数。
- * @param points 参战点。
- * @returns 目标变换。
- */
+ * 用丁E`Camera` 相同的有效最小缩放口征E��算期望的战斗极E���E�Eitfall 22�E�、E * @param config 镜头参数、E * @param points 参�E点、E * @returns 目栁E��换、E */
 function expectedBattleTransform(
     config: ICameraConfig,
     points: readonly IVec2[]
@@ -98,9 +84,7 @@ function expectedBattleTransform(
 }
 
 /**
- * 断言变换的五个分量都是有限数。
- * @param transform 待检查的变换。
- */
+ * 断言变换皁E��个刁E��都是有限数、E * @param transform 征E��查皁E��换、E */
 function expectFiniteTransform(transform: ICameraTransform): void {
     for (const value of [
         transform.centerX,
@@ -113,7 +97,7 @@ function expectFiniteTransform(transform: ICameraTransform): void {
     }
 }
 
-describe('render/Camera — reset is the only instant jump', () => {
+describe('render/Camera  Ereset is the only instant jump', () => {
     it('returns the panoramic composition and reports Strategic', () => {
         const config = makeConfig();
         const camera = new Camera(config);
@@ -134,7 +118,7 @@ describe('render/Camera — reset is the only instant jump', () => {
     });
 });
 
-describe('render/Camera — target changes never teleport', () => {
+describe('render/Camera  Etarget changes never teleport', () => {
     it('leaves the current transform untouched when a target is set', () => {
         const camera = new Camera(makeConfig());
         const before = camera.reset(BOUNDS, VIEWPORT);
@@ -145,7 +129,7 @@ describe('render/Camera — target changes never teleport', () => {
         expect(camera.getMode()).toBe(CameraMode.BattleFocus);
     });
 
-    it('lands exactly on the target on the (panFrames + zoomFrames - 1)-th update', () => {
+    it('lands exactly on the target on the zoomFrames-th update', () => {
         const config = makeConfig();
         const camera = new Camera(config);
         const start = camera.reset(BOUNDS, VIEWPORT);
@@ -153,82 +137,51 @@ describe('render/Camera — target changes never teleport', () => {
         camera.setBattleTarget(7);
 
         const first = camera.update(makeInput(BATTLE_POINTS));
-        expect(first.centerX).toBeCloseTo(start.centerX, 6);
-        expect(first.centerY).toBeCloseTo(start.centerY, 6);
-        expect(first.scale).toBeCloseTo(start.scale, 6);
+        // 首帧即同时向目栁E��进：不跳变到目栁E��也不空转在起点、E        expect(first.centerX).toBeLessThan(start.centerX);
+        expect(first.centerX).toBeGreaterThan(target.centerX);
+        expect(first.scale).toBeGreaterThan(start.scale);
+        expect(first.scale).toBeLessThan(target.scale);
 
         const frames: ICameraTransform[] = [first];
-        for (let frame = 2; frame <= TRANSITION_FRAMES; frame += 1) {
+        for (let frame = 2; frame <= ENTRY_FRAMES; frame += 1) {
             frames.push(camera.update(makeInput(BATTLE_POINTS)));
         }
-        expect(frames).toHaveLength(TRANSITION_FRAMES);
+        expect(frames).toHaveLength(ENTRY_FRAMES);
 
-        const penultimate = frames[TRANSITION_FRAMES - 2];
+        const penultimate = frames[ENTRY_FRAMES - 2];
         expect(Math.abs(penultimate.scale - target.scale)).toBeGreaterThan(
             1e-6
         );
 
-        const last = frames[TRANSITION_FRAMES - 1];
+        const last = frames[ENTRY_FRAMES - 1];
         expect(last.centerX).toBeCloseTo(target.centerX, 6);
         expect(last.centerY).toBeCloseTo(target.centerY, 6);
         expect(last.scale).toBeCloseTo(target.scale, 6);
         expect(camera.getMode()).toBe(CameraMode.BattleFocus);
     });
 
-    it('holds the snapshot scale for every frame of the pan phase', () => {
+    it('moves centre and scale in the same frame, never in two phases', () => {
         const config = makeConfig();
         const camera = new Camera(config);
         const start = camera.reset(BOUNDS, VIEWPORT);
-        camera.setBattleTarget(7);
-
-        for (let frame = 0; frame < config.panFrames; frame += 1) {
-            const next = camera.update(makeInput(BATTLE_POINTS));
-
-            expect(next.scale).toBe(start.scale);
-            expectFiniteTransform(next);
-        }
-    });
-
-    it('changes scale only after the pan, never during it', () => {
-        const config = makeConfig();
-        const camera = new Camera(config);
-        const start = camera.reset(BOUNDS, VIEWPORT);
-        const target = expectedBattleTransform(config, BATTLE_POINTS);
         camera.setBattleTarget(7);
 
         const frames: ICameraTransform[] = [];
-        for (let frame = 0; frame < TRANSITION_FRAMES; frame += 1) {
+        for (let frame = 0; frame < ENTRY_FRAMES; frame += 1) {
             frames.push(camera.update(makeInput(BATTLE_POINTS)));
         }
 
-        // 索引 0..panFrames（含推拉段首帧 beta = 0）的缩放必须与快照完全一致。
-        for (let index = 0; index <= config.panFrames; index += 1) {
-            expect(frames[index].scale).toBe(start.scale);
+        // 首帧就已离开全景快照�E�中忁E��缩放同时开始推进，没有一个“只平移”的段、E        expect(frames[0].centerX).toBeLessThan(start.centerX);
+        expect(frames[0].scale).toBeGreaterThan(start.scale);
+
+        for (let index = 1; index < ENTRY_FRAMES - 1; index += 1) {
+            expect(frames[index].centerX).toBeLessThan(
+                frames[index - 1].centerX
+            );
+            expect(frames[index].scale).toBeGreaterThan(
+                frames[index - 1].scale
+            );
         }
-        expect(frames[config.panFrames + 1].scale).not.toBe(start.scale);
-        expect(frames[config.panFrames + 1].scale).not.toBe(target.scale);
-    });
-
-    it('hands the zoom phase over without a teleport at the boundary', () => {
-        const config = makeConfig();
-        const camera = new Camera(config);
-        const start = camera.reset(BOUNDS, VIEWPORT);
-        const target = expectedBattleTransform(config, BATTLE_POINTS);
-        camera.setBattleTarget(7);
-
-        const frames: ICameraTransform[] = [];
-        for (let frame = 0; frame < TRANSITION_FRAMES; frame += 1) {
-            frames.push(camera.update(makeInput(BATTLE_POINTS)));
-        }
-
-        const lastPan = frames[config.panFrames - 1];
-        const firstZoom = frames[config.panFrames];
-        expect(lastPan.centerX).toBeCloseTo(target.centerX, 6);
-        expect(lastPan.centerY).toBeCloseTo(target.centerY, 6);
-        expect(lastPan.scale).toBe(start.scale);
-        expect(firstZoom.centerX).toBe(lastPan.centerX);
-        expect(firstZoom.centerY).toBe(lastPan.centerY);
-        expect(firstZoom.scale).toBe(start.scale);
     });
 
     it('never moves further in one frame than the remaining distance', () => {
@@ -238,7 +191,7 @@ describe('render/Camera — target changes never teleport', () => {
         const target = expectedBattleTransform(config, BATTLE_POINTS);
         camera.setBattleTarget(7);
 
-        for (let frame = 0; frame < TRANSITION_FRAMES; frame += 1) {
+        for (let frame = 0; frame < ENTRY_FRAMES; frame += 1) {
             const next = camera.update(makeInput(BATTLE_POINTS));
             const remaining = Math.hypot(
                 target.centerX - previous.centerX,
@@ -259,6 +212,7 @@ describe('render/Camera — target changes never teleport', () => {
         const config = makeConfig();
         const camera = new Camera(config);
         camera.reset(BOUNDS, VIEWPORT);
+        const target = expectedBattleTransform(config, BATTLE_POINTS);
         camera.setBattleTarget(7);
 
         const first = camera.update(makeInput(BATTLE_POINTS));
@@ -266,21 +220,19 @@ describe('render/Camera — target changes never teleport', () => {
         camera.setBattleTarget(7);
         const third = camera.update(makeInput(BATTLE_POINTS));
 
-        expect(first.centerX).toBeCloseTo(500, 6);
+        expect(first.centerX).toBeGreaterThan(target.centerX);
         expect(third.centerX).toBeLessThan(second.centerX);
-        expect(third.centerX).toBeGreaterThan(
-            expectedBattleTransform(config, BATTLE_POINTS).centerX
-        );
+        expect(third.centerX).toBeGreaterThan(target.centerX);
     });
 });
 
-describe('render/Camera — mode follows the target, one frame late on pull-back', () => {
+describe('render/Camera  Emode follows the target, one frame late on pull-back', () => {
     it('stays BattleFocus until the single-phase pull-back lands', () => {
         const config = makeConfig();
         const camera = new Camera(config);
         camera.reset(BOUNDS, VIEWPORT);
         camera.setBattleTarget(7);
-        for (let frame = 0; frame < TRANSITION_FRAMES; frame += 1) {
+        for (let frame = 0; frame < ENTRY_FRAMES; frame += 1) {
             camera.update(makeInput(BATTLE_POINTS));
         }
         expect(camera.getMode()).toBe(CameraMode.BattleFocus);
@@ -313,17 +265,14 @@ describe('render/Camera — mode follows the target, one frame late on pull-back
     });
 });
 
-describe('render/Camera — the pull-back is one simultaneous interpolation', () => {
+describe('render/Camera  Ethe pull-back is one simultaneous interpolation', () => {
     /**
-     * 推进到一场战斗的稳态构图（进入过渡已落地）。
-     * @param config 镜头参数。
-     * @returns 已跟拍战斗 7 的镜头。
-     */
+     * 推进到一场战斗皁E��态构图�E�进�E迁E��已落地�E�、E     * @param config 镜头参数、E     * @returns 已跟拍战斗 7 皁E��头、E     */
     function focusBattle(config: ICameraConfig): Camera {
         const camera = new Camera(config);
         camera.reset(BOUNDS, VIEWPORT);
         camera.setBattleTarget(7);
-        for (let frame = 0; frame < TRANSITION_FRAMES; frame += 1) {
+        for (let frame = 0; frame < ENTRY_FRAMES; frame += 1) {
             camera.update(makeInput(BATTLE_POINTS));
         }
         return camera;
@@ -341,8 +290,7 @@ describe('render/Camera — the pull-back is one simultaneous interpolation', ()
             frames.push(camera.update(makeInput([])));
         }
 
-        // 缩放自第一帧起就收缩：旧的“先以战斗缩放平移”签名不再出现。
-        expect(frames[0].scale).toBeLessThan(battle.scale);
+        // 缩放自第一帧起就收缩�E�旧皁E���E以战斗缩放平移”签名不�E出现、E        expect(frames[0].scale).toBeLessThan(battle.scale);
         for (let index = 1; index < frames.length; index += 1) {
             expect(frames[index].scale).toBeLessThan(frames[index - 1].scale);
         }
@@ -368,8 +316,7 @@ describe('render/Camera — the pull-back is one simultaneous interpolation', ()
             frame = camera.update(makeInput([]));
         }
 
-        // 中点处中心已向全景推进，但缩放也已离开战斗缩放——两者同步发生。
-        expect(frame.centerX).toBeGreaterThan(battle.centerX);
+        // 中点夁E��忁E��向�E景推进，佁E��放也已离开战斗缩放——两老E��步发生、E        expect(frame.centerX).toBeGreaterThan(battle.centerX);
         expect(frame.centerX).toBeLessThan(panoramic.centerX);
         expect(frame.scale).toBeLessThan(battle.scale);
         expect(frame.scale).toBeGreaterThan(panoramic.scale);
@@ -392,14 +339,9 @@ describe('render/Camera — the pull-back is one simultaneous interpolation', ()
     });
 });
 
-describe('render/Camera — battle weight only shortens in-battle tracking', () => {
+describe('render/Camera  Ebattle weight only shortens in-battle tracking', () => {
     /**
-     * 进入战斗后把参战点整体平移 40 米，再跟随若干帧，返回最终变换。
-     * @param config 镜头参数。
-     * @param battleWeight 每帧传入的战斗权重。
-     * @param frames 稳态跟随时长（输出帧）。
-     * @returns 跟随时长结束时的变换。
-     */
+     * 进�E战斗后把参�E点整体平移 40 米�E��E跟随若干帧�E�返回最终变换、E     * @param config 镜头参数、E     * @param battleWeight 每帧传入皁E�E斗权重、E     * @param frames 稳态跟随时长�E�输�E帧�E�、E     * @returns 跟随时长结束时皁E��换、E     */
     function followMovingBattle(
         config: ICameraConfig,
         battleWeight: number,
@@ -408,7 +350,7 @@ describe('render/Camera — battle weight only shortens in-battle tracking', () 
         const camera = new Camera(config);
         camera.reset(BOUNDS, VIEWPORT);
         camera.setBattleTarget(7);
-        for (let frame = 0; frame < TRANSITION_FRAMES; frame += 1) {
+        for (let frame = 0; frame < ENTRY_FRAMES; frame += 1) {
             camera.update(makeInput(BATTLE_POINTS, 0, battleWeight));
         }
         const moved = BATTLE_POINTS.map(point => ({
@@ -461,7 +403,7 @@ describe('render/Camera — battle weight only shortens in-battle tracking', () 
         light.setBattleTarget(7);
         heavy.setBattleTarget(7);
 
-        for (let frame = 0; frame < TRANSITION_FRAMES; frame += 1) {
+        for (let frame = 0; frame < ENTRY_FRAMES; frame += 1) {
             const a = light.update(makeInput(BATTLE_POINTS, 0, 0));
             const b = heavy.update(makeInput(BATTLE_POINTS, 0, 5000));
 
@@ -472,7 +414,7 @@ describe('render/Camera — battle weight only shortens in-battle tracking', () 
     });
 });
 
-describe('render/Camera — shake is capped, decayed and deterministic', () => {
+describe('render/Camera  Eshake is capped, decayed and deterministic', () => {
     it('emits no offset at all under the shipped default config', () => {
         const camera = new Camera(DEFAULT_RENDER_CONFIG.camera);
         camera.reset(BOUNDS, VIEWPORT);
@@ -536,7 +478,7 @@ describe('render/Camera — shake is capped, decayed and deterministic', () => {
     });
 });
 
-describe('render/Camera — degenerate input stays finite', () => {
+describe('render/Camera  Edegenerate input stays finite', () => {
     it('emits finite transforms for NaN points, zero viewport and empty points', () => {
         const camera = new Camera(makeConfig());
         camera.reset(BOUNDS, VIEWPORT);

@@ -3,11 +3,11 @@
  * 只有两种模式，且模式完全由跟拍目标推导——没有独立的模式设置方法，二者不可能互相矛盾。
  * `setBattleTarget` 只记录目标、快照当前变换并启动过渡，**绝不**直接改当前变换；
  * `reset` 是唯一允许的瞬时跳变（初始化）。
- * 过渡按方向分两种形态：
- * - **进入**（新目标是数字）：两段式——先以快照缩放平移中心到目标中心（`panFrames`），
- *   再推拉到目标缩放（`zoomFrames`）；平移期间缩放完全不动。
- * - **退出**（目标变为 `undefined`）：单段式——中心与缩放**同时**从战斗构图缓动到全景构图
- *    （`panFrames` 帧），因此镜头绝不会先以战斗缩放挪到地图中心再缩小。
+ * 过渡按方向各为**单段**同时插值（中心与缩放同帧动，绝不分成两段）：
+ * - **进入**（新目标是数字）：从快照构图（全景）推近到战斗构图，占 `zoomFrames` 帧；
+ *   入场前的“冻结全景”节拍由调用方（`ManualRunner`）负责，镜头本身只做这段推近。
+ * - **退出**（目标变为 `undefined`）：从战斗构图拉回全景构图，占 `panFrames` 帧，
+ *   因此镜头绝不会先以战斗缩放挪到地图中心再缩小。
  * 稳态跟随（无过渡）按战斗权重缩短平滑帧数：参战等级和越大，追赶越快；
  * 该权重**不**影响进入/退出的时长。
  * 全部几何委托给 `cameraMath.ts`，本类只持有状态；不引用 Pixi、不读 wall-clock、不用随机源，
@@ -20,7 +20,6 @@ import {
     fitBox,
     fitTransform,
     interpolateTransform,
-    lerp,
     strategicTransform,
     trackTransform
 } from '@/render/cameraMath';
@@ -85,7 +84,7 @@ export class Camera implements ICamera {
 
     /**
      * 只改变跟拍目标并启动过渡：当前变换保持原样，因此不会瞬移。
-     * 新目标是数字时立即进入 `BattleFocus`（单位在推近过程中就该出现）并启动两段式进入；
+     * 新目标是数字时立即进入 `BattleFocus`（单位在推近过程中就该出现）并启动单段式推近；
      * 目标是 `undefined` 时保持 `BattleFocus`，启动单段式退出，等落地后才由 `update()` 切换模式。
      * @param battleId 目标战斗 id；`undefined` 表示请求全景。
      */
@@ -120,8 +119,8 @@ export class Camera implements ICamera {
     /**
      * 推进一帧：解析目标构图 → 过渡或跟踪 → 叠加震动。
      * 过渡以**已用帧数**计时，第 k 次更新读到 `elapsed = k - 1`：
-     * - 进入：第 1 次更新恰为段首（返回起点，不跳变）；平移段占前 `panFrames` 次更新且缩放恒为快照值；
-     *   推拉段从第 `panFrames + 1` 次更新开始，第 `panFrames + zoomFrames - 1` 次更新恰落在目标上。
+     * - 进入：单段同时插值中心与缩放，第 1 次更新即已推进 `1 / zoomFrames`（不跳变、不空转），
+     *   第 `zoomFrames` 次更新恰好落在目标上；`mode` 在 `setBattleTarget` 时已为 `BattleFocus`。
      * - 退出：单段同时插值中心与缩放，第 1 次更新即开始移动，第 `panFrames` 次更新落在全景上。
      * 两段都在落地帧做一次位稳定的吸附；`panFrames`/`zoomFrames` 为 1 时该段退化为单帧瞬变。
      * @param input 本帧输入（视口、地图、拟合点、震动冲量、战斗权重）。
@@ -145,22 +144,10 @@ export class Camera implements ICamera {
                 this.mode = CameraMode.Strategic;
             }
         } else if (from !== null) {
-            const panFrames = Math.max(1, this.config.panFrames);
             const zoomFrames = Math.max(1, this.config.zoomFrames);
-            const totalFrames = panFrames + zoomFrames - 1;
-
-            next =
-                elapsed < panFrames
-                    ? this.panTransform(from, target, elapsed, panFrames)
-                    : this.zoomTransform(
-                          from,
-                          target,
-                          elapsed - panFrames,
-                          zoomFrames
-                      );
-
+            next = this.entryTransform(from, target, elapsed, zoomFrames);
             this.transitionElapsed = elapsed + 1;
-            if (elapsed >= totalFrames - 1) {
+            if (elapsed >= zoomFrames - 1) {
                 next = this.landingTransform(target);
                 this.transitionFrom = null;
                 this.transitionElapsed = 0;
@@ -239,55 +226,24 @@ export class Camera implements ICamera {
     }
 
     /**
-     * 过渡第一段（平移）：中心从快照缓动到目标中心，**缩放严格保持快照值**，
-     * 因此平移期间画面不会有任何“偷偷推近”的蠕动。
-     * @param from 过渡起点快照。
-     * @param target 本帧目标构图（中心为落点）。
-     * @param elapsed 本段已推进的帧数（0 = 段首）。
-     * @param panFrames 本段总帧数（>= 1）。
-     * @returns 本帧变换；震动分量为 0。
-     */
-    private panTransform(
-        from: ICameraTransform,
-        target: ICameraTransform,
-        elapsed: number,
-        panFrames: number
-    ): ICameraTransform {
-        const alpha = panFrames <= 1 ? 1 : elapsed / (panFrames - 1);
-        const eased = easeInOutCubic(alpha);
-        return {
-            centerX: lerp(from.centerX, target.centerX, eased),
-            centerY: lerp(from.centerY, target.centerY, eased),
-            scale: from.scale,
-            shakeX: 0,
-            shakeY: 0
-        };
-    }
-
-    /**
-     * 过渡第二段（推拉）：中心已固定在目标中心，缩放从快照值缓动到目标值（对数空间）。
-     * `beta = 0` 恰好返回段首（目标中心 + 快照缩放），`beta = 1` 恰好返回目标。
-     * @param from 过渡起点快照（只取其缩放）。
-     * @param target 本帧目标构图。
+     * 过渡（进入）：中心与缩放**同时**从快照（全景）构图缓动到战斗构图（单段，`easeInOutCubic`）。
+     * 第 1 次更新（`elapsed = 0`）即已推进 `1 / zoomFrames`，因此推近从入场第一帧就开始，
+     * 不存在“先平移再推拉”的两段式或空转帧；第 `zoomFrames` 次更新恰好落地。
+     * @param from 过渡起点快照（全景构图）。
+     * @param target 本帧目标构图（战斗）。
      * @param elapsed 本段已推进的帧数（0 = 段首）。
      * @param zoomFrames 本段总帧数（>= 1）。
      * @returns 本帧变换；震动分量为 0。
      */
-    private zoomTransform(
+    private entryTransform(
         from: ICameraTransform,
         target: ICameraTransform,
         elapsed: number,
         zoomFrames: number
     ): ICameraTransform {
-        const beta = zoomFrames <= 1 ? 1 : elapsed / (zoomFrames - 1);
-        const start: ICameraTransform = {
-            centerX: target.centerX,
-            centerY: target.centerY,
-            scale: from.scale,
-            shakeX: 0,
-            shakeY: 0
-        };
-        return interpolateTransform(start, target, easeInOutCubic(beta));
+        const alpha =
+            zoomFrames <= 1 ? 1 : Math.min(1, (elapsed + 1) / zoomFrames);
+        return interpolateTransform(from, target, easeInOutCubic(alpha));
     }
 
     /**
