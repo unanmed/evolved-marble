@@ -2,7 +2,8 @@
  * 操作者控制台（D-12/D-24）：`class OperatorPanel implements IOperatorPanel`。
  * 全部节点都用 `createElement` 构建、全部文本都经 `textContent` 写入，
  * 因此场景/势力/军队名永远不会被当作标记解析（T-05-42/ASVS V5）；
- * 全部监听器共用一个 `AbortController` 的信号，`dispose()` 一次 abort 即全部移除。
+ * 全部监听器共用一个 `AbortController` 的信号，`dispose()` 一次 abort 即全部移除；
+ * 比例尺读数另有一个有界定时器，同样在 `dispose()` 中清除。
  * 本类是纯 DOM 适配器：它只调用 `IOperatorPanelOptions` 上已声明的接缝
  * （runner 的暂停/单步/复位/延时/自动跟拍、camera 的跟拍目标、world 的 `issueOrder`），
  * 从不推进世界、从不渲染、也不读取单位内部——面板位于 canvas 之外，永不进入视频（D-12）。
@@ -44,6 +45,15 @@ const LABEL_MOVE_TO_PICKING = '点击画布选点';
 
 /** 空选择值：`<select>` 未选中任何项时的 `value`。 */
 const NO_OPTION_VALUE = '';
+
+/** 地图网格边长（米）：比例尺提示里的固定参照。 */
+const MAP_GRID_METERS = 100;
+
+/** 比例尺刷新间隔（毫秒）：有界定时器，`dispose()` 时清除。 */
+const SCALE_REFRESH_INTERVAL_MS = 250;
+
+/** 无法测量比例尺时的占位文案（canvas 未挂载或镜头缩放非有限值）。 */
+const SCALE_UNAVAILABLE = '比例尺 --';
 
 /**
  * 建造一行面板控件。
@@ -123,6 +133,10 @@ export class OperatorPanel implements IOperatorPanel {
     private controller: AbortController;
     /** 状态行文本节点。 */
     private statusText: HTMLSpanElement | null;
+    /** 比例尺读数节点（canvas 之外，永不入镜，D-12）。 */
+    private scaleText: HTMLDivElement | null;
+    /** 比例尺刷新定时器；`dispose()` 后为 `null`（无计时器泄漏）。 */
+    private scaleTimer: ReturnType<typeof setInterval> | null;
     /** 当前每帧延时的文本节点。 */
     private speedLabel: HTMLSpanElement | null;
     /** 速度滑杆（也用于把 runner 的延时回写进界面）。 */
@@ -152,6 +166,8 @@ export class OperatorPanel implements IOperatorPanel {
         this.picking = false;
         this.controller = new AbortController();
         this.statusText = null;
+        this.scaleText = null;
+        this.scaleTimer = null;
         this.speedLabel = null;
         this.speedInput = null;
         this.armySelect = null;
@@ -162,8 +178,8 @@ export class OperatorPanel implements IOperatorPanel {
     }
 
     /**
-     * 把面板挂到宿主元素（D-12）：清空宿主后填入标题、状态、运行、镜头、速度、
-     * 军队与指令行，并挂上 canvas 拾取监听；重复挂载为空操作。
+     * 把面板挂到宿主元素（D-12）：清空宿主后填入标题、比例尺、状态、运行、镜头、速度、
+     * 军队与指令行，并挂上 canvas 拾取监听与比例尺刷新定时器；重复挂载为空操作。
      * @param host 面板宿主（canvas 之外的兄弟节点）。
      */
     mount(host: HTMLElement): void {
@@ -180,6 +196,7 @@ export class OperatorPanel implements IOperatorPanel {
         section.className = 'panel';
         section.append(
             this.buildHeader(),
+            this.buildScaleRow(),
             this.buildRunRow(),
             this.buildCameraRow(),
             this.buildSpeedRow(),
@@ -200,6 +217,11 @@ export class OperatorPanel implements IOperatorPanel {
         this.refreshSpeedLabel();
         this.refreshPauseLabel();
         this.refreshStatus();
+        this.refreshScale();
+        this.scaleTimer = setInterval(
+            () => this.refreshScale(),
+            SCALE_REFRESH_INTERVAL_MS
+        );
     }
 
     /**
@@ -207,11 +229,16 @@ export class OperatorPanel implements IOperatorPanel {
      */
     dispose(): void {
         this.controller.abort();
+        if (this.scaleTimer !== null) {
+            clearInterval(this.scaleTimer);
+            this.scaleTimer = null;
+        }
         if (this.host !== null) {
             this.host.replaceChildren();
         }
         this.host = null;
         this.statusText = null;
+        this.scaleText = null;
         this.speedLabel = null;
         this.speedInput = null;
         this.armySelect = null;
@@ -238,6 +265,18 @@ export class OperatorPanel implements IOperatorPanel {
         this.statusText = status;
         header.append(title, scenario, status);
         return header;
+    }
+
+    /**
+     * 建造比例尺行（仅操作台可见）：显示当前缩放下的米/像素换算与 100 m 网格提示，
+     * 位于 canvas 之外，因此永远不会进入被捕捉的画面（D-12）。
+     * @returns 比例尺文本块。
+     */
+    private buildScaleRow(): HTMLDivElement {
+        const scale = document.createElement('div');
+        scale.className = 'panel-scale';
+        this.scaleText = scale;
+        return scale;
     }
 
     /**
@@ -723,6 +762,40 @@ export class OperatorPanel implements IOperatorPanel {
         if (this.speedLabel !== null) {
             this.speedLabel.textContent = `${delay} ms`;
         }
+    }
+
+    /**
+     * 刷新比例尺读数（REND-01）：把镜头的「每米后备像素」按 CSS/后备宽度比换算成
+     * 「每米 CSS 像素」，再给出 100 m 网格的等效像素宽度。canvas 未挂载（显示宽度为 0）、
+     * 后备宽度为 0 或缩放非有限值时只显示占位文案，绝不写入 `NaN`。
+     */
+    private refreshScale(): void {
+        const element = this.scaleText;
+        if (element === null) {
+            return;
+        }
+        const canvas = this.options.canvas;
+        const backingWidth = canvas.width;
+        const cssWidth = canvas.getBoundingClientRect().width;
+        const scale = this.options.camera.getTransform().scale;
+        if (
+            !Number.isFinite(backingWidth) ||
+            backingWidth <= 0 ||
+            !Number.isFinite(cssWidth) ||
+            cssWidth <= 0 ||
+            !Number.isFinite(scale) ||
+            scale <= 0
+        ) {
+            element.textContent = SCALE_UNAVAILABLE;
+            return;
+        }
+        const cssRatio = cssWidth / backingWidth;
+        const pxPerMeter = scale * cssRatio;
+        if (!Number.isFinite(pxPerMeter) || pxPerMeter <= 0) {
+            element.textContent = SCALE_UNAVAILABLE;
+            return;
+        }
+        element.textContent = `比例尺 ${MAP_GRID_METERS} m ≈ ${Math.round(pxPerMeter * MAP_GRID_METERS)} px · 网格 ${MAP_GRID_METERS} m · 1 m = ${pxPerMeter.toFixed(2)} px`;
     }
 
     /**

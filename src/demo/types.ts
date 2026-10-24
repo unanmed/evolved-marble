@@ -116,11 +116,11 @@ export interface IDemoSetup {
 export interface IOperatorPanelOptions {
     /** 重新读取当前世界（reset 会替换它）。 */
     readonly getWorld: () => IWorld;
-    /** 镜头：模式切换与批注。 */
+    /** 镜头：模式切换与比例尺读数（比例尺只显示在 canvas 之外的面板里）。 */
     readonly camera: ICamera;
     /** 帧驱动器：暂停/单步/复位/延时。 */
     readonly runner: IManualRunner;
-    /** 固定尺寸 canvas：用于点击拾取（D-24）。 */
+    /** 固定尺寸 canvas：用于点击拾取（D-24）与比例尺的 CSS/后备像素换算。 */
     readonly canvas: HTMLCanvasElement;
     /** 当前画布视口（像素）。 */
     readonly viewport: IViewport;
