@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: 渲染系统
 status: executing
-stopped_at: Completed 05-11-PLAN.md
-last_updated: "2026-10-24T11:13:48.120Z"
+stopped_at: Completed 05-12-PLAN.md
+last_updated: "2026-10-24T11:31:09.939Z"
 last_activity: 2026-10-24
 last_activity_desc: Phase 05 plan 11 executed
-state_head: e42fe35cecd4d7863a20335f7d5cd9cfa35089c1
+state_head: dbc7a3c1ae2a75a03afa342e1d64977b6dede79e
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 33
-  completed_plans: 30
+  completed_plans: 31
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-21)
 ## Current Position
 
 Phase: 05 (渲染系统) — EXECUTING
-Plan: 11 of 13
+Plan: 12 of 13
 Status: Ready to execute
 Last activity: 2026-10-24 — 05-11 (melee stall/disengage gap closure) completed
 
@@ -92,6 +92,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 5 P8 | 11min | 2 tasks | 6 files |
 | Phase 05 P09 | 20min | 2 tasks | 6 files |
 | Phase 05 P11 | 14min | 2 tasks | 4 files |
+| Phase 05 P12 | 12min | 2 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -201,6 +202,12 @@ Recent decisions affecting current work:
 - [Phase 05]: MoveTo picking zeroes shakeX/shakeY before screenToWorld and rejects non-finite or out-of-bounds points before issueOrder (D-24/T-05-43)
 - [Phase 05]: Demo page: async main() with no top-level await, canvas appended directly to #stage-host, letters by CSS only; reset keeps IManualRunner pause semantics
 - [Phase 05]: 05-11: melee stall is detected from the per-decision shrink rate of the tracked target distance (no target velocity in IUnitBrief), then the unit disengages 30 ticks with a unitId-parity lateral peel and re-charges
+- [Phase 05]: 05-12: ICameraConfig.switchFrames replaced by panFrames + zoomFrames (user-approved type change); the rest of the contract is untouched
+- [Phase 05]: 05-12: the pan segment returns the literal snapshot scale (no log-space round-trip) so the scale is exactly frozen during the pan
+- [Phase 05]: 05-12: the zoom segment reuses interpolateTransform with a synthetic start at the target centre + snapshot scale, keeping cameraMath untouched and endpoints exact
+- [Phase 05]: 05-12: the transition lands at update panFrames + zoomFrames - 1 (29 for 24+6); the plan''s '30 frames total' wording is one update more and was recorded as a wording gap rather than implemented
+- [Phase 05]: 05-12: hit shake is disabled by shakeAmplitudePx: 0 with the accumulation/decay path intact, so it is reversible with one constant and Renderer/hudModel stay untouched
+- [Phase 05]: 05-12: battle framing minSpanMeters 24 -> 12; coverage stays 0.9 and hud.screenScaleAt (20) stays above hud.worldScaleAt (10)
 
 ### Pending Todos
 
@@ -225,6 +232,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-24T11:13:30.703Z
-Stopped at: Completed 05-11-PLAN.md
+Last session: 2026-10-24T11:31:09.734Z
+Stopped at: Completed 05-12-PLAN.md
 Resume file: None
