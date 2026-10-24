@@ -10,7 +10,6 @@ import {
     DEFAULT_AI_DISENGAGE_SPEED,
     DEFAULT_AI_DISENGAGE_TICKS,
     DEFAULT_AI_LINEAR_GAIN,
-    DEFAULT_AI_RETREAT_SPEED,
     DEFAULT_AI_STALL_DECISIONS,
     DECISION_INTERVAL_TICKS,
     RAY_COUNT,
@@ -206,8 +205,8 @@ describe('DefaultUnitAI — baseline behaviour tree', () => {
         );
     });
 
-    it('retreats away from the nearest enemy at low health without any skill intent', () => {
-        const observation = makeObservation({
+    it('keeps attacking a low-health unit instead of retreating', () => {
+        const far = makeObservation({
             attributes: {
                 [AttributeKind.Health]: 10,
                 [AttributeKind.MaxHealth]: 100
@@ -216,16 +215,32 @@ describe('DefaultUnitAI — baseline behaviour tree', () => {
             equipment: [{ kind: EquipmentKind.Weapon, weapon: WeaponKind.Bow }],
             enemies: [enemyAt(2, 5, 0)]
         });
-        const action = new DefaultUnitAI().decide(observation);
-        const force = forceVector(action);
-        const mass = observation.attributes[AttributeKind.Mass];
+        const approach = new DefaultUnitAI().decide(far);
+        const approachForce = forceVector(approach);
+        const mass = far.attributes[AttributeKind.Mass];
 
-        expect(force.x).toBeLessThan(0);
-        expect(Math.hypot(force.x, force.y)).toBeCloseTo(
-            mass * DEFAULT_AI_LINEAR_GAIN * DEFAULT_AI_RETREAT_SPEED,
+        // No health-based flee: the unit still closes on the enemy at the approach speed.
+        expect(approachForce.x).toBeGreaterThan(0);
+        expect(Math.hypot(approachForce.x, approachForce.y)).toBeCloseTo(
+            mass * DEFAULT_AI_LINEAR_GAIN * DEFAULT_AI_APPROACH_SPEED,
             6
         );
-        expect(action.skillIntent).toBeNull();
+
+        const close = makeObservation({
+            attributes: {
+                [AttributeKind.Health]: 1,
+                [AttributeKind.MaxHealth]: 100
+            },
+            enemies: [enemyAt(2, 1, 0)]
+        });
+        const closeForce = forceVector(new DefaultUnitAI().decide(close));
+        expect(closeForce.x).toBeGreaterThan(0);
+        expect(Math.hypot(closeForce.x, closeForce.y)).toBeCloseTo(
+            close.attributes[AttributeKind.Mass] *
+                DEFAULT_AI_LINEAR_GAIN *
+                DEFAULT_AI_ATTACK_SPEED,
+            6
+        );
     });
 
     it('turns toward a perpendicular enemy and lets the PD damping term reduce the torque', () => {
@@ -512,10 +527,10 @@ describe('DefaultUnitAI — stall detection and disengage cycle', () => {
         expect(forceVector(afterWindow).x).toBeGreaterThan(0);
     });
 
-    it('lets low health retreat win over the armed stall logic', () => {
+    it('lets low health keep the armed stall/disengage cycle instead of fleeing', () => {
         const ai = new DefaultUnitAI();
         blockedDecisions(ai, 1, DEFAULT_AI_STALL_DECISIONS);
-        const retreat = ai.decide(
+        const action = ai.decide(
             makeObservation({
                 unitId: 1,
                 tick: DEFAULT_AI_STALL_DECISIONS * DECISION_INTERVAL_TICKS,
@@ -526,14 +541,15 @@ describe('DefaultUnitAI — stall detection and disengage cycle', () => {
                 enemies: [enemyAt(9, 1, 0)]
             })
         );
-        const force = forceVector(retreat);
-        const mass = attributesWith()[AttributeKind.Mass];
+        const force = forceVector(action);
 
-        // 撤退是纯反向（无横向分量），速度为 DEFAULT_AI_RETREAT_SPEED 而非脱离速度。
+        // 低生命不再覆盖僵持逻辑：仍是带横向分量的脱离（不是纯反向撤退）。
         expect(force.x).toBeLessThan(0);
-        expect(force.y).toBe(0);
+        expect(force.y).not.toBe(0);
         expect(Math.hypot(force.x, force.y)).toBeCloseTo(
-            mass * DEFAULT_AI_LINEAR_GAIN * DEFAULT_AI_RETREAT_SPEED,
+            attributesWith()[AttributeKind.Mass] *
+                DEFAULT_AI_LINEAR_GAIN *
+                DEFAULT_AI_DISENGAGE_SPEED,
             6
         );
     });

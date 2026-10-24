@@ -72,12 +72,6 @@ export const DEFAULT_AI_APPROACH_SPEED = 6;
 export const DEFAULT_AI_ATTACK_SPEED = 12;
 
 /**
- * 默认 AI 的撤退目标速度（米/秒）：低生命时远离最近敌人的期望线速度。
- * 可校准。
- */
-export const DEFAULT_AI_RETREAT_SPEED = 7;
-
-/**
  * 默认 AI 的速度误差线性增益：`force = (vDesired − vCurrent) · Mass · gain`。
  * Rapier 无默认阻尼，必须用速度误差控制才能停住（research Pitfall 2）。可校准。
  */
@@ -105,12 +99,6 @@ export const DEFAULT_AI_ATTACK_RANGE = 2;
  * 本计划只声明常量，技能选择在 03-03 完成。
  */
 export const DEFAULT_AI_SKILL_RANGE = 20;
-
-/**
- * 默认 AI 的低生命阈值（比例）：`Health / MaxHealth` 不超过该值时撤退。
- * 可校准。
- */
-export const DEFAULT_AI_LOW_HEALTH_RATIO = 0.25;
 
 /**
  * 默认 AI 的「僵持」判定速度阈值（米/秒）：进入攻击距离后，朝目标的接近速度

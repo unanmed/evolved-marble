@@ -1,7 +1,7 @@
 /**
  * 默认基线 AI：`class DefaultUnitAI implements IUnitAI`（D-14/D-15/D-16/D-17）。
- * 固定优先级选择器：无敌人 → 静止；低生命 → 远离最近敌人；僵持 → 脱离；进入攻击距离
- * → 冲撞；否则 → 追击。行为树以私有方法表达，不引入节点类、状态枚举或外部 BT 库。
+ * 固定优先级选择器：无敌人 → 静止；僵持 → 脱离；进入攻击距离 → 冲撞；否则 → 追击。
+ * 行为树以私有方法表达，不引入节点类、状态枚举或外部 BT 库。
  *
  * 实现要点：
  * - **确定性**：不使用 `IRng`，也不读取 wall-clock（D-15）；横向脱离方向只由 `unitId` 奇偶决定。
@@ -9,6 +9,8 @@
  *   （research Pitfall 2）。
  * - 输出保持契约的四向力 + 双向力矩；伤害来自物理碰撞，契约没有独立「攻击」字段。
  * - 技能只输出意图 + 实例内 tick 冷却，不实现任何技能物理（D-17）。
+ * - **无低生命撤退**：受伤不改变行为，单位永远不因 HP 逃跑——否则双方残兵互相逃窜，
+ *   战斗永远打不完（UAT 反馈）。战斗只由歼灭（或既有王国规则）结束。
  * - **僵持 → 脱离 → 再冲撞**：伤害只在**新接触**（物理层只 drain `started` 事件）产生，
  *   因此被顶死时持续推挤永远不会再产生伤害。AI 在攻击距离内连续若干次决策都测不到
  *   接近速度时后退一小段，再重新加速冲撞，从而持续制造高 Δv 的新接触。
@@ -35,8 +37,6 @@ import {
     DEFAULT_AI_DISENGAGE_SPEED,
     DEFAULT_AI_DISENGAGE_TICKS,
     DEFAULT_AI_LINEAR_GAIN,
-    DEFAULT_AI_LOW_HEALTH_RATIO,
-    DEFAULT_AI_RETREAT_SPEED,
     DEFAULT_AI_SKILL_RANGE,
     DEFAULT_AI_STALL_DECISIONS,
     DEFAULT_AI_STALL_SPEED_THRESHOLD,
@@ -80,7 +80,7 @@ export class DefaultUnitAI implements IUnitAI {
 
     /**
      * 基于一次决策快照选择动作。纯计算，不持有物理或单位引用。
-     * 优先级：无敌人 → 低生命撤退 → 脱离窗口 → 攻击距离内冲撞（僵持则转脱离）→ 追击。
+     * 优先级：无敌人 → 脱离窗口 → 攻击距离内冲撞（僵持则转脱离）→ 追击。
      * @param observation 纯数据快照。
      * @returns 世界坐标四向力 + 双向力矩 + 技能意图。
      */
@@ -98,16 +98,6 @@ export class DefaultUnitAI implements IUnitAI {
             target.brief.unitId,
             distance
         );
-
-        if (this.isLowHealth(observation)) {
-            return this.buildAction(
-                observation,
-                -dx,
-                -dy,
-                DEFAULT_AI_RETREAT_SPEED,
-                null
-            );
-        }
 
         const hasDirection =
             Number.isFinite(distance) && distance > FORCE_EPSILON;
@@ -270,23 +260,8 @@ export class DefaultUnitAI implements IUnitAI {
     }
 
     /**
-     * 判断是否处于低生命：`Health / MaxHealth <= DEFAULT_AI_LOW_HEALTH_RATIO`。
-     * `MaxHealth` 非正时视为「不低」，避免除零产生无穷/NaN。
-     * @param observation 纯数据快照。
-     * @returns 是否应撤退。
-     */
-    private isLowHealth(observation: IUnitObservation): boolean {
-        const maxHealth = observation.attributes[AttributeKind.MaxHealth];
-        if (!Number.isFinite(maxHealth) || maxHealth <= 0) {
-            return false;
-        }
-        const health = observation.attributes[AttributeKind.Health];
-        return health / maxHealth <= DEFAULT_AI_LOW_HEALTH_RATIO;
-    }
-
-    /**
      * 每决策至多输出一个技能意图，按「近距单位技能 → 万箭齐发 → 弓箭」优先
-     * （D-17）。命中时在实例上记录下一次可用 tick；撤退路径不调用本方法。
+     * （D-17）。命中时在实例上记录下一次可用 tick；脱离路径不调用本方法。
      * @param observation 纯数据快照。
      * @param distance 与最近敌人的距离（米）。
      * @returns 本决策的技能意图，或 `null`。
@@ -404,8 +379,8 @@ export class DefaultUnitAI implements IUnitAI {
      * 期望速度 = 单位方向 × 目标速度；`force = (vDesired − vCurrent) · Mass · gain`，
      * 向量幅值截到 `MAX_FORCE_MAGNITUDE`。
      * @param observation 纯数据快照。
-     * @param dirX 期望方向的 x 分量（无需预先归一化；撤退时传入反向）。
-     * @param dirY 期望方向的 y 分量（无需预先归一化；撤退时传入反向）。
+     * @param dirX 期望方向的 x 分量（无需预先归一化）。
+     * @param dirY 期望方向的 y 分量（无需预先归一化）。
      * @param speed 期望线速度大小（米/秒）。
      * @param skillIntent 本决策的技能意图。
      * @returns 动作。
