@@ -16,7 +16,7 @@ affects: [04-combat, demo, recording]
 actuals:
   tokens: 1100
   tasks: 1
-  commits: 1
+  commits: 3
 plan_head_before: 45beacb28e0210b0fdc19a0e789cf78da82b825a
 
 tech-stack:
@@ -54,7 +54,7 @@ status: complete
 - **Duration:** 6 min
 - **Tasks:** 1
 - **Files modified:** 1
-- **Commits:** 1 (measured from the plan ledger: `git rev-list --count 45beacb..HEAD`)
+- **Commits:** 3 (measured from the plan ledger: `git rev-list --count 45beacb..HEAD`, which includes the plan metadata commit and this summary refresh)
 
 ## Accomplishments
 
@@ -68,6 +68,8 @@ status: complete
 ## Task Commits
 
 1. **Task 1: Raise AI force and speed constants** — `c19227c` (perf)
+2. **Plan metadata: complete summary** — `e381dc0` (docs)
+3. **Summary refresh: measured commit count** — this commit (docs)
 
 ## Files Created/Modified
 
@@ -98,7 +100,7 @@ None — plan executed exactly as written. The plan listed the two control test 
 
 ## Issues Encountered
 
-None.
+- `state advance-plan` declined (`reason: plans_outstanding`): phase 05 still reports `05-10-PLAN.md` without a SUMMARY.md, which is a pre-existing phase-05 gap unrelated to this plan. STATE.md's plan counter was therefore left as-is; `state update-progress` still recorded 37/38 plans complete and `roadmap update-plan-progress` recorded 18 plans / 17 summaries for the phase. Resolving 05-10 is the orchestrator's call, not something this gap-closure plan should paper over with a fabricated summary.
 
 ## Known Stubs
 
@@ -126,5 +128,6 @@ None.
 
 - FOUND: .planning/phases/05-render-system/05-18-SUMMARY.md
 - FOUND: c19227c (Task 1)
+- FOUND: e381dc0 (plan metadata)
 - FOUND: src/control/constants.ts
 - `pnpm test` 524 passed / 46 files · `pnpm typecheck` exit 0 · `pnpm lint` exit 0 (2 pre-existing `no-console` warnings in `src/main.ts`)
