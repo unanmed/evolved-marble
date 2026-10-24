@@ -2,6 +2,7 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import RAPIER from '@dimforge/rapier2d-compat';
 import { createKingdom, teleportUnitPhysics } from './harness';
 import type { IKingdomFixture } from './harness';
+import { BATTLE_END_DEBOUNCE_TICKS } from '@/kingdom/constants';
 import {
     ArmyOrderKind,
     ArmyState,
@@ -946,7 +947,9 @@ describe('city battles — trigger, capture, garrison selection and regroup', ()
         for (const unitId of redMembers) {
             teleportUnit(kingdom, unitId, 500, 750);
         }
-        kingdom.world.tick();
+        // The one-sided ending is debounced: the battle finishes only after the whole
+        // streak window, and it must not retrigger the pair before then.
+        tickUntilNoBattle(kingdom, BATTLE_END_DEBOUNCE_TICKS + 5);
         expect(kingdom.world.getBattleSystem().hasActiveBattle()).toBe(false);
         kingdom.world.getBattleSystem().drainEvents();
 

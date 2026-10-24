@@ -20,7 +20,10 @@ import type {
     IMutableBattle,
     UnitWeight
 } from '@/kingdom/types';
-import { BATTLE_JOIN_GRACE_TICKS } from '@/kingdom/constants';
+import {
+    BATTLE_END_DEBOUNCE_TICKS,
+    BATTLE_JOIN_GRACE_TICKS
+} from '@/kingdom/constants';
 import {
     BattleLifecycleKind,
     BattleState,
@@ -254,6 +257,8 @@ export class BattleSystem implements IBattleSystem {
     private everJoinedTeams = new Map<number, Set<number>>();
     /** battleId → 创建时的内部 tick 计数（新触发宽限期判定）。 */
     private battleCreatedTick = new Map<number, number>();
+    /** battleId → 连续单边成员的子步数（结束防抖；出现两阵营即清零）。 */
+    private oneSidedTicks = new Map<number, number>();
     /** pair 键 → 重新武装后允许再次触发的内部 tick 计数（防止同 tick 抖动）。 */
     private retriggerCooldown = new Map<string, number>();
     /** 内部子步计数：仅用于宽限期与重新触发冷却，不进入任何对外读取面。 */
@@ -771,6 +776,7 @@ export class BattleSystem implements IBattleSystem {
         this.expectedTeams.set(battle.getId(), new Set(expectedTeams));
         this.everJoinedTeams.set(battle.getId(), new Set());
         this.battleCreatedTick.set(battle.getId(), this.tickCounter);
+        this.oneSidedTicks.delete(battle.getId());
         this.events.push({
             kind: BattleLifecycleKind.Started,
             battleId: battle.getId(),
@@ -932,6 +938,7 @@ export class BattleSystem implements IBattleSystem {
         this.expectedTeams.delete(absorbedId);
         this.everJoinedTeams.delete(absorbedId);
         this.battleCreatedTick.delete(absorbedId);
+        this.oneSidedTicks.delete(absorbedId);
     }
 
     /**
@@ -1006,8 +1013,9 @@ export class BattleSystem implements IBattleSystem {
      * 结束判定（D-03/D-05/D-17）：
      * - 全新触发但尚无成员的战斗只保留到参与宽限期结束（避免把“本 tick 刚触发”误判为幽灵）；
      * - 曾经有成员、如今成员为零的战斗必须结束（相互歼灭或全员离区），否则会永久钉住 1×；
-     * - 区内只剩至多一个阵营时，仅当**全部期望阵营都曾加入过**才结算（防止 80 m 触发 /
-     *   40 m 成员差导致单边提前结束、城池被未接触的攻方接管）；
+     * - 区内只剩至多一个阵营时，仅当**全部期望阵营都曾加入过**才进入结束流程，
+     *   且必须连续 `BATTLE_END_DEBOUNCE_TICKS` 个子步保持单边才真正结算——
+     *   边界抖动掉一个单位不该终结一场双方仍在互砍的战斗；出现第二阵营立即清零重计；
      * - 单边战斗宽限期耗尽后结束但**不结算**，并重新武装该 pair 锁，避免城市被永久免疫。
      * 结束**不**写重战锁：锁在创建时已取得，只由分离流程释放（D-05）。
      */
@@ -1050,11 +1058,16 @@ export class BattleSystem implements IBattleSystem {
             }
 
             if (teams.size > 1) {
+                this.oneSidedTicks.delete(battleId);
                 continue;
             }
 
             if (allExpectedJoined) {
-                this.finishBattle(battle, true);
+                const streak = (this.oneSidedTicks.get(battleId) ?? 0) + 1;
+                this.oneSidedTicks.set(battleId, streak);
+                if (streak >= BATTLE_END_DEBOUNCE_TICKS) {
+                    this.finishBattle(battle, true);
+                }
                 continue;
             }
 
@@ -1103,6 +1116,7 @@ export class BattleSystem implements IBattleSystem {
         this.expectedTeams.delete(battleId);
         this.everJoinedTeams.delete(battleId);
         this.battleCreatedTick.delete(battleId);
+        this.oneSidedTicks.delete(battleId);
         this.onEnded(battle, contested);
     }
 

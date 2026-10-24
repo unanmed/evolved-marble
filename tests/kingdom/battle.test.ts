@@ -12,6 +12,7 @@ import { MarchAI } from '@/kingdom/MarchAI';
 import {
     BATTLE_AREA_HALF_EXTENT,
     BATTLE_AREA_HYSTERESIS,
+    BATTLE_END_DEBOUNCE_TICKS,
     BATTLE_JOIN_GRACE_TICKS,
     BATTLE_TRIGGER_DISTANCE,
     BRAKE_MIN_MINUTES
@@ -1418,6 +1419,11 @@ describe('BattleSystem — membership, merge, locks and weighting (stub physics)
         battles.drainEvents();
 
         second.takeDamage(second.getAttribute(AttributeKind.MaxHealth) * 2);
+        // A one-sided end is debounced: the streak must hold for the whole window.
+        for (let tick = 0; tick < BATTLE_END_DEBOUNCE_TICKS - 1; tick += 1) {
+            battles.tick();
+            expect(battles.listActiveBattles()).toHaveLength(1);
+        }
         battles.tick();
         expect(battles.listActiveBattles()).toHaveLength(0);
         expect(battles.listCompletedBattles()).toHaveLength(1);
@@ -1633,9 +1639,77 @@ describe('BattleSystem — membership, merge, locks and weighting (stub physics)
                 (unit?.getAttribute(AttributeKind.MaxHealth) ?? 0) * 2
             );
         }
+        // One-sided ending is debounced: it settles only after the streak window.
+        for (let tick = 1; tick < BATTLE_END_DEBOUNCE_TICKS; tick += 1) {
+            battles.tick();
+            expect(battles.listActiveBattles()).toHaveLength(1);
+            expect(ended).toHaveLength(0);
+        }
         battles.tick();
 
         expect(battles.listActiveBattles()).toHaveLength(0);
+        expect(ended).toHaveLength(1);
+    });
+
+    it('survives a single one-sided tick but ends after the debounce window', () => {
+        const positions = new Map<number, IUnitState>();
+        const units = new Map<number, IUnit>();
+        const teams = new Map<number, number>();
+        for (const [unitId, team, x] of [
+            [1, 1, 150],
+            [2, 1, 160],
+            [3, 2, 190]
+        ] as const) {
+            units.set(
+                unitId,
+                spawnUnit(ClassKind.Swordsman, mulberry32(unitId))
+            );
+            teams.set(unitId, team);
+            place(positions, unitId, x, 100);
+        }
+        const armies = [
+            makeArmy(1, 1, 155, 100, [1, 2]),
+            makeArmy(2, 2, 190, 100, [3])
+        ];
+        const ended: IBattle[] = [];
+        const battles = makeBattles(
+            positions,
+            armies,
+            units,
+            teams,
+            () => 1,
+            ended
+        );
+
+        battles.tick();
+        battles.tick();
+        expect(battles.listActiveBattles()).toHaveLength(1);
+        expect(ended).toHaveLength(0);
+
+        // Faction 2 steps out of the square for a single tick: one-sided, no end.
+        place(positions, 3, 800, 800);
+        battles.tick();
+        expect(battles.listActiveBattles()).toHaveLength(1);
+        expect(ended).toHaveLength(0);
+
+        // Back inside resets the streak.
+        place(positions, 3, 190, 100);
+        battles.tick();
+        expect(battles.listActiveBattles()).toHaveLength(1);
+
+        // Sustained one-sided membership: the end arrives exactly at the window.
+        const onlyFactionTwo = units.get(3);
+        onlyFactionTwo?.takeDamage(
+            (onlyFactionTwo?.getAttribute(AttributeKind.MaxHealth) ?? 0) * 2
+        );
+        for (let tick = 0; tick < BATTLE_END_DEBOUNCE_TICKS - 1; tick += 1) {
+            battles.tick();
+            expect(battles.listActiveBattles()).toHaveLength(1);
+            expect(ended).toHaveLength(0);
+        }
+        battles.tick();
+        expect(battles.listActiveBattles()).toHaveLength(0);
+        expect(battles.listCompletedBattles()).toHaveLength(1);
         expect(ended).toHaveLength(1);
     });
 
