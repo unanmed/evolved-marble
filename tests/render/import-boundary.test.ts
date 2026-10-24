@@ -44,6 +44,13 @@ const EVAL_EXTENSION = /pixi\.js\/unsafe-eval/;
 /** 由字符串构造/执行代码的调用：`eval(...)` 与 `new Function(...)`。 */
 const DYNAMIC_CODE = /(?:\beval\s*\(|new\s+Function\s*\()/;
 
+/**
+ * wall-clock / 定时器 API：镜头一旦读真实时间或自行调度，同样的帧序列就不再得到同样的变换序列
+ * （D-06/D-17），两段式过渡的“第 k 次 update 恰好落在某处”也不再成立。
+ */
+const WALL_CLOCK =
+    /\b(?:Date\.now|performance\.now|setTimeout|setInterval|requestAnimationFrame)\s*\(/;
+
 /** 契约文件必须保留的冻结锚点：类型门禁批准的签名与枚举值。 */
 const CONTRACT_ANCHORS: readonly string[] = [
     'export enum CameraMode',
@@ -157,6 +164,16 @@ describe('render/import-boundary — the contract stays declaration-only', () =>
             anchor => !source.includes(anchor)
         );
         expect(missing, `契约锚点缺失：${missing.join(' | ')}`).toEqual([]);
+    });
+});
+
+describe('render/import-boundary — the camera counts frames, never wall-clock', () => {
+    it('keeps Camera.ts free of wall-clock and timer APIs', () => {
+        const found = readSource('src/render/Camera.ts').match(WALL_CLOCK);
+        expect(
+            found?.[0] ?? null,
+            '两段式过渡必须只按 update() 调用次数计时（D-06/D-17）'
+        ).toBeNull();
     });
 });
 
