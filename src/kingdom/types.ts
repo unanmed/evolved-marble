@@ -260,7 +260,11 @@ export interface IBattle {
     getTriggerKind(): BattleTriggerKind;
     /** 城池战对应的城池 id；军队对军队的战斗为 `undefined`（缺失字面量）。 */
     getCityId(): number | undefined;
-    /** 战斗区中心的加权质心（米；D-17/D-18）。 */
+    /**
+     * 战斗区中心（米；D-17/D-18）：按阵营平衡的加权中心——两方都在区内时取双方
+     * 各自加权质心的中点，只有一方时取该方的加权质心；两方都钉住正方形，
+     * 单方掉一个边界单位不会把战斗区整体推向对手。
+     */
     getCenter(): IVec2;
     /** 战斗区半边长（米）；规格的 80 m 正方形即 40。 */
     getHalfExtent(): number;

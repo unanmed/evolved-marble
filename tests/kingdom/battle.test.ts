@@ -230,6 +230,116 @@ function tickUntilMembers(
 }
 
 /**
+ * 两势力各 1 军的空旷地图场景：两军中心相距 `separation` 米，相向行军。
+ * @param count 每军单位数。
+ * @param separation 初始军队中心间距（米）。
+ * @returns 场景表。
+ */
+function meetingScenario(count: number, separation: number): IScenario {
+    const middle = 500;
+    return {
+        width: 1000,
+        height: 1000,
+        factions: [
+            { id: 1, name: 'Red' },
+            { id: 2, name: 'Blue' }
+        ],
+        cities: [],
+        armies: [
+            {
+                id: 1,
+                factionId: 1,
+                x: middle - separation / 2,
+                y: middle,
+                heading: 0,
+                units: [{ classKind: ClassKind.Swordsman, count }]
+            },
+            {
+                id: 2,
+                factionId: 2,
+                x: middle + separation / 2,
+                y: middle,
+                heading: Math.PI,
+                units: [{ classKind: ClassKind.Swordsman, count }]
+            }
+        ],
+        terrain: []
+    };
+}
+
+/**
+ * 让两支军队穿过对方位置继续行军（`MoveTo` 目标放在对方身后）。
+ * @param world 王国世界。
+ */
+function driveAcross(
+    world: import('@/kingdom/KingdomWorld').KingdomWorld
+): void {
+    for (const [armyId, targetX] of [
+        [1, 900],
+        [2, 100]
+    ] as const) {
+        world.issueOrder({
+            armyId,
+            kind: ArmyOrderKind.MoveTo,
+            targetX,
+            targetY: 500
+        });
+    }
+}
+
+/**
+ * 统计一支军队中仍存活且仍注册的单位数。
+ * @param world 王国世界。
+ * @param control 控制系统。
+ * @param armyId 军队 id。
+ * @returns 存活单位数。
+ */
+function livingCount(
+    world: import('@/kingdom/KingdomWorld').KingdomWorld,
+    control: {
+        getUnit(unitId: number): IUnit | null;
+    },
+    armyId: number
+): number {
+    let living = 0;
+    for (const unitId of world.getArmy(armyId)?.getUnitIds() ?? []) {
+        const unit = control.getUnit(unitId);
+        if (unit !== null && unit.isAlive()) {
+            living += 1;
+        }
+    }
+    return living;
+}
+
+/**
+ * 一场活跃战斗中每个阵营的存活成员数。
+ * @param battle 战斗。
+ * @param control 控制系统。
+ * @returns teamId → 存活成员数。
+ */
+function livingTeamsOf(
+    battle: IBattle,
+    control: {
+        getUnit(unitId: number): IUnit | null;
+        getTeam(unitId: number): number | undefined;
+    }
+): Map<number, number> {
+    const teams = new Map<number, number>();
+    for (const unitId of battle.getMemberUnitIds()) {
+        const unit = control.getUnit(unitId);
+        if (unit === null || !unit.isAlive()) {
+            continue;
+        }
+        const team = control.getTeam(unitId);
+        if (team === undefined) {
+            continue;
+        }
+        teams.set(team, (teams.get(team) ?? 0) + 1);
+    }
+    return teams;
+}
+
+/**
  * 当前真实 Rapier 夹具。
  */
 let fixture: IKingdomFixture | null = null;
@@ -321,25 +431,85 @@ describe('battle — real Rapier trigger, membership, damage and end', () => {
         }
         expect(teams.size).toBe(2);
 
-        // The centre is the injected weight's weighted mean of member positions.
-        let totalWeight = 0;
-        let sumX = 0;
-        let sumY = 0;
+        // The centre is the midpoint of each faction's own weighted centroid.
+        const sums = new Map<
+            number,
+            { weight: number; sumX: number; sumY: number }
+        >();
         for (const unitId of members) {
             const state = physics.getUnitState(unitId);
             const unit = control.getUnit(unitId);
-            if (state === null || unit === null) {
+            const team = control.getTeam(unitId);
+            if (state === null || unit === null || team === undefined) {
                 continue;
             }
             const unitWeight = weight(unit);
-            totalWeight += unitWeight;
-            sumX += state.x * unitWeight;
-            sumY += state.y * unitWeight;
+            const acc = sums.get(team) ?? { weight: 0, sumX: 0, sumY: 0 };
+            acc.weight += unitWeight;
+            acc.sumX += state.x * unitWeight;
+            acc.sumY += state.y * unitWeight;
+            sums.set(team, acc);
         }
+        expect(sums.size).toBe(2);
+        let expectedX = 0;
+        let expectedY = 0;
+        for (const acc of sums.values()) {
+            expectedX += acc.sumX / acc.weight;
+            expectedY += acc.sumY / acc.weight;
+        }
+        expectedX /= sums.size;
+        expectedY /= sums.size;
         const center = battle.getCenter();
         // The centre was computed before this tick's physics step, so allow one step of drift.
-        expect(Math.abs(center.x - sumX / totalWeight)).toBeLessThan(0.1);
-        expect(Math.abs(center.y - sumY / totalWeight)).toBeLessThan(0.1);
+        expect(Math.abs(center.x - expectedX)).toBeLessThan(0.1);
+        expect(Math.abs(center.y - expectedY)).toBeLessThan(0.1);
+    });
+
+    it('keeps an army-vs-army meeting alive for 120 battle ticks with both factions represented', () => {
+        const meetings = [
+            { count: 8, separation: 300, seed: 31 },
+            { count: 4, separation: 340, seed: 32 }
+        ];
+        for (const meeting of meetings) {
+            const created = createKingdom({
+                scenario: meetingScenario(meeting.count, meeting.separation),
+                seed: meeting.seed
+            });
+            fixture = created;
+            const { world, control } = created;
+            driveAcross(world);
+
+            let battleStartTick = -1;
+            for (let tick = 0; tick < 200 && battleStartTick < 0; tick += 1) {
+                world.tick();
+                if (world.getBattleSystem().hasActiveBattle()) {
+                    battleStartTick = tick;
+                }
+            }
+            expect(battleStartTick).toBeGreaterThanOrEqual(0);
+
+            // The reported bug: the battle "ended" a handful of ticks after two armies met
+            // while both sides still had living units. Hold the fight for 120 battle ticks.
+            for (let tick = 0; tick < 120; tick += 1) {
+                world.tick();
+            }
+
+            const active = world.getBattleSystem().listActiveBattles();
+            expect(active).toHaveLength(1);
+            expect(world.getBattleSystem().listCompletedBattles()).toHaveLength(
+                0
+            );
+            const battle = active[0];
+            const living = livingTeamsOf(battle, control);
+            expect([...living.keys()].sort()).toEqual([1, 2]);
+            expect(livingCount(world, control, 1)).toBeGreaterThan(0);
+            expect(livingCount(world, control, 2)).toBeGreaterThan(0);
+
+            created.world.dispose();
+            created.control.dispose();
+            created.physics.dispose();
+            fixture = null;
+        }
     });
 
     it('drops a same-team hit inside the battle square', () => {
@@ -1061,21 +1231,25 @@ describe('BattleSystem — membership, merge, locks and weighting (stub physics)
         expect([...survivor.getMemberUnitIds()].sort()).toEqual([1, 2]);
     });
 
-    it('uses the injected weight and clamps a throwing weight to 1', () => {
+    it('uses the injected weight inside a faction and clamps a throwing weight to 1', () => {
         const positions = new Map<number, IUnitState>();
         const units = new Map<number, IUnit>();
         const teams = new Map<number, number>();
         const first = spawnUnit(ClassKind.Swordsman, mulberry32(1));
         const second = spawnUnit(ClassKind.Swordsman, mulberry32(2));
+        const third = spawnUnit(ClassKind.Swordsman, mulberry32(3));
         units.set(1, first);
         units.set(2, second);
+        units.set(3, third);
         teams.set(1, 1);
-        teams.set(2, 2);
-        place(positions, 1, 100, 100);
-        place(positions, 2, 140, 100);
+        teams.set(2, 1);
+        teams.set(3, 2);
+        place(positions, 1, 160, 100);
+        place(positions, 2, 190, 100);
+        place(positions, 3, 210, 100);
         const armies = [
-            makeArmy(1, 1, 100, 100, [1]),
-            makeArmy(2, 2, 140, 100, [2])
+            makeArmy(1, 1, 170, 100, [1, 2]),
+            makeArmy(2, 2, 220, 100, [3])
         ];
 
         const weighted: UnitWeight = unit => (unit === first ? 1 : 3);
@@ -1090,8 +1264,9 @@ describe('BattleSystem — membership, merge, locks and weighting (stub physics)
         battles.tick();
         battles.tick();
         const battle = battles.listActiveBattles()[0];
-        expect(battle.getMemberUnitIds()).toHaveLength(2);
-        expect(battle.getCenter().x).toBeCloseTo((100 * 1 + 140 * 3) / 4, 6);
+        expect(battle.getMemberUnitIds()).toHaveLength(3);
+        // Faction 1's weighted centroid is (160·1 + 190·3) / 4 = 182.5; faction 2's is 210.
+        expect(battle.getCenter().x).toBeCloseTo((182.5 + 210) / 2, 6);
 
         const throwing: UnitWeight = () => {
             throw new Error('bad weight');
@@ -1107,8 +1282,65 @@ describe('BattleSystem — membership, merge, locks and weighting (stub physics)
         fallback.tick();
         fallback.tick();
         const fallbackBattle = fallback.listActiveBattles()[0];
+        expect(fallbackBattle.getMemberUnitIds()).toHaveLength(3);
+        // Every weight clamps to 1: faction centroids 175 and 210, midpoint 192.5.
         expect(Number.isFinite(fallbackBattle.getCenter().x)).toBe(true);
-        expect(fallbackBattle.getCenter().x).toBeCloseTo(120, 6);
+        expect(fallbackBattle.getCenter().x).toBeCloseTo((175 + 210) / 2, 6);
+    });
+
+    it('moves the centre only slightly when one faction loses a boundary unit', () => {
+        const positions = new Map<number, IUnitState>();
+        const units = new Map<number, IUnit>();
+        const teams = new Map<number, number>();
+        for (const [unitId, team, x] of [
+            [1, 1, 150],
+            [2, 1, 160],
+            [3, 2, 190],
+            [4, 2, 200]
+        ] as const) {
+            units.set(
+                unitId,
+                spawnUnit(ClassKind.Swordsman, mulberry32(unitId))
+            );
+            teams.set(unitId, team);
+            place(positions, unitId, x, 100);
+        }
+        const armies = [
+            makeArmy(1, 1, 155, 100, [1, 2]),
+            makeArmy(2, 2, 195, 100, [3, 4])
+        ];
+        const battles = makeBattles(
+            positions,
+            armies,
+            units,
+            teams,
+            () => 1,
+            []
+        );
+
+        battles.tick();
+        battles.tick();
+        const battle = battles.listActiveBattles()[0];
+        expect(battle.getMemberUnitIds()).toHaveLength(4);
+        // Faction centroids 155 and 195 → centre exactly between the two armies.
+        expect(battle.getCenter().x).toBeCloseTo(175, 6);
+
+        // Kill faction 1's outermost unit: the old rule (raw weighted centroid of the
+        // survivors) dragged the square 8.3 m toward the enemy, which cascaded.
+        const boundary = units.get(1);
+        expect(boundary).toBeDefined();
+        boundary?.takeDamage(
+            (boundary?.getAttribute(AttributeKind.MaxHealth) ?? 0) * 2
+        );
+        battles.tick();
+
+        const moved = battle.getCenter().x;
+        // Faction 1's centroid becomes 160 → the midpoint moves to 177.5 (half the drift).
+        expect(moved).toBeCloseTo((160 + 195) / 2, 6);
+        expect(moved - 175).toBeLessThan(5);
+        // The other faction's centroid still pins the square; nobody else is lost.
+        expect(moved).toBeLessThan(195);
+        expect(battle.getMemberUnitIds()).toHaveLength(3);
     });
 
     it('drops a member that leaves, then re-admits it when the area covers it again', () => {

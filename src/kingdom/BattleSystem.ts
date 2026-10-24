@@ -935,15 +935,19 @@ export class BattleSystem implements IBattleSystem {
     }
 
     /**
-     * 重算每场活跃战斗的加权中心：权重经注入函数、try/catch + 有限/正数钳制为 1
-     * （T-04-02）；成员位置全部缺失时保留上一中心（Pitfall 6）。
+     * 重算每场活跃战斗的加权中心（D-17/D-18）：**先按阵营**求各自的加权质心，
+     * 再取这些阵营质心的等权平均。两阵营时即为双方质心的中点，只加入了一方时
+     * 就是该方质心。这样某一方掉一个边界单位只会轻微挪动该阵营质心，中点被
+     * 对方质心钉住，正方形不会整体滑向对手、进而连锁掉人（UAT：两军相遇后
+     * 战斗十几 tick 就“结束”而双方仍有存活单位）。
+     * 权重经注入函数、try/catch + 有限/正数钳制为 1（T-04-02）；
+     * 阵营 id 未知的单位自成一档；成员位置全部缺失时保留上一中心（Pitfall 6）。
      */
     private recomputeWeightedCenters(): void {
         for (const battle of this.active) {
-            let totalWeight = 0;
-            let sumX = 0;
-            let sumY = 0;
-            let hasPosition = false;
+            const weights = new Map<number | undefined, number>();
+            const sumXs = new Map<number | undefined, number>();
+            const sumYs = new Map<number | undefined, number>();
 
             for (const unitId of battle.getMemberUnitIds()) {
                 const state = this.physics.getUnitState(unitId);
@@ -965,19 +969,35 @@ export class BattleSystem implements IBattleSystem {
                     weight = 1;
                 }
 
-                sumX += state.x * weight;
-                sumY += state.y * weight;
-                totalWeight += weight;
-                hasPosition = true;
+                const key = this.teamOf(unitId);
+                weights.set(key, (weights.get(key) ?? 0) + weight);
+                sumXs.set(key, (sumXs.get(key) ?? 0) + state.x * weight);
+                sumYs.set(key, (sumYs.get(key) ?? 0) + state.y * weight);
             }
 
-            if (
-                hasPosition &&
-                totalWeight > 0 &&
-                Number.isFinite(sumX) &&
-                Number.isFinite(sumY)
-            ) {
-                battle.setCenter(sumX / totalWeight, sumY / totalWeight);
+            let centerX = 0;
+            let centerY = 0;
+            let factions = 0;
+            let resolvable = true;
+            for (const key of weights.keys()) {
+                const weight = weights.get(key) ?? 0;
+                const sumX = sumXs.get(key) ?? 0;
+                const sumY = sumYs.get(key) ?? 0;
+                if (
+                    weight <= 0 ||
+                    !Number.isFinite(sumX) ||
+                    !Number.isFinite(sumY)
+                ) {
+                    resolvable = false;
+                    break;
+                }
+                centerX += sumX / weight;
+                centerY += sumY / weight;
+                factions += 1;
+            }
+
+            if (resolvable && factions > 0) {
+                battle.setCenter(centerX / factions, centerY / factions);
             }
         }
     }
