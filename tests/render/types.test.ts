@@ -111,7 +111,8 @@ function makeCameraConfig(): ICameraConfig {
         minScale: 1,
         maxScale: 40,
         smoothingFrames: 12,
-        switchFrames: 30,
+        panFrames: 20,
+        zoomFrames: 10,
         shakeAmplitudePx: 6,
         shakeDecayPerFrame: 0.85
     };

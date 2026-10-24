@@ -124,6 +124,20 @@ const invalidCases: readonly IInvalidCase[] = [
         field: /camera\.maxScale/
     },
     {
+        name: 'panFrames 0',
+        config: withTopLevel({
+            camera: { ...defaultCamera, panFrames: 0 }
+        }),
+        field: /camera\.panFrames/
+    },
+    {
+        name: 'zoomFrames 0',
+        config: withTopLevel({
+            camera: { ...defaultCamera, zoomFrames: 0 }
+        }),
+        field: /camera\.zoomFrames/
+    },
+    {
         name: 'flashFrames 0',
         config: withTopLevel({
             effects: { ...defaultEffects, flashFrames: 0 }
@@ -153,12 +167,31 @@ describe('render/constants — shipped default config', () => {
 
     it('pins the decision-critical camera, HUD and effects values', () => {
         expect(DEFAULT_RENDER_CONFIG.camera.coverage).toBe(0.9);
+        expect(DEFAULT_RENDER_CONFIG.camera.minSpanMeters).toBe(12);
         expect(DEFAULT_RENDER_CONFIG.hud.healthBarSeconds).toBe(15);
         expect(DEFAULT_RENDER_CONFIG.hud.alwaysVisibleBelowUnits).toBe(6);
         expect(DEFAULT_RENDER_CONFIG.effects.damageNumberThreshold).toBe(50);
         expect(DEFAULT_RENDER_CONFIG.hud.screenScaleAt).toBeGreaterThan(
             DEFAULT_RENDER_CONFIG.hud.worldScaleAt
         );
+    });
+
+    it('ships a 24 + 6 frame two-phase transition with shake switched off', () => {
+        const camera = DEFAULT_RENDER_CONFIG.camera;
+        expect(camera.panFrames).toBe(24);
+        expect(camera.zoomFrames).toBe(6);
+        // 落地更新序号：段首即 t = 0，故总更新次数是 panFrames + zoomFrames - 1。
+        expect(camera.panFrames + camera.zoomFrames - 1).toBe(29);
+        expect(camera.panFrames / DEFAULT_RENDER_CONFIG.outputFps).toBeCloseTo(
+            0.8,
+            6
+        );
+        expect(camera.zoomFrames / DEFAULT_RENDER_CONFIG.outputFps).toBeCloseTo(
+            0.2,
+            6
+        );
+        expect(camera.shakeAmplitudePx).toBe(0);
+        expect(camera.shakeDecayPerFrame).toBeGreaterThan(0);
     });
 
     it('keeps the faction table configurable rather than baked in', () => {

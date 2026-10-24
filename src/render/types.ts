@@ -128,8 +128,10 @@ export interface ICameraConfig {
     readonly maxScale: number;
     /** 跟踪的时间常数（输出帧）：指数平滑越远越慢，永不瞬移。 */
     readonly smoothingFrames: number;
-    /** 切换目标时的固定过渡长度（输出帧）。 */
-    readonly switchFrames: number;
+    /** 两段式过渡的第一段：以**当前缩放**平移中心到目标中心所需的输出帧数。 */
+    readonly panFrames: number;
+    /** 两段式过渡的第二段：平移结束后推拉到目标缩放所需的输出帧数。 */
+    readonly zoomFrames: number;
     /** 震动振幅上限（屏幕像素）：冲量与累计振幅都钳制到此值。 */
     readonly shakeAmplitudePx: number;
     /** 每帧振幅衰减乘数：震动以输出帧计，不用 wall-clock。 */

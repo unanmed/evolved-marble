@@ -26,13 +26,21 @@ const BATTLE_POINTS: readonly IVec2[] = [
     { x: 280, y: 320 }
 ];
 
-/** 过渡/平滑/震动的固定测试值：`switchFrames: 10` 让“第 10 次更新落地”可断言。 */
+/**
+ * 过渡/平滑/震动的固定测试值：`panFrames: 10` + `zoomFrames: 4` 让“平移段恒缩放、
+ * 推拉段只占 4 帧、第 13 次更新落地”全部可断言。
+ */
 const TEST_OVERRIDES = {
-    switchFrames: 10,
+    panFrames: 10,
+    zoomFrames: 4,
     smoothingFrames: 4,
     shakeAmplitudePx: 8,
     shakeDecayPerFrame: 0.5
 };
+
+/** 一次完整两段式过渡的更新次数：`panFrames + zoomFrames - 1`。 */
+const TRANSITION_FRAMES =
+    TEST_OVERRIDES.panFrames + TEST_OVERRIDES.zoomFrames - 1;
 
 /**
  * 构造测试用镜头参数：在出厂默认值上钉死过渡、平滑与震动。
@@ -129,7 +137,7 @@ describe('render/Camera — target changes never teleport', () => {
         expect(camera.getMode()).toBe(CameraMode.BattleFocus);
     });
 
-    it('lands exactly on the target on the switchFrames-th update', () => {
+    it('lands exactly on the target on the (panFrames + zoomFrames - 1)-th update', () => {
         const config = makeConfig();
         const camera = new Camera(config);
         const start = camera.reset(BOUNDS, VIEWPORT);
@@ -142,21 +150,77 @@ describe('render/Camera — target changes never teleport', () => {
         expect(first.scale).toBeCloseTo(start.scale, 6);
 
         const frames: ICameraTransform[] = [first];
-        for (let frame = 2; frame <= config.switchFrames; frame += 1) {
+        for (let frame = 2; frame <= TRANSITION_FRAMES; frame += 1) {
             frames.push(camera.update(makeInput(BATTLE_POINTS)));
         }
-        expect(frames).toHaveLength(config.switchFrames);
+        expect(frames).toHaveLength(TRANSITION_FRAMES);
 
-        const penultimate = frames[config.switchFrames - 2];
+        const penultimate = frames[TRANSITION_FRAMES - 2];
         expect(Math.abs(penultimate.scale - target.scale)).toBeGreaterThan(
             1e-6
         );
 
-        const last = frames[config.switchFrames - 1];
+        const last = frames[TRANSITION_FRAMES - 1];
         expect(last.centerX).toBeCloseTo(target.centerX, 6);
         expect(last.centerY).toBeCloseTo(target.centerY, 6);
         expect(last.scale).toBeCloseTo(target.scale, 6);
         expect(camera.getMode()).toBe(CameraMode.BattleFocus);
+    });
+
+    it('holds the snapshot scale for every frame of the pan phase', () => {
+        const config = makeConfig();
+        const camera = new Camera(config);
+        const start = camera.reset(BOUNDS, VIEWPORT);
+        camera.setBattleTarget(7);
+
+        for (let frame = 0; frame < config.panFrames; frame += 1) {
+            const next = camera.update(makeInput(BATTLE_POINTS));
+
+            expect(next.scale).toBe(start.scale);
+            expectFiniteTransform(next);
+        }
+    });
+
+    it('changes scale only after the pan, never during it', () => {
+        const config = makeConfig();
+        const camera = new Camera(config);
+        const start = camera.reset(BOUNDS, VIEWPORT);
+        const target = expectedBattleTransform(config, BATTLE_POINTS);
+        camera.setBattleTarget(7);
+
+        const frames: ICameraTransform[] = [];
+        for (let frame = 0; frame < TRANSITION_FRAMES; frame += 1) {
+            frames.push(camera.update(makeInput(BATTLE_POINTS)));
+        }
+
+        // 索引 0..panFrames（含推拉段首帧 beta = 0）的缩放必须与快照完全一致。
+        for (let index = 0; index <= config.panFrames; index += 1) {
+            expect(frames[index].scale).toBe(start.scale);
+        }
+        expect(frames[config.panFrames + 1].scale).not.toBe(start.scale);
+        expect(frames[config.panFrames + 1].scale).not.toBe(target.scale);
+    });
+
+    it('hands the zoom phase over without a teleport at the boundary', () => {
+        const config = makeConfig();
+        const camera = new Camera(config);
+        const start = camera.reset(BOUNDS, VIEWPORT);
+        const target = expectedBattleTransform(config, BATTLE_POINTS);
+        camera.setBattleTarget(7);
+
+        const frames: ICameraTransform[] = [];
+        for (let frame = 0; frame < TRANSITION_FRAMES; frame += 1) {
+            frames.push(camera.update(makeInput(BATTLE_POINTS)));
+        }
+
+        const lastPan = frames[config.panFrames - 1];
+        const firstZoom = frames[config.panFrames];
+        expect(lastPan.centerX).toBeCloseTo(target.centerX, 6);
+        expect(lastPan.centerY).toBeCloseTo(target.centerY, 6);
+        expect(lastPan.scale).toBe(start.scale);
+        expect(firstZoom.centerX).toBe(lastPan.centerX);
+        expect(firstZoom.centerY).toBe(lastPan.centerY);
+        expect(firstZoom.scale).toBe(start.scale);
     });
 
     it('never moves further in one frame than the remaining distance', () => {
@@ -166,7 +230,7 @@ describe('render/Camera — target changes never teleport', () => {
         const target = expectedBattleTransform(config, BATTLE_POINTS);
         camera.setBattleTarget(7);
 
-        for (let frame = 0; frame < config.switchFrames; frame += 1) {
+        for (let frame = 0; frame < TRANSITION_FRAMES; frame += 1) {
             const next = camera.update(makeInput(BATTLE_POINTS));
             const remaining = Math.hypot(
                 target.centerX - previous.centerX,
@@ -208,7 +272,7 @@ describe('render/Camera — mode follows the target, one frame late on pull-back
         const camera = new Camera(config);
         camera.reset(BOUNDS, VIEWPORT);
         camera.setBattleTarget(7);
-        for (let frame = 0; frame < config.switchFrames; frame += 1) {
+        for (let frame = 0; frame < TRANSITION_FRAMES; frame += 1) {
             camera.update(makeInput(BATTLE_POINTS));
         }
         expect(camera.getMode()).toBe(CameraMode.BattleFocus);
@@ -217,12 +281,42 @@ describe('render/Camera — mode follows the target, one frame late on pull-back
         expect(camera.getBattleTarget()).toBeUndefined();
         expect(camera.getMode()).toBe(CameraMode.BattleFocus);
 
-        for (let frame = 1; frame < config.switchFrames; frame += 1) {
+        for (let frame = 1; frame < TRANSITION_FRAMES; frame += 1) {
             camera.update(makeInput([]));
         }
         expect(camera.getMode()).toBe(CameraMode.BattleFocus);
 
         camera.update(makeInput([]));
+        expect(camera.getMode()).toBe(CameraMode.Strategic);
+    });
+
+    it('pans back at a constant scale before zooming out', () => {
+        const config = makeConfig();
+        const camera = new Camera(config);
+        camera.reset(BOUNDS, VIEWPORT);
+        camera.setBattleTarget(7);
+        for (let frame = 0; frame < TRANSITION_FRAMES; frame += 1) {
+            camera.update(makeInput(BATTLE_POINTS));
+        }
+        const battle = camera.getTransform();
+        const panoramic = strategicTransform(BOUNDS, VIEWPORT, config);
+
+        camera.setBattleTarget(undefined);
+        for (let frame = 0; frame < config.panFrames; frame += 1) {
+            const next = camera.update(makeInput([]));
+
+            expect(next.scale).toBe(battle.scale);
+        }
+        expect(camera.getTransform().centerX).toBeCloseTo(panoramic.centerX, 6);
+
+        for (
+            let frame = config.panFrames;
+            frame < TRANSITION_FRAMES;
+            frame += 1
+        ) {
+            camera.update(makeInput([]));
+        }
+        expect(camera.getTransform().scale).toBeCloseTo(panoramic.scale, 6);
         expect(camera.getMode()).toBe(CameraMode.Strategic);
     });
 
@@ -242,6 +336,17 @@ describe('render/Camera — mode follows the target, one frame late on pull-back
 });
 
 describe('render/Camera — shake is capped, decayed and deterministic', () => {
+    it('emits no offset at all under the shipped default config', () => {
+        const camera = new Camera(DEFAULT_RENDER_CONFIG.camera);
+        camera.reset(BOUNDS, VIEWPORT);
+
+        const frame = camera.update(makeInput([], 1000));
+
+        expect(DEFAULT_RENDER_CONFIG.camera.shakeAmplitudePx).toBe(0);
+        expect(Math.abs(frame.shakeX)).toBe(0);
+        expect(Math.abs(frame.shakeY)).toBe(0);
+    });
+
     it('clamps an oversized impulse to the configured amplitude', () => {
         const config = makeConfig();
         const camera = new Camera(config);
