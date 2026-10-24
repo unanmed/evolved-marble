@@ -486,6 +486,23 @@ describe('demo/runner — battle-entry freeze (REND-05)', () => {
         expect(fixture.camera.getBattleTarget()).toBeUndefined();
     });
 
+    it('drops a freeze that is in flight when auto-follow is turned off', () => {
+        const fixture = createFixture();
+        fixture.active.push(makeBattle([1], CENTER, 5));
+
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
+        const ticks = fixture.probe.ticks;
+
+        fixture.runner.setAutoFollow(false);
+
+        // 关闭自动跟拍会同时丢弃待应用目标与剩余冻结帧：立刻恢复推进，且绝不写镜头目标。
+        fixture.runner.stepOnce();
+        expect(fixture.probe.ticks).toBe(ticks + 1);
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
+        expect(fixture.camera.getMode()).toBe(CameraMode.Strategic);
+    });
+
     it('does not freeze on battle-to-battle switches or on clearing the target', () => {
         const fixture = createFixture();
         fixture.active.push(makeBattle([1], CENTER, 5));

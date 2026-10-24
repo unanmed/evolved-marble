@@ -137,10 +137,15 @@ export class ManualRunner implements IManualRunner {
     /**
      * 开关自动跟拍。关闭时本类不写镜头目标，因此操作者全景不会被覆盖；
      * 面板可在同一次操作里自行 `setBattleTarget`。
+     * 关闭还会立即丢弃冻结中的待应用目标与剩余冻结帧，使“关闭即不冻结”依然成立。
      * @param enabled 是否启用自动跟拍。
      */
     setAutoFollow(enabled: boolean): void {
         this.autoFollow = enabled === true;
+        if (!this.autoFollow) {
+            this.freezeFramesRemaining = 0;
+            this.pendingBattleId = undefined;
+        }
     }
 
     /**
@@ -228,8 +233,8 @@ export class ManualRunner implements IManualRunner {
     }
 
     /**
-     * 冻结结束后的目标落地：只有该战斗仍活跃才写入镜头，否则丢弃待应用目标、
-     * 让画面留在全景（下一帧 `updateTarget` 会按常规重新选目标）。
+     * 冻结结束后的目标落地：只有自动跟拍仍开启且该战斗仍活跃才写入镜头，
+     * 否则丢弃待应用目标、让画面留在全景（下一帧 `updateTarget` 会按常规重新选目标）。
      * 没有待应用目标时为空操作，因此普通帧可以直接调用。
      * @param world 当前世界。
      */
@@ -239,6 +244,9 @@ export class ManualRunner implements IManualRunner {
             return;
         }
         this.pendingBattleId = undefined;
+        if (!this.autoFollow) {
+            return;
+        }
         const stillActive = world
             .getBattleSystem()
             .listActiveBattles()
