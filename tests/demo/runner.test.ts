@@ -1,13 +1,14 @@
 /**
  * 帧驱动器的假计时器测试（REND-04/REND-05/D-12/D-17）：证明每输出帧恰好一次
- * `world.tick()` 与一次 `renderFrame()`、暂停不留计时器、单步不排定后续帧、
- * 延时钳制、自动跟拍/操作者全景/显式选择的三种镜头策略、异常暂停与会话复位。
+ * `renderFrame()`、非冻结帧恰好一次 `world.tick()`、战斗入场冻结 24 个纯渲染帧、
+ * 暂停不留计时器、单步不排定后续帧、延时钳制、自动跟拍/操作者全景/显式选择的
+ * 三种镜头策略、异常暂停与会话复位。
  * 全部依赖都是窄接口的本地假件：不引入 Rapier、不引入 Pixi、不推进真实世界。
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ManualRunner } from '@/demo/runner';
+import { BATTLE_ENTRY_FREEZE_FRAMES, ManualRunner } from '@/demo/runner';
 import type { IRunnerDeps, IRunnerRenderer, IRunnerWorld } from '@/demo/types';
 import type {
     IBattle,
@@ -225,6 +226,17 @@ function createFixture(
     return { probe, active, session, errors, camera, runner };
 }
 
+/**
+ * 走完一次战斗入场冻结：这 24 帧只渲染、不推进世界。
+ * 测试在断言“正常 tick 语义”前必须先调用它，否则会落在冻结窗口里。
+ * @param fixture 夹具。
+ */
+function drainEntryFreeze(fixture: IRunnerFixture): void {
+    for (let frame = 0; frame < BATTLE_ENTRY_FREEZE_FRAMES; frame += 1) {
+        fixture.runner.stepOnce();
+    }
+}
+
 beforeEach(() => {
     vi.useFakeTimers();
 });
@@ -310,10 +322,12 @@ describe('demo/runner — automatic battle targeting (D-12/D-15/OQ-6)', () => {
 
         fixture.runner.stepOnce();
         expect(fixture.camera.getBattleTarget()).toBe(5);
+        drainEntryFreeze(fixture);
 
         fixture.camera.setBattleTarget(undefined);
         fixture.runner.stepOnce();
         expect(fixture.camera.getBattleTarget()).toBe(5);
+        drainEntryFreeze(fixture);
 
         fixture.active.length = 0;
         fixture.runner.stepOnce();
@@ -326,6 +340,7 @@ describe('demo/runner — automatic battle targeting (D-12/D-15/OQ-6)', () => {
 
         fixture.runner.stepOnce();
         expect(fixture.camera.getBattleTarget()).toBe(5);
+        drainEntryFreeze(fixture);
 
         fixture.runner.setAutoFollow(false);
         fixture.camera.setBattleTarget(undefined);
@@ -350,6 +365,7 @@ describe('demo/runner — automatic battle targeting (D-12/D-15/OQ-6)', () => {
 
         fixture.runner.stepOnce();
         expect(fixture.camera.getBattleTarget()).toBe(5);
+        drainEntryFreeze(fixture);
 
         fixture.camera.setBattleTarget(7);
         fixture.runner.stepOnce();
@@ -358,6 +374,132 @@ describe('demo/runner — automatic battle targeting (D-12/D-15/OQ-6)', () => {
         fixture.active.splice(1, 1);
         fixture.runner.stepOnce();
         expect(fixture.camera.getBattleTarget()).toBe(5);
+    });
+});
+
+describe('demo/runner — battle-entry freeze (REND-05)', () => {
+    it('renders 24 frames with zero ticks on battle entry, then resumes ticking', () => {
+        expect(BATTLE_ENTRY_FREEZE_FRAMES).toBe(24);
+
+        const fixture = createFixture();
+        fixture.runner.start();
+        vi.advanceTimersByTime(DELAY_MS);
+        expect(fixture.probe.ticks).toBe(1);
+        expect(fixture.probe.renders).toBe(1);
+
+        fixture.active.push(makeBattle([1], CENTER, 5));
+        vi.advanceTimersByTime(DELAY_MS);
+        expect(fixture.probe.ticks).toBe(2);
+        expect(fixture.camera.getBattleTarget()).toBe(5);
+
+        const frozenTicks = fixture.probe.ticks;
+        const frozenRenders = fixture.probe.renders;
+
+        vi.advanceTimersByTime(DELAY_MS * BATTLE_ENTRY_FREEZE_FRAMES);
+        expect(fixture.probe.ticks).toBe(frozenTicks);
+        expect(fixture.probe.renders).toBe(
+            frozenRenders + BATTLE_ENTRY_FREEZE_FRAMES
+        );
+        expect(fixture.runner.getFrameCount()).toBe(
+            frozenRenders + BATTLE_ENTRY_FREEZE_FRAMES
+        );
+        expect(vi.getTimerCount()).toBe(1);
+
+        vi.advanceTimersByTime(DELAY_MS);
+        expect(fixture.probe.ticks).toBe(frozenTicks + 1);
+        expect(fixture.probe.renders).toBe(
+            frozenRenders + BATTLE_ENTRY_FREEZE_FRAMES + 1
+        );
+
+        fixture.runner.dispose();
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('renders exactly one frame without ticking per stepOnce while frozen', () => {
+        const fixture = createFixture();
+        fixture.active.push(makeBattle([1], CENTER, 5));
+
+        fixture.runner.stepOnce();
+        const ticks = fixture.probe.ticks;
+        const renders = fixture.probe.renders;
+
+        fixture.runner.stepOnce();
+        expect(fixture.probe.ticks).toBe(ticks);
+        expect(fixture.probe.renders).toBe(renders + 1);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('clears a pending freeze on reset', () => {
+        const fixture = createFixture();
+        fixture.active.push(makeBattle([1], CENTER, 5));
+
+        fixture.runner.stepOnce();
+        const ticks = fixture.probe.ticks;
+
+        fixture.runner.stepOnce();
+        expect(fixture.probe.ticks).toBe(ticks);
+
+        fixture.runner.reset();
+        fixture.runner.stepOnce();
+        expect(fixture.probe.ticks).toBe(ticks + 1);
+    });
+
+    it('never freezes while auto-follow is off', () => {
+        const fixture = createFixture();
+        fixture.runner.setAutoFollow(false);
+        fixture.active.push(makeBattle([1], CENTER, 5));
+
+        fixture.runner.start();
+        vi.advanceTimersByTime(DELAY_MS * 5);
+
+        expect(fixture.probe.ticks).toBe(5);
+        expect(fixture.probe.renders).toBe(5);
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
+    });
+
+    it('does not freeze on battle-to-battle switches or on clearing the target', () => {
+        const fixture = createFixture();
+        fixture.active.push(makeBattle([1], CENTER, 5));
+
+        fixture.runner.stepOnce();
+        drainEntryFreeze(fixture);
+        const ticks = fixture.probe.ticks;
+
+        fixture.active.splice(0, 1, makeBattle([2], CENTER, 7));
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).toBe(7);
+        expect(fixture.probe.ticks).toBe(ticks + 1);
+
+        fixture.runner.stepOnce();
+        expect(fixture.probe.ticks).toBe(ticks + 2);
+
+        fixture.active.length = 0;
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
+        fixture.runner.stepOnce();
+        expect(fixture.probe.ticks).toBe(ticks + 4);
+    });
+
+    it('re-arms the freeze when a target reappears after clearing', () => {
+        const fixture = createFixture();
+        fixture.active.push(makeBattle([1], CENTER, 5));
+
+        fixture.runner.stepOnce();
+        drainEntryFreeze(fixture);
+
+        fixture.active.length = 0;
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
+
+        fixture.active.push(makeBattle([2], CENTER, 7));
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).toBe(7);
+
+        const ticks = fixture.probe.ticks;
+        const renders = fixture.probe.renders;
+        fixture.runner.stepOnce();
+        expect(fixture.probe.ticks).toBe(ticks);
+        expect(fixture.probe.renders).toBe(renders + 1);
     });
 });
 

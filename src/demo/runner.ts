@@ -1,7 +1,8 @@
 /**
  * 演示帧驱动：`class ManualRunner implements IManualRunner`（D-12/D-17/D-18）。
- * 本类是 Phase 5 唯一的循环：每个输出帧恰好一次 `world.tick()`，然后一次
- * `renderer.renderFrame()`，再用**单个** `setTimeout` 让出事件循环并排定下一帧。
+ * 本类是 Phase 5 唯一的循环：每个输出帧恰好一次 `renderer.renderFrame()`；非冻结帧在此之外
+ * 还做恰好一次 `world.tick()`，然后用**单个** `setTimeout` 让出事件循环并排定下一帧。
+ * 战斗入场时先冻结固定帧数（只渲染、不推进），让镜头把平移走完再恢复模拟。
  * 它从不推进控制或物理（`KingdomWorld` 已在每个子步内推进控制，Pitfall 8），
  * 也不使用 rAF、重复计时器或固定 fps 累加器；延时就是操作面板的“速度”。
  */
@@ -9,6 +10,12 @@
 import type { IManualRunner, IRunnerDeps, IRunnerWorld } from '@/demo/types';
 import type { IBattle } from '@/kingdom/types';
 import { MAX_FRAME_DELAY_MS, MIN_FRAME_DELAY_MS } from '@/render/constants';
+
+/**
+ * 战斗入场冻结的输出帧数：30 fps 下 0.8 s，与 `Camera` 的 24 帧进入平移段对齐。
+ * 按输出帧计数而非墙钟，因此冻结时长与每帧延时、单步或快进都无关。
+ */
+export const BATTLE_ENTRY_FREEZE_FRAMES = 24;
 
 /**
  * 每帧延时的解析：非有限值回落到下限，其余钳制到 `[MIN_FRAME_DELAY_MS, MAX_FRAME_DELAY_MS]`。
@@ -23,7 +30,7 @@ function clampFrameDelay(ms: number): number {
 }
 
 /**
- * 单计时器帧驱动器：一次 tick → 一次渲染 → 一次 `setTimeout`。
+ * 单计时器帧驱动器：一次渲染 → （非冻结时）一次 tick → 一次 `setTimeout`。
  * 自动跟拍默认开启；关闭后本类绝不写镜头目标，操作者选定的全景得以保留。
  */
 export class ManualRunner implements IManualRunner {
@@ -41,6 +48,8 @@ export class ManualRunner implements IManualRunner {
     private frameCount: number;
     /** 是否启用自动跟拍（REND-04）；默认 `true`。 */
     private autoFollow: boolean;
+    /** 战斗入场冻结剩余的输出帧数；0 表示正常推进（按帧计数，绝不读墙钟）。 */
+    private freezeFramesRemaining: number;
 
     /**
      * 构造帧驱动器。
@@ -55,6 +64,7 @@ export class ManualRunner implements IManualRunner {
         this.frameDelayMs = MIN_FRAME_DELAY_MS;
         this.frameCount = 0;
         this.autoFollow = true;
+        this.freezeFramesRemaining = 0;
         this.setFrameDelay(frameDelayMs);
     }
 
@@ -91,12 +101,13 @@ export class ManualRunner implements IManualRunner {
     }
 
     /**
-     * 复位会话：暂停 → 注入的会话重置 → 帧计数清零 → 恢复默认自动跟拍。
+     * 复位会话：暂停 → 注入的会话重置 → 帧计数与冻结计数清零 → 恢复默认自动跟拍。
      */
     reset(): void {
         this.pause();
         this.deps.resetSession();
         this.frameCount = 0;
+        this.freezeFramesRemaining = 0;
         this.autoFollow = true;
     }
 
@@ -150,13 +161,14 @@ export class ManualRunner implements IManualRunner {
     }
 
     /**
-     * 幂等释放：暂停并阻止后续调度。
+     * 幂等释放：暂停、丢弃待完成的冻结并阻止后续调度。
      */
     dispose(): void {
         if (this.disposed) {
             return;
         }
         this.pause();
+        this.freezeFramesRemaining = 0;
         this.disposed = true;
     }
 
@@ -174,7 +186,9 @@ export class ManualRunner implements IManualRunner {
     }
 
     /**
-     * 执行一个输出帧：一次世界推进、一次目标更新、一次渲染、帧计数加一。
+     * 执行一个输出帧：冻结帧只渲染，普通帧先推进世界并更新目标再渲染，最后帧计数加一。
+     * 冻结期间**不**调用 `world.tick()`、**不**重解目标，因此冻结画面停在入场那一刻，
+     * 由 `renderer.renderFrame()` 里的镜头过渡把平移走完。
      * tick 或渲染抛出的异常会暂停循环并经 `onError` 上报一次，绝不排定后续帧。
      * @param scheduleNext 是否在成功后继续排定下一帧（单步为 `false`）。
      */
@@ -184,9 +198,13 @@ export class ManualRunner implements IManualRunner {
             return;
         }
         try {
-            const world = this.deps.getWorld();
-            world.tick();
-            this.updateTarget(world);
+            if (this.freezeFramesRemaining > 0) {
+                this.freezeFramesRemaining -= 1;
+            } else {
+                const world = this.deps.getWorld();
+                world.tick();
+                this.updateTarget(world);
+            }
             this.deps.renderer.renderFrame();
             this.frameCount += 1;
         } catch (error) {
@@ -202,6 +220,8 @@ export class ManualRunner implements IManualRunner {
     /**
      * 自动跟拍策略（D-12/D-15/OQ-6）：自动跟拍关闭时直接返回，镜头目标保持不变；
      * 否则保留仍然活跃的当前目标，没有则选第一场活跃战斗，再没有则请求全景。
+     * 只有 `undefined → 数字` 的入场切换会启动冻结：战斗间切换、退出全景、
+     * 关闭自动跟拍都不冻结，既有语义保持不变。
      * @param world 当前世界。
      */
     private updateTarget(world: IRunnerWorld): void {
@@ -218,8 +238,10 @@ export class ManualRunner implements IManualRunner {
         ) {
             return;
         }
-        this.deps.camera.setBattleTarget(
-            active.length > 0 ? active[0].getId() : undefined
-        );
+        const next = active.length > 0 ? active[0].getId() : undefined;
+        this.deps.camera.setBattleTarget(next);
+        if (current === undefined && next !== undefined) {
+            this.freezeFramesRemaining = BATTLE_ENTRY_FREEZE_FRAMES;
+        }
     }
 }
