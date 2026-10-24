@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: 渲染系统
 status: executing
-stopped_at: Completed 05-16-PLAN.md
-last_updated: "2026-10-24T14:17:20.539Z"
+stopped_at: Completed 05-17-PLAN.md
+last_updated: "2026-10-24T16:00:15.205Z"
 last_activity: 2026-10-24
 last_activity_desc: Phase 05 plan 15 executed (single-phase pull-back, weight-aware in-battle follow)
-state_head: 218b4d0b9c1925e886ac9ade2427b2ade6411ec4
+state_head: f4385c75dfa18706be0c676e612f88a86abadcb5
 progress:
   total_phases: 8
   completed_phases: 0
-  total_plans: 36
-  completed_plans: 35
+  total_plans: 38
+  completed_plans: 36
   percent: 0
 ---
 
@@ -97,6 +97,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P14 | 27min | 3 tasks | 8 files |
 | Phase 05 P15 | 17min | 3 tasks | 9 files |
 | Phase 05 P16 | 7 | 1 tasks | 2 files |
+| Phase 05 P17 | 12min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -222,6 +223,8 @@ Recent decisions affecting current work:
 - [Phase 05]: In-battle tracking is weight-aware: effective smoothing = clamp(round(smoothingFrames * weightScale / (weightScale + W)), 1, smoothingFrames) with weightScale = 20; entry and exit timing never read the weight
 - [Phase 05]: resolveBattleWeight is a pure frameModel helper (sum of living member levels, 0 when nothing resolves) and the Renderer supplies it to camera.update every frame
 - [Phase 05]: Battle entry freezes the simulation for 24 frame-counted output frames (matching Camera.panFrames), rendering every frame but calling no world.tick(); the freeze is armed only on undefined -> defined targets with auto-follow on and is cleared by reset()/dispose()
+- [Phase 05]: 05-17: camera entry is a single push-in over zoomFrames (progress (elapsed+1)/zoomFrames, first frame moves, 6th lands); panFrames now means exit duration only
+- [Phase 05]: 05-17: the battle-entry freeze renders the strategic panorama by leaving camera.getBattleTarget() undefined, then releases pendingBattleId on the frame after the 24-frame hold and resumes ticking on that same frame
 
 ### Pending Todos
 
@@ -246,6 +249,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-24T14:17:20.210Z
-Stopped at: Completed 05-16-PLAN.md
+Last session: 2026-10-24T16:00:14.974Z
+Stopped at: Completed 05-17-PLAN.md
 Resume file: None
