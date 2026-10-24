@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: 渲染系统
 status: executing
-stopped_at: Completed 05-07-PLAN.md (pooled HUD + per-frame Renderer)
-last_updated: "2026-10-23T16:20:02.542Z"
+stopped_at: Completed 05-08-PLAN.md
+last_updated: "2026-10-24T06:05:15.279Z"
 last_activity: 2026-10-24
-last_activity_desc: Phase 05 plan 07 executed
-state_head: 5833a3967f54c477b7ef3ee594a447903efd2196
+last_activity_desc: Phase 05 plan 08 executed
+state_head: bfe3f7ac2a5accd85bbdb404b9b8f28ea9d8bffe
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 30
-  completed_plans: 27
+  completed_plans: 28
   percent: 0
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-10-21)
 ## Current Position
 
 Phase: 05 (渲染系统) — EXECUTING
-Plan: 7 of 10
+Plan: 8 of 10
 Status: Ready to execute
-Last activity: 2026-10-24 — 05-07 (pooled HUD + per-frame Renderer) completed
+Last activity: 2026-10-24 — 05-08 (demo composition + frame runner) completed
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -89,6 +89,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P05 | ~7min | 2 tasks | 4 files |
 | Phase 05 P06 | ~8min | 2 tasks | 3 files |
 | Phase 05 P07 | 16min | 2 tasks | 3 files |
+| Phase 5 P8 | 11min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -190,6 +191,10 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-07: Hud reads only pre-resolved IHudFrame values (healthRatio/hudScale/healthVisible/level) and keeps bars/levels/effects in age-recycled pools capped by IEffectsConfig; sparks fan deterministically from shot index + frame index, so no random source exists in src/render
 - [Phase 05]: 05-07: Renderer builds its layer graph, Camera, UnitViewFactory and Hud inside a 3-arg constructor (app, provider, config) because types.ts is frozen and AGENTS 12 forbids a 9-param constructor; createRenderer only validates, awaits app.init and constructs
 - [Phase 05]: 05-07: strategic mode is a visibility switch — unit views are hidden, never destroyed, so a focus/strategic round trip re-reads no getEquipment and an in-place upgrade cannot re-snapshot a frozen collider (G-6); buildStrategicFrame is the only producer of IStrategicFrame
+- [Phase 05]: 05-08: disposeDemoSetup is idempotent via a module-level WeakSet<IDemoSetup> marked before world -> control -> physics, because IDemoSetup cannot grow a disposed field (AGENTS §5)
+- [Phase 05]: 05-08: issueInitialEngagementOrders feeds real IWorld.issueOrder MoveTo orders toward the nearest opposing army; the PlaceholderCommander leaves them alone since it only orders armies whose getOrder() is null
+- [Phase 05]: 05-08: ManualRunner.setAutoFollow(false) never writes camera.setBattleTarget, so an operator panorama survives; the panel clears or selects the target in the same action
+- [Phase 05]: 05-08: stepOnce reuses runOneFrame(false), making a single step provably one tick + one target update + one render without scheduling
 
 ### Pending Todos
 
@@ -214,6 +219,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-23T16:20:02.316Z
-Stopped at: Completed 05-07-PLAN.md (pooled HUD + per-frame Renderer)
+Last session: 2026-10-24T06:05:14.921Z
+Stopped at: Completed 05-08-PLAN.md
 Resume file: None

@@ -189,7 +189,7 @@ Plans:
   4. 镜头自动跟拍激烈战斗区域，无需人工控制。
   5. Chrome-only 下数十单位混战维持可交互帧率。
 
-**Plans**: 7/10 plans executed (05-01..05-06 complete; 05-07..05-10 round 2 planned)
+**Plans**: 8/10 plans executed (05-01..05-06 complete; 05-07..05-10 round 2 planned)
 Plans:
 
 **Wave 1** *(round 1 — type gate, complete)*
@@ -216,7 +216,7 @@ Plans:
 
 **Wave 6**
 
-- [ ] 05-08-PLAN.md — `src/demo/{types,scenario,composition,runner}.ts`：真实组合根（物理→感知→sink→tap→控制→王国）+ setTimeout 逐帧 runner（自动跟拍战斗）+ 真实 Rapier 与 fake-timer 测试
+- [x] 05-08-PLAN.md — `src/demo/{types,scenario,composition,runner}.ts`：真实组合根（物理→感知→sink→tap→控制→王国）+ setTimeout 逐帧 runner（自动跟拍战斗）+ 真实 Rapier 与 fake-timer 测试
 
 **Wave 7**
 
@@ -283,7 +283,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8
 | 2. 物理模拟系统 | 7/7 | Complete    | 2026-10-19 |
 | 3. 操控系统 | 3/3 | Complete    | 2026-10-20 |
 | 4. 王国系统 | 5/5 | Complete    | 2026-10-21 |
-| 5. 渲染系统 | 7/10 | In Progress|  |
+| 5. 渲染系统 | 8/10 | In Progress|  |
 | 6. 录制系统 | 0/0 | Not started | - |
 | 7. AI 接入系统 | 0/0 | Not started | - |
 | 8. 统计与精彩回放系统 | 0/0 | Not started | - |
