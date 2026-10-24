@@ -91,3 +91,7 @@ Do not make direct repo edits outside a GSD workflow unless the user explicitly 
 > Profile not yet configured. Run `/gsd-profile-user` to generate your developer profile.
 > This section is managed by `generate-claude-profile` -- do not edit manually.
 <!-- GSD:profile-end -->
+
+## 环境与协作约定（用户偏好）
+
+- **不要由 AI 启动或停止长驻服务器**（`pnpm dev`、Vite、watcher 等）。服务器由用户自己启动并管理生命周期；需要用户查看页面时，只提供启动命令与 URL，不要自行 `Start-Process` 或后台拉起。
