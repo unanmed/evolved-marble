@@ -1,10 +1,15 @@
 /**
  * 自动镜头：`class Camera implements ICamera`（D-02/D-14/D-15/D-21）。
  * 只有两种模式，且模式完全由跟拍目标推导——没有独立的模式设置方法，二者不可能互相矛盾。
- * `setBattleTarget` 只记录目标、快照当前变换并启动两段式过渡，**绝不**直接改当前变换；
+ * `setBattleTarget` 只记录目标、快照当前变换并启动过渡，**绝不**直接改当前变换；
  * `reset` 是唯一允许的瞬时跳变（初始化）。
- * 两段式过渡：先以**当前缩放**平移中心到目标中心（`panFrames`），再推拉到目标缩放（`zoomFrames`）——
- * 平移期间缩放完全不动，观众能先看清“镜头去了哪”，再看到“镜头推近了”。
+ * 过渡按方向分两种形态：
+ * - **进入**（新目标是数字）：两段式——先以快照缩放平移中心到目标中心（`panFrames`），
+ *   再推拉到目标缩放（`zoomFrames`）；平移期间缩放完全不动。
+ * - **退出**（目标变为 `undefined`）：单段式——中心与缩放**同时**从战斗构图缓动到全景构图
+ *    （`panFrames` 帧），因此镜头绝不会先以战斗缩放挪到地图中心再缩小。
+ * 稳态跟随（无过渡）按战斗权重缩短平滑帧数：参战等级和越大，追赶越快；
+ * 该权重**不**影响进入/退出的时长。
  * 全部几何委托给 `cameraMath.ts`，本类只持有状态；不引用 Pixi、不读 wall-clock、不用随机源，
  * 因此可在 Node/Vitest 中直接单测（REND-04）。一切运动以本类自己的 `update()` 调用次数
  * （输出帧）计数，同样的帧序列必然得到同样的变换序列（D-06/D-17）。
@@ -79,9 +84,9 @@ export class Camera implements ICamera {
     }
 
     /**
-     * 只改变跟拍目标并启动两段式过渡：当前变换保持原样，因此不会瞬移。
-     * 新目标是数字时立即进入 `BattleFocus`（单位在推近过程中就该出现）；
-     * 目标是 `undefined` 时保持 `BattleFocus`，等拉回全景的过渡完成后才由 `update()` 切换模式。
+     * 只改变跟拍目标并启动过渡：当前变换保持原样，因此不会瞬移。
+     * 新目标是数字时立即进入 `BattleFocus`（单位在推近过程中就该出现）并启动两段式进入；
+     * 目标是 `undefined` 时保持 `BattleFocus`，启动单段式退出，等落地后才由 `update()` 切换模式。
      * @param battleId 目标战斗 id；`undefined` 表示请求全景。
      */
     setBattleTarget(battleId: number | undefined): void {
@@ -113,25 +118,36 @@ export class Camera implements ICamera {
     }
 
     /**
-     * 推进一帧：解析目标构图 → 两段式过渡或跟踪 → 叠加震动。
-     * 过渡以**已用帧数**计时，第 k 次更新读到 `elapsed = k - 1`，因此：
-     * 第 1 次更新恰为段首（返回起点，不跳变）；平移段占前 `panFrames` 次更新且缩放恒为快照值；
-     * 推拉段从第 `panFrames + 1` 次更新开始，第 `panFrames + zoomFrames - 1` 次更新恰落在目标上
-     * （并做一次位稳定的吸附）。`panFrames`/`zoomFrames` 为 1 时该段退化为单帧瞬变。
-     * @param input 本帧输入（视口、地图、拟合点、震动冲量）。
+     * 推进一帧：解析目标构图 → 过渡或跟踪 → 叠加震动。
+     * 过渡以**已用帧数**计时，第 k 次更新读到 `elapsed = k - 1`：
+     * - 进入：第 1 次更新恰为段首（返回起点，不跳变）；平移段占前 `panFrames` 次更新且缩放恒为快照值；
+     *   推拉段从第 `panFrames + 1` 次更新开始，第 `panFrames + zoomFrames - 1` 次更新恰落在目标上。
+     * - 退出：单段同时插值中心与缩放，第 1 次更新即开始移动，第 `panFrames` 次更新落在全景上。
+     * 两段都在落地帧做一次位稳定的吸附；`panFrames`/`zoomFrames` 为 1 时该段退化为单帧瞬变。
+     * @param input 本帧输入（视口、地图、拟合点、震动冲量、战斗权重）。
      * @returns 本帧实际应用的变换；所有分量保证有限。
      */
     update(input: ICameraUpdateInput): ICameraTransform {
         this.frameIndex += 1;
         const target = this.resolveTarget(input);
         const from = this.transitionFrom;
+        const elapsed = Math.max(0, this.transitionElapsed);
         let next: ICameraTransform;
 
-        if (from !== null) {
+        if (from !== null && this.targetBattleId === undefined) {
+            const panFrames = Math.max(1, this.config.panFrames);
+            next = this.exitTransform(from, target, elapsed, panFrames);
+            this.transitionElapsed = elapsed + 1;
+            if (elapsed >= panFrames - 1) {
+                next = this.landingTransform(target);
+                this.transitionFrom = null;
+                this.transitionElapsed = 0;
+                this.mode = CameraMode.Strategic;
+            }
+        } else if (from !== null) {
             const panFrames = Math.max(1, this.config.panFrames);
             const zoomFrames = Math.max(1, this.config.zoomFrames);
             const totalFrames = panFrames + zoomFrames - 1;
-            const elapsed = Math.max(0, this.transitionElapsed);
 
             next =
                 elapsed < panFrames
@@ -145,22 +161,17 @@ export class Camera implements ICamera {
 
             this.transitionElapsed = elapsed + 1;
             if (elapsed >= totalFrames - 1) {
-                next = {
-                    centerX: target.centerX,
-                    centerY: target.centerY,
-                    scale: target.scale,
-                    shakeX: 0,
-                    shakeY: 0
-                };
+                next = this.landingTransform(target);
                 this.transitionFrom = null;
                 this.transitionElapsed = 0;
-                this.mode =
-                    this.targetBattleId === undefined
-                        ? CameraMode.Strategic
-                        : CameraMode.BattleFocus;
+                this.mode = CameraMode.BattleFocus;
             }
         } else {
-            next = trackTransform(this.current, target, this.config);
+            next = trackTransform(
+                this.current,
+                target,
+                this.trackingConfig(input.battleWeight)
+            );
         }
 
         const cap = Math.max(
@@ -277,6 +288,75 @@ export class Camera implements ICamera {
             shakeY: 0
         };
         return interpolateTransform(start, target, easeInOutCubic(beta));
+    }
+
+    /**
+     * 过渡（退出）：中心与缩放**同时**从快照缓动到全景构图（单段，`easeInOutCubic`）。
+     * 第 1 次更新（`elapsed = 0`）即已推进 `1 / panFrames`，因此缩放从第一帧就开始收缩，
+     * 不存在“先以战斗缩放平移、再缩小”的旧形态；第 `panFrames` 次更新恰好落地。
+     * @param from 过渡起点快照（战斗构图）。
+     * @param target 本帧目标构图（全景）。
+     * @param elapsed 本段已推进的帧数（0 = 段首）。
+     * @param panFrames 本段总帧数（>= 1）。
+     * @returns 本帧变换；震动分量为 0。
+     */
+    private exitTransform(
+        from: ICameraTransform,
+        target: ICameraTransform,
+        elapsed: number,
+        panFrames: number
+    ): ICameraTransform {
+        const alpha =
+            panFrames <= 1 ? 1 : Math.min(1, (elapsed + 1) / panFrames);
+        return interpolateTransform(from, target, easeInOutCubic(alpha));
+    }
+
+    /**
+     * 落地吸附：过渡最后一帧直接返回目标构图，使“最后一次更新等于目标”是位稳定的性质。
+     * @param target 本帧目标构图。
+     * @returns 目标构图；震动分量为 0。
+     */
+    private landingTransform(target: ICameraTransform): ICameraTransform {
+        return {
+            centerX: target.centerX,
+            centerY: target.centerY,
+            scale: target.scale,
+            shakeX: 0,
+            shakeY: 0
+        };
+    }
+
+    /**
+     * 稳态跟随的参数：只有战斗内的跟随按权重缩短平滑帧数，全景跟随与过渡不受影响。
+     * 有效平滑帧数 = clamp(round(smoothingFrames × weightScale / (weightScale + W)), 1, smoothingFrames)：
+     * W = 0 时保持配置值，等级和越大追赶越快；非有限的 W 或标度按 0 处理。
+     * @param battleWeight 本帧战斗权重（存活成员等级和）。
+     * @returns 本帧用于 `trackTransform` 的参数。
+     */
+    private trackingConfig(battleWeight: number): ICameraConfig {
+        if (this.targetBattleId === undefined) {
+            return this.config;
+        }
+        const base = Math.max(1, Math.round(this.config.smoothingFrames));
+        const weight =
+            Number.isFinite(battleWeight) && battleWeight > 0
+                ? battleWeight
+                : 0;
+        const weightScale =
+            Number.isFinite(this.config.weightScale) &&
+            this.config.weightScale > 0
+                ? this.config.weightScale
+                : 1;
+        const effective = Math.max(
+            1,
+            Math.min(
+                base,
+                Math.round((base * weightScale) / (weightScale + weight))
+            )
+        );
+        return effective === base
+            ? this.config
+            : { ...this.config, smoothingFrames: effective };
     }
 
     /**
