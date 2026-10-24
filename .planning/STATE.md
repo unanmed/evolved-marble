@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: 渲染系统
 status: executing
-stopped_at: Completed 05-17-PLAN.md
-last_updated: "2026-10-24T16:05:12.412Z"
+stopped_at: Completed 05-18-PLAN.md
+last_updated: "2026-10-24T16:10:26.754Z"
 last_activity: 2026-10-24
 last_activity_desc: Phase 05 plan 15 executed (single-phase pull-back, weight-aware in-battle follow)
-state_head: c572f66e81d308870121c7758a1fc104b34f4c32
+state_head: c19227c24f2d3f0d68e7c36e6b113221f36079ad
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 38
-  completed_plans: 36
+  completed_plans: 37
   percent: 0
 ---
 
@@ -98,6 +98,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P15 | 17min | 3 tasks | 9 files |
 | Phase 05 P16 | 7 | 1 tasks | 2 files |
 | Phase 05 P17 | 12min | 2 tasks | 5 files |
+| Phase 05 P18 | 6min | 1 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -226,6 +227,7 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-17: camera entry is a single push-in over zoomFrames (progress (elapsed+1)/zoomFrames, first frame moves, 6th lands); panFrames now means exit duration only
 - [Phase 05]: 05-17: the battle-entry freeze renders the strategic panorama by leaving camera.getBattleTarget() undefined, then releases pendingBattleId on the frame after the 24-frame hold and resumes ticking on that same frame
 - [Phase 05]: 05-17: turning auto-follow off drops an in-flight entry freeze and its pending target, so the class never writes the camera target while auto-follow is off
+- [Phase 05]: 05-18: combat tempo raised by tuning only - gain 4->8, attack 12->16, approach 6->8, disengage 8->10 m/s; MAX_FORCE_MAGNITUDE and all physics/damage code untouched
 
 ### Pending Todos
 
@@ -250,6 +252,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-24T16:00:14.974Z
-Stopped at: Completed 05-17-PLAN.md
+Last session: 2026-10-24T16:10:26.513Z
+Stopped at: Completed 05-18-PLAN.md
 Resume file: None
