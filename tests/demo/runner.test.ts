@@ -1,6 +1,7 @@
 /**
  * 帧驱动器的假计时器测试（REND-04/REND-05/D-12/D-17）：证明每输出帧恰好一次
- * `renderFrame()`、非冻结帧恰好一次 `world.tick()`、战斗入场冻结 24 个纯渲染帧、
+ * `renderFrame()`、非冻结帧恰好一次 `world.tick()`、战斗入场冻结 24 个纯渲染帧
+ * 且冻结期间镜头无目标（全景层）、冻结结束才设置目标并在同一帧恢复推进、
  * 暂停不留计时器、单步不排定后续帧、延时钳制、自动跟拍/操作者全景/显式选择的
  * 三种镜头策略、异常暂停与会话复位。
  * 全部依赖都是窄接口的本地假件：不引入 Rapier、不引入 Pixi、不推进真实世界。
@@ -19,6 +20,7 @@ import type {
 } from '@/kingdom/types';
 import { Camera } from '@/render/Camera';
 import { DEFAULT_RENDER_CONFIG } from '@/render/constants';
+import { CameraMode } from '@/render/types';
 import type { IViewport } from '@/render/types';
 import { makeBattle } from '../render/fakes';
 
@@ -227,8 +229,8 @@ function createFixture(
 }
 
 /**
- * 走完一次战斗入场冻结：这 24 帧只渲染、不推进世界。
- * 测试在断言“正常 tick 语义”前必须先调用它，否则会落在冻结窗口里。
+ * 走完一次战斗入场的 24 个冻结帧（只渲染、不推进），不含其后的释放帧。
+ * 释放帧（设置目标并恢复 tick）由调用方自己 `stepOnce()`，以便断言那一帧的语义。
  * @param fixture 夹具。
  */
 function drainEntryFreeze(fixture: IRunnerFixture): void {
@@ -321,13 +323,21 @@ describe('demo/runner — automatic battle targeting (D-12/D-15/OQ-6)', () => {
         fixture.active.push(makeBattle([1], CENTER, 5));
 
         fixture.runner.stepOnce();
-        expect(fixture.camera.getBattleTarget()).toBe(5);
+        // 入场首帧只武装冻结：镜头仍无目标，渲染器因此画全景。
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
+        expect(fixture.camera.getMode()).toBe(CameraMode.Strategic);
         drainEntryFreeze(fixture);
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
+
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).toBe(5);
 
         fixture.camera.setBattleTarget(undefined);
         fixture.runner.stepOnce();
-        expect(fixture.camera.getBattleTarget()).toBe(5);
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
         drainEntryFreeze(fixture);
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).toBe(5);
 
         fixture.active.length = 0;
         fixture.runner.stepOnce();
@@ -339,8 +349,10 @@ describe('demo/runner — automatic battle targeting (D-12/D-15/OQ-6)', () => {
         fixture.active.push(makeBattle([1], CENTER, 5));
 
         fixture.runner.stepOnce();
-        expect(fixture.camera.getBattleTarget()).toBe(5);
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
         drainEntryFreeze(fixture);
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).toBe(5);
 
         fixture.runner.setAutoFollow(false);
         fixture.camera.setBattleTarget(undefined);
@@ -353,6 +365,10 @@ describe('demo/runner — automatic battle targeting (D-12/D-15/OQ-6)', () => {
 
         fixture.runner.setAutoFollow(true);
         fixture.runner.stepOnce();
+        // 重新开启自动跟拍会重新走一遍入场冻结，目标要等冻结结束才设置。
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
+        drainEntryFreeze(fixture);
+        fixture.runner.stepOnce();
         expect(fixture.camera.getBattleTarget()).toBe(5);
     });
 
@@ -364,8 +380,10 @@ describe('demo/runner — automatic battle targeting (D-12/D-15/OQ-6)', () => {
         );
 
         fixture.runner.stepOnce();
-        expect(fixture.camera.getBattleTarget()).toBe(5);
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
         drainEntryFreeze(fixture);
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).toBe(5);
 
         fixture.camera.setBattleTarget(7);
         fixture.runner.stepOnce();
@@ -378,7 +396,7 @@ describe('demo/runner — automatic battle targeting (D-12/D-15/OQ-6)', () => {
 });
 
 describe('demo/runner — battle-entry freeze (REND-05)', () => {
-    it('renders 24 frames with zero ticks on battle entry, then resumes ticking', () => {
+    it('renders 24 panoramic frames with zero ticks, then sets the target and ticks', () => {
         expect(BATTLE_ENTRY_FREEZE_FRAMES).toBe(24);
 
         const fixture = createFixture();
@@ -390,7 +408,8 @@ describe('demo/runner — battle-entry freeze (REND-05)', () => {
         fixture.active.push(makeBattle([1], CENTER, 5));
         vi.advanceTimersByTime(DELAY_MS);
         expect(fixture.probe.ticks).toBe(2);
-        expect(fixture.camera.getBattleTarget()).toBe(5);
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
+        expect(fixture.camera.getMode()).toBe(CameraMode.Strategic);
 
         const frozenTicks = fixture.probe.ticks;
         const frozenRenders = fixture.probe.renders;
@@ -403,6 +422,9 @@ describe('demo/runner — battle-entry freeze (REND-05)', () => {
         expect(fixture.runner.getFrameCount()).toBe(
             frozenRenders + BATTLE_ENTRY_FREEZE_FRAMES
         );
+        // 整个冻结窗口都没有目标 → 渲染器一直画全景层，而不是战斗特写。
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
+        expect(fixture.camera.getMode()).toBe(CameraMode.Strategic);
         expect(vi.getTimerCount()).toBe(1);
 
         vi.advanceTimersByTime(DELAY_MS);
@@ -410,6 +432,8 @@ describe('demo/runner — battle-entry freeze (REND-05)', () => {
         expect(fixture.probe.renders).toBe(
             frozenRenders + BATTLE_ENTRY_FREEZE_FRAMES + 1
         );
+        expect(fixture.camera.getBattleTarget()).toBe(5);
+        expect(fixture.camera.getMode()).toBe(CameraMode.BattleFocus);
 
         fixture.runner.dispose();
         expect(vi.getTimerCount()).toBe(0);
@@ -426,6 +450,7 @@ describe('demo/runner — battle-entry freeze (REND-05)', () => {
         fixture.runner.stepOnce();
         expect(fixture.probe.ticks).toBe(ticks);
         expect(fixture.probe.renders).toBe(renders + 1);
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
         expect(vi.getTimerCount()).toBe(0);
     });
 
@@ -440,8 +465,12 @@ describe('demo/runner — battle-entry freeze (REND-05)', () => {
         expect(fixture.probe.ticks).toBe(ticks);
 
         fixture.runner.reset();
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
+
+        // 冻结已被丢弃：下一帧是普通帧（推进世界），并按常规重新武装一次入场冻结。
         fixture.runner.stepOnce();
         expect(fixture.probe.ticks).toBe(ticks + 1);
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
     });
 
     it('never freezes while auto-follow is off', () => {
@@ -463,6 +492,8 @@ describe('demo/runner — battle-entry freeze (REND-05)', () => {
 
         fixture.runner.stepOnce();
         drainEntryFreeze(fixture);
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).toBe(5);
         const ticks = fixture.probe.ticks;
 
         fixture.active.splice(0, 1, makeBattle([2], CENTER, 7));
@@ -486,6 +517,8 @@ describe('demo/runner — battle-entry freeze (REND-05)', () => {
 
         fixture.runner.stepOnce();
         drainEntryFreeze(fixture);
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).toBe(5);
 
         fixture.active.length = 0;
         fixture.runner.stepOnce();
@@ -493,13 +526,18 @@ describe('demo/runner — battle-entry freeze (REND-05)', () => {
 
         fixture.active.push(makeBattle([2], CENTER, 7));
         fixture.runner.stepOnce();
-        expect(fixture.camera.getBattleTarget()).toBe(7);
+        // 重新入场：先冻结，目标仍未设置。
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
 
         const ticks = fixture.probe.ticks;
         const renders = fixture.probe.renders;
         fixture.runner.stepOnce();
         expect(fixture.probe.ticks).toBe(ticks);
         expect(fixture.probe.renders).toBe(renders + 1);
+
+        drainEntryFreeze(fixture);
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).toBe(7);
     });
 });
 

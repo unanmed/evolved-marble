@@ -2,7 +2,9 @@
  * 演示帧驱动：`class ManualRunner implements IManualRunner`（D-12/D-17/D-18）。
  * 本类是 Phase 5 唯一的循环：每个输出帧恰好一次 `renderer.renderFrame()`；非冻结帧在此之外
  * 还做恰好一次 `world.tick()`，然后用**单个** `setTimeout` 让出事件循环并排定下一帧。
- * 战斗入场时先冻结固定帧数（只渲染、不推进），让镜头把平移走完再恢复模拟。
+ * 战斗入场时先冻结固定帧数（只渲染、不推进）：此时镜头**没有**目标，渲染器因此停在
+ * 全景层（整张地图 + 军队/城池标志），让观众看清战斗发生在哪；冻结结束后才设置目标，
+ * 由 `Camera` 用 6 帧推近战斗，并在同一帧恢复模拟。
  * 它从不推进控制或物理（`KingdomWorld` 已在每个子步内推进控制，Pitfall 8），
  * 也不使用 rAF、重复计时器或固定 fps 累加器；延时就是操作面板的“速度”。
  */
@@ -12,7 +14,8 @@ import type { IBattle } from '@/kingdom/types';
 import { MAX_FRAME_DELAY_MS, MIN_FRAME_DELAY_MS } from '@/render/constants';
 
 /**
- * 战斗入场冻结的输出帧数：30 fps 下 0.8 s，与 `Camera` 的 24 帧进入平移段对齐。
+ * 战斗入场冻结的输出帧数：30 fps 下 0.8 s。冻结期间镜头无目标、画面是全景，
+ * 结束后才设置目标并开始 `Camera` 的 6 帧推近。
  * 按输出帧计数而非墙钟，因此冻结时长与每帧延时、单步或快进都无关。
  */
 export const BATTLE_ENTRY_FREEZE_FRAMES = 24;
@@ -50,6 +53,8 @@ export class ManualRunner implements IManualRunner {
     private autoFollow: boolean;
     /** 战斗入场冻结剩余的输出帧数；0 表示正常推进（按帧计数，绝不读墙钟）。 */
     private freezeFramesRemaining: number;
+    /** 冻结期间待应用的战斗 id；冻结结束时才写入镜头（缺失字面量 → `undefined`）。 */
+    private pendingBattleId: number | undefined;
 
     /**
      * 构造帧驱动器。
@@ -65,6 +70,7 @@ export class ManualRunner implements IManualRunner {
         this.frameCount = 0;
         this.autoFollow = true;
         this.freezeFramesRemaining = 0;
+        this.pendingBattleId = undefined;
         this.setFrameDelay(frameDelayMs);
     }
 
@@ -101,13 +107,14 @@ export class ManualRunner implements IManualRunner {
     }
 
     /**
-     * 复位会话：暂停 → 注入的会话重置 → 帧计数与冻结计数清零 → 恢复默认自动跟拍。
+     * 复位会话：暂停 → 注入的会话重置 → 帧计数、冻结计数与待应用目标清零 → 恢复默认自动跟拍。
      */
     reset(): void {
         this.pause();
         this.deps.resetSession();
         this.frameCount = 0;
         this.freezeFramesRemaining = 0;
+        this.pendingBattleId = undefined;
         this.autoFollow = true;
     }
 
@@ -161,7 +168,7 @@ export class ManualRunner implements IManualRunner {
     }
 
     /**
-     * 幂等释放：暂停、丢弃待完成的冻结并阻止后续调度。
+     * 幂等释放：暂停、丢弃待完成的冻结与待应用目标并阻止后续调度。
      */
     dispose(): void {
         if (this.disposed) {
@@ -169,6 +176,7 @@ export class ManualRunner implements IManualRunner {
         }
         this.pause();
         this.freezeFramesRemaining = 0;
+        this.pendingBattleId = undefined;
         this.disposed = true;
     }
 
@@ -186,9 +194,10 @@ export class ManualRunner implements IManualRunner {
     }
 
     /**
-     * 执行一个输出帧：冻结帧只渲染，普通帧先推进世界并更新目标再渲染，最后帧计数加一。
-     * 冻结期间**不**调用 `world.tick()`、**不**重解目标，因此冻结画面停在入场那一刻，
-     * 由 `renderer.renderFrame()` 里的镜头过渡把平移走完。
+     * 执行一个输出帧：冻结帧只渲染，普通帧先释放待应用目标、推进世界并更新目标再渲染，
+     * 最后帧计数加一。冻结期间**不**调用 `world.tick()`、**不**重解目标，且镜头目标保持
+     * `undefined`，因此渲染器停在全景层——观众在入场那一刻看到的是整张地图与军队/城池标志。
+     * 冻结计数归零后的下一帧先 `setBattleTarget`，再在同一帧恢复 `world.tick()`。
      * tick 或渲染抛出的异常会暂停循环并经 `onError` 上报一次，绝不排定后续帧。
      * @param scheduleNext 是否在成功后继续排定下一帧（单步为 `false`）。
      */
@@ -202,6 +211,7 @@ export class ManualRunner implements IManualRunner {
                 this.freezeFramesRemaining -= 1;
             } else {
                 const world = this.deps.getWorld();
+                this.releasePendingTarget(world);
                 world.tick();
                 this.updateTarget(world);
             }
@@ -218,10 +228,32 @@ export class ManualRunner implements IManualRunner {
     }
 
     /**
+     * 冻结结束后的目标落地：只有该战斗仍活跃才写入镜头，否则丢弃待应用目标、
+     * 让画面留在全景（下一帧 `updateTarget` 会按常规重新选目标）。
+     * 没有待应用目标时为空操作，因此普通帧可以直接调用。
+     * @param world 当前世界。
+     */
+    private releasePendingTarget(world: IRunnerWorld): void {
+        const pending = this.pendingBattleId;
+        if (pending === undefined) {
+            return;
+        }
+        this.pendingBattleId = undefined;
+        const stillActive = world
+            .getBattleSystem()
+            .listActiveBattles()
+            .some(battle => battle.getId() === pending);
+        if (stillActive) {
+            this.deps.camera.setBattleTarget(pending);
+        }
+    }
+
+    /**
      * 自动跟拍策略（D-12/D-15/OQ-6）：自动跟拍关闭时直接返回，镜头目标保持不变；
      * 否则保留仍然活跃的当前目标，没有则选第一场活跃战斗，再没有则请求全景。
-     * 只有 `undefined → 数字` 的入场切换会启动冻结：战斗间切换、退出全景、
-     * 关闭自动跟拍都不冻结，既有语义保持不变。
+     * 只有 `undefined → 数字` 的入场切换会启动冻结，且**不**立即写镜头目标——
+     * 待冻结结束才由 `releasePendingTarget` 应用，从而先播完全景节拍再推近；
+     * 战斗间切换、退出全景、关闭自动跟拍都不冻结，既有语义保持不变。
      * @param world 当前世界。
      */
     private updateTarget(world: IRunnerWorld): void {
@@ -239,9 +271,11 @@ export class ManualRunner implements IManualRunner {
             return;
         }
         const next = active.length > 0 ? active[0].getId() : undefined;
-        this.deps.camera.setBattleTarget(next);
         if (current === undefined && next !== undefined) {
+            this.pendingBattleId = next;
             this.freezeFramesRemaining = BATTLE_ENTRY_FREEZE_FRAMES;
+            return;
         }
+        this.deps.camera.setBattleTarget(next);
     }
 }
