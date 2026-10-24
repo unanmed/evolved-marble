@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: 渲染系统
 status: executing
-stopped_at: Completed 05-12-PLAN.md
-last_updated: "2026-10-24T11:31:09.939Z"
+stopped_at: Completed 05-13-PLAN.md
+last_updated: "2026-10-24T11:40:27.017Z"
 last_activity: 2026-10-24
 last_activity_desc: Phase 05 plan 11 executed
-state_head: dbc7a3c1ae2a75a03afa342e1d64977b6dede79e
+state_head: 261f3faa2f08e1cce38fd667ba6ca65d396be43b
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 33
-  completed_plans: 31
+  completed_plans: 32
   percent: 0
 ---
 
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-10-21)
 ## Current Position
 
 Phase: 05 (渲染系统) — EXECUTING
-Plan: 12 of 13
+Plan: 13 of 13
 Status: Ready to execute
 Last activity: 2026-10-24 — 05-11 (melee stall/disengage gap closure) completed
 
@@ -93,6 +93,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P09 | 20min | 2 tasks | 6 files |
 | Phase 05 P11 | 14min | 2 tasks | 4 files |
 | Phase 05 P12 | 12min | 2 tasks | 7 files |
+| Phase 05 P13 | 6min | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -208,6 +209,8 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-12: the transition lands at update panFrames + zoomFrames - 1 (29 for 24+6); the plan''s '30 frames total' wording is one update more and was recorded as a wording gap rather than implemented
 - [Phase 05]: 05-12: hit shake is disabled by shakeAmplitudePx: 0 with the accumulation/decay path intact, so it is reversible with one constant and Renderer/hudModel stay untouched
 - [Phase 05]: 05-12: battle framing minSpanMeters 24 -> 12; coverage stays 0.9 and hud.screenScaleAt (20) stays above hud.worldScaleAt (10)
+- [Phase 05]: 05-13: the panel scale readout multiplies the camera scale by the canvas CSS/backing width ratio, so a letterboxed 1920x1080 canvas reports true on-screen px per metre (and degraded states print 'scale --', never NaN)
+- [Phase 05]: 05-13: the readout refreshes on a single bounded 250 ms interval cleared in dispose(); ICamera has no change event and the panel may not grow public surface, so polling keeps it a pure adapter
 
 ### Pending Todos
 
@@ -232,6 +235,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-24T11:31:09.734Z
-Stopped at: Completed 05-12-PLAN.md
+Last session: 2026-10-24T11:40:26.817Z
+Stopped at: Completed 05-13-PLAN.md
 Resume file: None
