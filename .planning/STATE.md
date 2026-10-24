@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: 渲染系统
 status: executing
-stopped_at: Completed 05-09-PLAN.md
-last_updated: "2026-10-24T06:33:42.311Z"
+stopped_at: Completed 05-11-PLAN.md
+last_updated: "2026-10-24T11:13:48.120Z"
 last_activity: 2026-10-24
-last_activity_desc: Phase 05 plan 09 executed
-state_head: 338376f3749f8ae20f86f60672542693fb14a643
+last_activity_desc: Phase 05 plan 11 executed
+state_head: e42fe35cecd4d7863a20335f7d5cd9cfa35089c1
 progress:
   total_phases: 8
   completed_phases: 0
-  total_plans: 30
-  completed_plans: 29
+  total_plans: 33
+  completed_plans: 30
   percent: 0
 ---
 
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-10-21)
 ## Current Position
 
 Phase: 05 (渲染系统) — EXECUTING
-Plan: 9 of 10
+Plan: 11 of 13
 Status: Ready to execute
-Last activity: 2026-10-24 — 05-09 (operator panel + demo bootstrap) completed
+Last activity: 2026-10-24 — 05-11 (melee stall/disengage gap closure) completed
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -91,6 +91,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P07 | 16min | 2 tasks | 3 files |
 | Phase 5 P8 | 11min | 2 tasks | 6 files |
 | Phase 05 P09 | 20min | 2 tasks | 6 files |
+| Phase 05 P11 | 14min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -199,6 +200,7 @@ Recent decisions affecting current work:
 - [Phase 05]: Operator panel drives only declared seams; 全景 disables auto-follow before clearing the target so an operator panorama survives a live battle (D-12/REND-04)
 - [Phase 05]: MoveTo picking zeroes shakeX/shakeY before screenToWorld and rejects non-finite or out-of-bounds points before issueOrder (D-24/T-05-43)
 - [Phase 05]: Demo page: async main() with no top-level await, canvas appended directly to #stage-host, letters by CSS only; reset keeps IManualRunner pause semantics
+- [Phase 05]: 05-11: melee stall is detected from the per-decision shrink rate of the tracked target distance (no target velocity in IUnitBrief), then the unit disengages 30 ticks with a unitId-parity lateral peel and re-charges
 
 ### Pending Todos
 
@@ -223,6 +225,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-24T06:33:28.286Z
-Stopped at: Completed 05-09-PLAN.md
+Last session: 2026-10-24T11:13:30.703Z
+Stopped at: Completed 05-11-PLAN.md
 Resume file: None
