@@ -2,17 +2,17 @@
 gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: 渲染系统
-status: executing
-stopped_at: Completed 05-21-PLAN.md (post-battle aftermath hold)
-last_updated: "2026-10-25T06:11:56.996Z"
-last_activity: 2026-10-24
-last_activity_desc: Phase 05 plan 15 executed (single-phase pull-back, weight-aware in-battle follow)
-state_head: 8208246fe2957a8b9b237b3e3e9281a5396319d2
+status: verifying
+stopped_at: Completed 05-10-PLAN.md (Chrome UAT record + D-01 doc sync)
+last_updated: "2026-10-25T06:40:14.250Z"
+last_activity: 2026-10-25
+last_activity_desc: Phase 05 plan 10 executed (Chrome UAT record 05-UAT.md + D-01 requirement/roadmap sync)
+state_head: 13688820e476325f1b5992e2f8f90e6aa1ad9584
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 41
-  completed_plans: 40
+  completed_plans: 41
   percent: 0
 ---
 
@@ -27,10 +27,10 @@ See: .planning/PROJECT.md (updated 2026-10-21)
 
 ## Current Position
 
-Phase: 05 (渲染系统) — EXECUTING
-Plan: 16 of 16
-Status: Ready to execute
-Last activity: 2026-10-24 — 05-15 (direct pull-back, weight-aware in-battle follow) completed
+Phase: 05 (渲染系统) — VERIFYING
+Plan: 21 of 21
+Status: Phase complete — ready for verification
+Last activity: 2026-10-25 — 05-10 (Chrome UAT record + D-01 doc sync) completed
 
 Progress: [░░░░░░░░░░] 0%
 
@@ -102,6 +102,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05-render-system P19 | 5min | 1 tasks | 3 files |
 | Phase 05 P20 | 4min | 2 tasks | 5 files |
 | Phase 05 P21 | 22min | 3 tasks | 9 files |
+| Phase 05 P10 | 25min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -237,6 +238,9 @@ Recent decisions affecting current work:
 - [Phase 05]: Post-battle aftermath is a counted tick/frame budget (90 hold + 24 pull-back), never a wall clock: the world keeps 1x for 114 ticks, the runner holds the camera target 90 frames, the renderer caches the last focus
 - [Phase 05]: The world's hold budget refreshes on any tick with an active battle (so a new battle resets it) and is not spent by the tick in which the battle ends
 - [Phase 05]: A retained camera target id outlives its battle: the renderer caches points/weight keyed by that id and drops the cache on change or clear
+- [Phase 05]: 05-10: REND-05 acceptance is D-01 wording only (Chrome 下能运行、不崩溃、能逐帧推进并输出 canvas；不设 fps 目标); no fps number is measured, promised or asserted anywhere
+- [Phase 05]: 05-10: the UAT record labels each row operator vs operator+test, so an unmeasurable numeric rule cites the test that pins it instead of inventing an observation (T-05-48)
+- [Phase 05]: 05-10: UAT environment recorded honestly as Microsoft Edge 155 (Chromium) on Windows 11 with Chrome named as the target; remaining animation polish deferred to the CONTEXT Deferred Ideas
 
 ### Pending Todos
 
@@ -261,6 +265,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-25T06:11:56.809Z
-Stopped at: Completed 05-21-PLAN.md (post-battle aftermath hold)
+Last session: 2026-10-25T06:40:14.044Z
+Stopped at: Completed 05-10-PLAN.md (Chrome UAT record + D-01 doc sync)
 Resume file: None
