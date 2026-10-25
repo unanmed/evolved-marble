@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: 渲染系统
 status: executing
-stopped_at: Completed 05-19-PLAN.md
-last_updated: "2026-10-25T05:35:16.226Z"
+stopped_at: Completed 05-20-PLAN.md
+last_updated: "2026-10-25T05:45:48.483Z"
 last_activity: 2026-10-24
 last_activity_desc: Phase 05 plan 15 executed (single-phase pull-back, weight-aware in-battle follow)
-state_head: 915a72b36c3fe6f953d1cf18a0ff4eeda5c50191
+state_head: 14c4e83e4cae7985d14e97f2fe3ce5b52d2d1b1b
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 41
-  completed_plans: 38
+  completed_plans: 39
   percent: 0
 ---
 
@@ -100,6 +100,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P17 | 12min | 2 tasks | 5 files |
 | Phase 05 P18 | 6min | 1 tasks | 1 files |
 | Phase 05-render-system P19 | 5min | 1 tasks | 3 files |
+| Phase 05 P20 | 4min | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -231,6 +232,7 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-18: combat tempo raised by tuning only - gain 4->8, attack 12->16, approach 6->8, disengage 8->10 m/s; MAX_FORCE_MAGNITUDE and all physics/damage code untouched
 - [Phase 05]: advanceArmyCenter reflects the per-axis travel direction (dir) rather than the old heading, then returns atan2(travelY, travelX): out-of-bounds-target bounces stay bit-identical while normal marches no longer report a stale heading
 - [Phase 05]: Renderer marker math needed no fix: the +x-apex arrow rotated by heading is already the atan2(dy,dx) convention in a y-down canvas, so the arrow bug was purely a stale source value
+- [Phase 05]: Empty-army ghost fix filters observability (strategic frame, getVisibleArmies, visionCircles, panel list) instead of deleting the army, preserving D-05 identity retention and garrison training
 
 ### Pending Todos
 
@@ -255,6 +257,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-25T05:35:16.042Z
-Stopped at: Completed 05-19-PLAN.md
+Last session: 2026-10-25T05:45:40.020Z
+Stopped at: Completed 05-20-PLAN.md
 Resume file: None
