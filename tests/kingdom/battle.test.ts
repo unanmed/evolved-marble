@@ -14,8 +14,12 @@ import {
     BATTLE_AREA_HYSTERESIS,
     BATTLE_END_DEBOUNCE_TICKS,
     BATTLE_JOIN_GRACE_TICKS,
+    BATTLE_TICK_MINUTES,
     BATTLE_TRIGGER_DISTANCE,
-    BRAKE_MIN_MINUTES
+    BRAKE_MIN_MINUTES,
+    PEACE_TICK_MINUTES,
+    POST_BATTLE_HOLD_TICKS,
+    POST_BATTLE_PULLBACK_TICKS
 } from '@/kingdom/constants';
 import { Army } from '@/kingdom/Army';
 import {
@@ -809,7 +813,7 @@ describe('battle — real Rapier trigger, membership, damage and end', () => {
         expect(startedCount).toBe(1);
     });
 
-    it('finishes a battle when one faction remains and keeps ticking at peace rate', () => {
+    it('finishes a battle when one faction remains and then holds 1× before the peace rate', () => {
         const created = createKingdom({
             scenario: battleScenario(),
             seed: 22
@@ -877,11 +881,20 @@ describe('battle — real Rapier trigger, membership, damage and end', () => {
         expect(world.getBattleSystem().listActiveBattles()).toHaveLength(0);
         expect(world.getBattleSystem().listCompletedBattles()).toHaveLength(1);
 
-        // After the end the pair stays locked in place, so the world returns to 24×.
-        for (let tick = 0; tick < 3; tick += 1) {
+        // After the end the pair stays locked in place: the world holds 1× for the
+        // aftermath (90 + 24 ticks) and only then returns to 24×.
+        for (
+            let tick = 0;
+            tick < POST_BATTLE_HOLD_TICKS + POST_BATTLE_PULLBACK_TICKS;
+            tick += 1
+        ) {
             const result = world.tick();
-            expect(result.minutesPerTick).toBe(24);
+            expect(result.gameMinutes).toBe(BATTLE_TICK_MINUTES);
+            expect(result.minutesPerTick).toBe(BATTLE_TICK_MINUTES);
         }
+        const peace = world.tick();
+        expect(peace.minutesPerTick).toBe(PEACE_TICK_MINUTES);
+        expect(peace.gameMinutes).toBe(PEACE_TICK_MINUTES);
         expect(physics.getUnitState(1)).not.toBeNull();
     });
 });

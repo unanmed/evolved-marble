@@ -1,5 +1,10 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { PEACE_TICK_MINUTES } from '@/kingdom/constants';
+import {
+    BATTLE_TICK_MINUTES,
+    PEACE_TICK_MINUTES,
+    POST_BATTLE_HOLD_TICKS,
+    POST_BATTLE_PULLBACK_TICKS
+} from '@/kingdom/constants';
 import { ArmyOrderKind, BattleLifecycleKind } from '@/kingdom/types';
 import type { IScenario } from '@/kingdom/types';
 import { AttributeKind, ClassKind } from '@/units/types';
@@ -168,12 +173,23 @@ describe('tracer — scenario → march → battle → damage → end → contin
         expect(world.getBattleSystem().listCompletedBattles()).toHaveLength(1);
         expect(world.getBattleSystem().listActiveBattles()).toHaveLength(0);
 
+        // The aftermath stays at 1× for 90 + 24 ticks (result reading time plus the
+        // camera pull-back), and only then does peace speed (24×) come back.
         const minutesAtEnd = world.getTime().getGameMinutes();
-        for (let tick = 0; tick < 10; tick += 1) {
+        for (
+            let tick = 0;
+            tick < POST_BATTLE_HOLD_TICKS + POST_BATTLE_PULLBACK_TICKS;
+            tick += 1
+        ) {
             const result = world.tick();
-            expect(result.minutesPerTick).toBe(PEACE_TICK_MINUTES);
-            expect(result.gameMinutes).toBe(PEACE_TICK_MINUTES);
+            expect(result.minutesPerTick).toBe(BATTLE_TICK_MINUTES);
+            expect(result.gameMinutes).toBe(BATTLE_TICK_MINUTES);
         }
-        expect(world.getTime().getGameMinutes()).toBeGreaterThan(minutesAtEnd);
+        const peace = world.tick();
+        expect(peace.minutesPerTick).toBe(PEACE_TICK_MINUTES);
+        expect(peace.gameMinutes).toBe(PEACE_TICK_MINUTES);
+        expect(world.getTime().getGameMinutes()).toBeGreaterThan(
+            minutesAtEnd + POST_BATTLE_HOLD_TICKS
+        );
     }, 30000);
 });

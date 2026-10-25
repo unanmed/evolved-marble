@@ -30,6 +30,20 @@ export const BATTLE_TICK_MINUTES = 1;
 export const PEACE_TICK_MINUTES = 24;
 
 /**
+ * 战后余韵的 1× 外层 tick 数（D-07）：最后一场战斗结束后仍按
+ * `BATTLE_TICK_MINUTES` 推进这么多 tick，让观众看清战果（30 fps 下约 3 s）。
+ * 只按 tick 计数，绝不读墙钟；可校准。
+ */
+export const POST_BATTLE_HOLD_TICKS = 90;
+
+/**
+ * 战后镜头拉远占用的 1× 外层 tick 数（D-07/D-15）：紧跟 `POST_BATTLE_HOLD_TICKS`
+ * 之后、仍不进入 `PEACE_TICK_MINUTES` 的那一段，与 `Camera` 的退出拉远
+ * （`panFrames = 24`，0.8 s）同步。可校准；改动须与渲染配置保持一致。
+ */
+export const POST_BATTLE_PULLBACK_TICKS = 24;
+
+/**
  * 一小时的分钟数：把「每小时」规格值换算成按游戏分钟累计的量。
  * 规格固定值，不可校准。
  */

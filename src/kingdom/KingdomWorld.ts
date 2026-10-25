@@ -32,6 +32,8 @@ import {
     MAX_SCENARIO_UNITS,
     MINUTES_PER_HOUR,
     PEACE_TICK_MINUTES,
+    POST_BATTLE_HOLD_TICKS,
+    POST_BATTLE_PULLBACK_TICKS,
     SPAWN_RING_RADIUS,
     TRAINING_HOURS_CAPITAL,
     TRAINING_HOURS_NORMAL
@@ -149,6 +151,12 @@ export class KingdomWorld implements IWorld {
     private nextArmyId = 1;
     /** 是否已释放（`dispose` 幂等）。 */
     private disposed = false;
+    /**
+     * 战后余韵的 1× tick 预算：有任一活跃战斗时刷新为
+     * `POST_BATTLE_HOLD_TICKS + POST_BATTLE_PULLBACK_TICKS`，战斗全部结束后每 tick 递减，
+     * 归零才回到 `PEACE_TICK_MINUTES`。只按 tick 计数，绝不读墙钟。
+     */
+    private postBattleHoldTicks = 0;
 
     /**
      * 构造王国世界：**先完整校验场景表**（非法表绝不触及物理世界或控制系统），
@@ -259,15 +267,19 @@ export class KingdomWorld implements IWorld {
      * 推进一个外层 tick：和平 24 个子步、战斗 1 个子步；若和平 tick 中途开战则提前结束。
      * 子步循环**之后**重新决策速率，因此「本 tick 开战」返回 `minutesPerTick: 1`
      * （KING-02/D-09）。`DT` 从不修改。
+     *
+     * 战斗全部结束后仍有 `POST_BATTLE_HOLD_TICKS + POST_BATTLE_PULLBACK_TICKS` 个
+     * 1× tick 的余韵：观众先看清战果，再随镜头拉远，之后才回到 24× 和平速率。
+     * 期间出现新战斗即把预算刷新为满值。
      * @returns 本 tick 实际推进的游戏分钟与结束时的每 tick 分钟数。
      */
     tick(): IWorldTickResult {
         this.expireFulfilledOrders();
         this.runCommanders();
 
-        const rate = this.battles.hasActiveBattle()
-            ? BATTLE_TICK_MINUTES
-            : PEACE_TICK_MINUTES;
+        const battleAtStart = this.battles.hasActiveBattle();
+        this.refreshPostBattleHold();
+        const rate = this.resolveTickRate();
         this.time.setMinutesPerTick(rate);
 
         let advanced = 0;
@@ -279,16 +291,46 @@ export class KingdomWorld implements IWorld {
             }
         }
 
-        const finalRate = this.battles.hasActiveBattle()
-            ? BATTLE_TICK_MINUTES
-            : PEACE_TICK_MINUTES;
+        // 子步内可能开战或结束：收尾按最新战斗状态再定一次速率与预算。
+        this.refreshPostBattleHold();
+        const finalRate = this.resolveTickRate();
         this.time.setMinutesPerTick(finalRate);
         this.time.advanceTick();
+
+        // 战斗刚结束的那一 tick 仍是「战斗 tick」，不消耗余韵预算。
+        if (
+            !battleAtStart &&
+            !this.battles.hasActiveBattle() &&
+            this.postBattleHoldTicks > 0
+        ) {
+            this.postBattleHoldTicks -= 1;
+        }
 
         return {
             gameMinutes: advanced,
             minutesPerTick: this.time.getMinutesPerTick()
         };
+    }
+
+    /**
+     * 有任一活跃战斗时把战后余韵预算刷新为满值（新战斗因此重置余韵）；
+     * 无战斗时保留剩余预算，由 `tick` 逐 tick 递减。
+     */
+    private refreshPostBattleHold(): void {
+        if (this.battles.hasActiveBattle()) {
+            this.postBattleHoldTicks =
+                POST_BATTLE_HOLD_TICKS + POST_BATTLE_PULLBACK_TICKS;
+        }
+    }
+
+    /**
+     * 本 tick 的推进速率：战斗进行中或战后余韵预算尚未耗尽 → 1×；否则 24×。
+     * @returns 每个外层 tick 的游戏分钟数。
+     */
+    private resolveTickRate(): number {
+        return this.battles.hasActiveBattle() || this.postBattleHoldTicks > 0
+            ? BATTLE_TICK_MINUTES
+            : PEACE_TICK_MINUTES;
     }
 
     /**

@@ -1,13 +1,20 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { advanceArmyCenter, computeFormationSlots } from '@/kingdom/Army';
 import {
     ARMY_FORMATION_RADIUS,
     BATTLE_TICK_MINUTES,
     MAP_HEIGHT,
     MAP_WIDTH,
-    PEACE_TICK_MINUTES
+    PEACE_TICK_MINUTES,
+    POST_BATTLE_HOLD_TICKS,
+    POST_BATTLE_PULLBACK_TICKS
 } from '@/kingdom/constants';
 import { TimeSystem } from '@/kingdom/TimeSystem';
+import { ArmyOrderKind } from '@/kingdom/types';
+import type { IScenario } from '@/kingdom/types';
+import { AttributeKind, ClassKind } from '@/units/types';
+import { createKingdom, disposeKingdom, initRapier } from './harness';
+import type { IKingdomFixture } from './harness';
 
 /**
  * 把弧度归一到 (-π, π]，便于比较朝向。
@@ -371,3 +378,247 @@ describe('computeFormationSlots — deterministic disc', () => {
         expect(computeFormationSlots(0, 0, 0, [], 25).size).toBe(0);
     });
 });
+
+/**
+ * 战后余韵场景：两势力各 1 军 1 单位、中心相距 5 m，因此首 tick 即触发战斗；
+ * 之后地图上没有任何其他敌对军队，战斗结束便进入余韵并最终回到 24×。
+ * @returns 场景表。
+ */
+function aftermathScenario(): IScenario {
+    return {
+        width: 1000,
+        height: 1000,
+        factions: [
+            { id: 1, name: '赤' },
+            { id: 2, name: '蓝' }
+        ],
+        cities: [],
+        armies: [
+            {
+                id: 1,
+                factionId: 1,
+                x: 500,
+                y: 500,
+                heading: 0,
+                units: [{ classKind: ClassKind.Swordsman, count: 1 }]
+            },
+            {
+                id: 2,
+                factionId: 2,
+                x: 505,
+                y: 500,
+                heading: Math.PI,
+                units: [{ classKind: ClassKind.Swordsman, count: 1 }]
+            }
+        ],
+        terrain: []
+    };
+}
+
+/**
+ * 余韵重置场景：army 1/2 相距 5 m 立刻开战；army 3/4 相距 90 m（触发距离 80 m）
+ * 并相向行军，因此第二场战斗会在第一场结束后的余韵期间才触发。
+ * @returns 场景表。
+ */
+function resetScenario(): IScenario {
+    return {
+        width: 1000,
+        height: 1000,
+        factions: [
+            { id: 1, name: '赤' },
+            { id: 2, name: '蓝' }
+        ],
+        cities: [],
+        armies: [
+            {
+                id: 1,
+                factionId: 1,
+                x: 500,
+                y: 500,
+                heading: 0,
+                units: [{ classKind: ClassKind.Swordsman, count: 1 }]
+            },
+            {
+                id: 2,
+                factionId: 2,
+                x: 505,
+                y: 500,
+                heading: Math.PI,
+                units: [{ classKind: ClassKind.Swordsman, count: 1 }]
+            },
+            {
+                id: 3,
+                factionId: 1,
+                x: 200,
+                y: 500,
+                heading: 0,
+                units: [{ classKind: ClassKind.Swordsman, count: 1 }]
+            },
+            {
+                id: 4,
+                factionId: 2,
+                x: 290,
+                y: 500,
+                heading: Math.PI,
+                units: [{ classKind: ClassKind.Swordsman, count: 1 }]
+            }
+        ],
+        terrain: []
+    };
+}
+
+/**
+ * 让一支军队的名册全部阵亡（伤害接收方会做同样的工作）。
+ * @param fixture 夹具。
+ * @param armyId 军队 id。
+ */
+function killRoster(fixture: IKingdomFixture, armyId: number): void {
+    for (const unitId of fixture.world.getArmy(armyId)?.getUnitIds() ?? []) {
+        const unit = fixture.control.getUnit(unitId);
+        if (unit !== null) {
+            unit.takeDamage(unit.getAttribute(AttributeKind.MaxHealth) * 2);
+        }
+    }
+}
+
+/**
+ * 推进到第一场战斗出现并已有成员入场（跳过零成员宽限期）。
+ * @param world 王国世界。
+ */
+function waitForMembers(world: IKingdomFixture['world']): void {
+    for (
+        let tick = 0;
+        tick < 30 && !world.getBattleSystem().hasActiveBattle();
+        tick += 1
+    ) {
+        world.tick();
+    }
+    for (
+        let tick = 0;
+        tick < 30 &&
+        (world.getBattleSystem().listActiveBattles()[0]?.getMemberUnitIds()
+            .length ?? 0) === 0;
+        tick += 1
+    ) {
+        world.tick();
+    }
+}
+
+/** 当前测试持有的夹具（真实 Rapier）。 */
+let fixture: IKingdomFixture | null = null;
+
+describe('KingdomWorld — post-battle 1× hold before the peace rate', () => {
+    beforeAll(async () => {
+        await initRapier();
+    });
+
+    afterEach(() => {
+        if (fixture !== null) {
+            disposeKingdom(fixture);
+        }
+        fixture = null;
+    });
+
+    it('advances 1× for 114 ticks after the last battle, then 24×', () => {
+        const created = createKingdom({ scenario: aftermathScenario(), seed: 5 });
+        fixture = created;
+        const { world } = created;
+
+        waitForMembers(world);
+        expect(world.getBattleSystem().hasActiveBattle()).toBe(true);
+
+        killRoster(created, 2);
+        let ended = false;
+        for (let tick = 0; tick < 60 && !ended; tick += 1) {
+            world.tick();
+            ended = !world.getBattleSystem().hasActiveBattle();
+        }
+        expect(ended).toBe(true);
+
+        const holdTicks =
+            POST_BATTLE_HOLD_TICKS + POST_BATTLE_PULLBACK_TICKS;
+        expect(holdTicks).toBe(114);
+        const minutesAtEnd = world.getTime().getGameMinutes();
+        for (let tick = 0; tick < holdTicks; tick += 1) {
+            const result = world.tick();
+            expect(result.gameMinutes).toBe(BATTLE_TICK_MINUTES);
+            expect(result.minutesPerTick).toBe(BATTLE_TICK_MINUTES);
+        }
+        expect(world.getTime().getGameMinutes()).toBe(
+            minutesAtEnd + holdTicks
+        );
+
+        const peace = world.tick();
+        expect(peace.gameMinutes).toBe(PEACE_TICK_MINUTES);
+        expect(peace.minutesPerTick).toBe(PEACE_TICK_MINUTES);
+        expect(world.getTime().getMinutesPerTick()).toBe(PEACE_TICK_MINUTES);
+        expect(world.getTime().getSubstepsPerTick()).toBe(PEACE_TICK_MINUTES);
+    });
+
+    it('resets the hold when a new battle appears during the aftermath', () => {
+        const created = createKingdom({ scenario: resetScenario(), seed: 6 });
+        fixture = created;
+        const { world } = created;
+
+        // army 3/4 相向行军；只有 1× 的余韵期才可能慢慢进入 80 m 触发距离。
+        world.issueOrder({
+            armyId: 3,
+            kind: ArmyOrderKind.MoveTo,
+            targetX: 290,
+            targetY: 500
+        });
+        world.issueOrder({
+            armyId: 4,
+            kind: ArmyOrderKind.MoveTo,
+            targetX: 200,
+            targetY: 500
+        });
+
+        waitForMembers(world);
+        expect(world.getBattleSystem().hasActiveBattle()).toBe(true);
+
+        killRoster(created, 2);
+        let firstEnded = false;
+        for (let tick = 0; tick < 60 && !firstEnded; tick += 1) {
+            world.tick();
+            firstEnded = !world.getBattleSystem().hasActiveBattle();
+        }
+        expect(firstEnded).toBe(true);
+
+        // 第一场结束后的余韵期里等第二场开战：确实过了若干 tick 才触发。
+        let restarted = false;
+        let burned = 0;
+        for (let tick = 0; tick < 90 && !restarted; tick += 1) {
+            const result = world.tick();
+            expect(result.minutesPerTick).toBe(BATTLE_TICK_MINUTES);
+            burned += 1;
+            restarted = world.getBattleSystem().hasActiveBattle();
+        }
+        expect(restarted).toBe(true);
+        expect(burned).toBeGreaterThan(1);
+
+        // 第二场结束同样走满 114 个 1× tick——余韵预算被新战斗重置过。
+        killRoster(created, 4);
+        let secondEnded = false;
+        for (let tick = 0; tick < 60 && !secondEnded; tick += 1) {
+            world.tick();
+            secondEnded = !world.getBattleSystem().hasActiveBattle();
+        }
+        expect(secondEnded).toBe(true);
+
+        for (
+            let tick = 0;
+            tick < POST_BATTLE_HOLD_TICKS + POST_BATTLE_PULLBACK_TICKS;
+            tick += 1
+        ) {
+            const result = world.tick();
+            expect(result.gameMinutes).toBe(BATTLE_TICK_MINUTES);
+            expect(result.minutesPerTick).toBe(BATTLE_TICK_MINUTES);
+        }
+
+        const peace = world.tick();
+        expect(peace.minutesPerTick).toBe(PEACE_TICK_MINUTES);
+        expect(peace.gameMinutes).toBe(PEACE_TICK_MINUTES);
+    });
+});
+
