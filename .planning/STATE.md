@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: 渲染系统
 status: executing
-stopped_at: Completed 05-20-PLAN.md
-last_updated: "2026-10-25T05:45:48.483Z"
+stopped_at: Completed 05-21-PLAN.md (post-battle aftermath hold)
+last_updated: "2026-10-25T06:11:56.996Z"
 last_activity: 2026-10-24
 last_activity_desc: Phase 05 plan 15 executed (single-phase pull-back, weight-aware in-battle follow)
-state_head: 14c4e83e4cae7985d14e97f2fe3ce5b52d2d1b1b
+state_head: 8208246fe2957a8b9b237b3e3e9281a5396319d2
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 41
-  completed_plans: 39
+  completed_plans: 40
   percent: 0
 ---
 
@@ -101,6 +101,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P18 | 6min | 1 tasks | 1 files |
 | Phase 05-render-system P19 | 5min | 1 tasks | 3 files |
 | Phase 05 P20 | 4min | 2 tasks | 5 files |
+| Phase 05 P21 | 22min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -233,6 +234,9 @@ Recent decisions affecting current work:
 - [Phase 05]: advanceArmyCenter reflects the per-axis travel direction (dir) rather than the old heading, then returns atan2(travelY, travelX): out-of-bounds-target bounces stay bit-identical while normal marches no longer report a stale heading
 - [Phase 05]: Renderer marker math needed no fix: the +x-apex arrow rotated by heading is already the atan2(dy,dx) convention in a y-down canvas, so the arrow bug was purely a stale source value
 - [Phase 05]: Empty-army ghost fix filters observability (strategic frame, getVisibleArmies, visionCircles, panel list) instead of deleting the army, preserving D-05 identity retention and garrison training
+- [Phase 05]: Post-battle aftermath is a counted tick/frame budget (90 hold + 24 pull-back), never a wall clock: the world keeps 1x for 114 ticks, the runner holds the camera target 90 frames, the renderer caches the last focus
+- [Phase 05]: The world's hold budget refreshes on any tick with an active battle (so a new battle resets it) and is not spent by the tick in which the battle ends
+- [Phase 05]: A retained camera target id outlives its battle: the renderer caches points/weight keyed by that id and drops the cache on change or clear
 
 ### Pending Todos
 
@@ -257,6 +261,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-25T05:45:40.020Z
-Stopped at: Completed 05-20-PLAN.md
+Last session: 2026-10-25T06:11:56.809Z
+Stopped at: Completed 05-21-PLAN.md (post-battle aftermath hold)
 Resume file: None
