@@ -56,7 +56,13 @@ import type {
     RenderServicesProvider
 } from '@/render/types';
 import { CityKind } from '@/kingdom/types';
-import type { IMapBounds, ITerrainRect, IVec2, IWorld } from '@/kingdom/types';
+import type {
+    IBattle,
+    IMapBounds,
+    ITerrainRect,
+    IVec2,
+    IWorld
+} from '@/kingdom/types';
 import { UnitViewFactory } from '@/render/UnitViewFactory';
 import { AttributeKind } from '@/units/types';
 
@@ -245,6 +251,12 @@ export class Renderer implements IRenderer {
     private readonly seenCityIds = new Set<number>();
     /** 输出帧序号：每次 `renderFrame` 递增一次。 */
     private frameIndex = 0;
+    /** 余韵缓存所属的战斗 id（缺失 → `undefined`）：只有目标变化或清空才会换 id。 */
+    private focusCacheId: number | undefined;
+    /** 余韵缓存：最后一次解析到的拟合点，战斗结束后仍复用（见 `collectTargetPoints`）。 */
+    private focusCachePoints: readonly IVec2[] = [];
+    /** 余韵缓存：最后一次解析到的战斗权重（REND-04）。 */
+    private focusCacheWeight = 0;
     /** 是否已释放：保证 `dispose()` 幂等。 */
     private disposed = false;
 
@@ -349,7 +361,7 @@ export class Renderer implements IRenderer {
     }
 
     /**
-     * 清空视图/HUD/对象池/帧计数并把镜头复位到全景构图，
+     * 清空视图/HUD/对象池/帧计数与余韵缓存，并把镜头复位到全景构图，
      * 但**不**销毁 Pixi 应用（D-18）。
      */
     reset(): void {
@@ -364,6 +376,7 @@ export class Renderer implements IRenderer {
         this.hud.reset();
         services.damageFeed.clear();
         this.frameIndex = 0;
+        this.resetFocusCache();
         this.drawMapLayer(
             services.world.getBounds(),
             services.world.getTerrain()
@@ -394,37 +407,42 @@ export class Renderer implements IRenderer {
     }
 
     /**
-     * 解析本帧镜头拟合点：目标战斗的存活成员位置；无目标或目标已消失时为空集。
+     * 解析本帧镜头拟合点：目标战斗的存活成员位置；无目标或目标已消失且没有缓存时为空集。
      * 战斗存在但成员读数全部缺失时退回战斗中心，使拟合盒不会退化为空（D-21）。
+     *
+     * 战后余韵：目标战斗已满足结束条件后，镜头上仍保留同一个目标 id 若干帧；
+     * 此时目标不在活跃列表里，本方法复用上一次为该 id 解析出的拟合点，
+     * 让战斗特写撑满余韵而不是立刻跳回全景。目标变化或清空即丢弃缓存。
      * @param services 本帧只读服务。
      * @returns 拟合点（世界米）；空数组表示全景拟合。
      */
     private collectTargetPoints(services: IRenderServices): readonly IVec2[] {
         const targetId = this.camera.getBattleTarget();
         if (targetId === undefined) {
+            this.resetFocusCache();
             return [];
         }
-        const battle = services.world
-            .getBattleSystem()
-            .listActiveBattles()
-            .find(candidate => candidate.getId() === targetId);
-        if (battle === undefined) {
-            return [];
+        if (this.focusCacheId !== targetId) {
+            this.resetFocusCache();
+        }
+        const battle = this.findTargetBattle(services, targetId);
+        if (battle === null) {
+            return this.focusCacheId === targetId ? this.focusCachePoints : [];
         }
         const points = resolveTargetPoints(battle, unitId =>
             services.physics.getUnitState(unitId)
         );
-        if (points.length > 0) {
-            return points;
-        }
-        const center = battle.getCenter();
-        return [{ x: center.x, y: center.y }];
+        const resolved = points.length > 0 ? points : [battle.getCenter()];
+        this.focusCacheId = targetId;
+        this.focusCachePoints = resolved;
+        return resolved;
     }
 
     /**
      * 解析本帧战斗权重：目标战斗存活成员的等级和；无目标或目标已消失时为 0（REND-04）。
-     * 与 `collectTargetPoints` 使用同一目标解析口径，只把单位目录交给纯函数汇总，
-     * 使“镜头该多快跟上”由真实参战规模决定，而渲染器自身不做等级算术。
+     * 与 `collectTargetPoints` 使用同一目标解析口径与同一份余韵缓存，
+     * 只把单位目录交给纯函数汇总，使“镜头该多快跟上”由真实参战规模决定，
+     * 而渲染器自身不做等级算术。
      * @param services 本帧只读服务。
      * @returns 本帧战斗权重（非负有限；无战斗时为 0）。
      */
@@ -433,16 +451,43 @@ export class Renderer implements IRenderer {
         if (targetId === undefined) {
             return 0;
         }
-        const battle = services.world
-            .getBattleSystem()
-            .listActiveBattles()
-            .find(candidate => candidate.getId() === targetId);
-        if (battle === undefined) {
-            return 0;
+        const battle = this.findTargetBattle(services, targetId);
+        if (battle === null) {
+            return this.focusCacheId === targetId ? this.focusCacheWeight : 0;
         }
-        return resolveBattleWeight(battle, unitId =>
+        const weight = resolveBattleWeight(battle, unitId =>
             services.catalog.getUnit(unitId)
         );
+        this.focusCacheId = targetId;
+        this.focusCacheWeight = weight;
+        return weight;
+    }
+
+    /**
+     * 从活跃列表里解析跟拍目标对应的战斗。
+     * @param services 本帧只读服务。
+     * @param targetId 当前跟拍目标 id。
+     * @returns 活跃战斗；已结束或从未存在时为 `null`。
+     */
+    private findTargetBattle(
+        services: IRenderServices,
+        targetId: number
+    ): IBattle | null {
+        return (
+            services.world
+                .getBattleSystem()
+                .listActiveBattles()
+                .find(candidate => candidate.getId() === targetId) ?? null
+        );
+    }
+
+    /**
+     * 丢弃余韵缓存：目标变化、目标清空与 `reset()` 都走这里。
+     */
+    private resetFocusCache(): void {
+        this.focusCacheId = undefined;
+        this.focusCachePoints = [];
+        this.focusCacheWeight = 0;
     }
 
     /**
