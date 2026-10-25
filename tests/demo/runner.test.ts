@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { BATTLE_ENTRY_FREEZE_FRAMES, ManualRunner } from '@/demo/runner';
 import type { IRunnerDeps, IRunnerRenderer, IRunnerWorld } from '@/demo/types';
+import { POST_BATTLE_HOLD_TICKS } from '@/kingdom/constants';
 import type {
     IBattle,
     IBattleLifecycleEvent,
@@ -219,6 +220,8 @@ function createFixture(
         renderer: new CountingRenderer(probe),
         resetSession: () => {
             session.resets += 1;
+            // 生产组合根在这里重建世界并 `renderer.reset()`：镜头回到全景构图。
+            camera.reset(BOUNDS, VIEWPORT);
         },
         onError: error => {
             errors.push(error);
@@ -236,6 +239,18 @@ function createFixture(
 function drainEntryFreeze(fixture: IRunnerFixture): void {
     for (let frame = 0; frame < BATTLE_ENTRY_FREEZE_FRAMES; frame += 1) {
         fixture.runner.stepOnce();
+    }
+}
+
+/**
+ * 走完战后余韵的 90 个保持帧：每帧仍然推进世界，且目标一直留在镜头上。
+ * 余韵耗尽后的下一帧才清空目标（或切到别的战斗），由调用方自己 `stepOnce()` 断言。
+ * @param fixture 夹具。
+ */
+function drainAftermathHold(fixture: IRunnerFixture): void {
+    for (let frame = 0; frame < POST_BATTLE_HOLD_TICKS; frame += 1) {
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).not.toBeUndefined();
     }
 }
 
@@ -318,7 +333,7 @@ describe('demo/runner — one tick and one render per output frame (D-17)', () =
 });
 
 describe('demo/runner — automatic battle targeting (D-12/D-15/OQ-6)', () => {
-    it('selects the first active battle and clears the target when it ends', () => {
+    it('selects the first active battle and keeps the finished battle through the aftermath', () => {
         const fixture = createFixture();
         fixture.active.push(makeBattle([1], CENTER, 5));
 
@@ -339,7 +354,10 @@ describe('demo/runner — automatic battle targeting (D-12/D-15/OQ-6)', () => {
         fixture.runner.stepOnce();
         expect(fixture.camera.getBattleTarget()).toBe(5);
 
+        // 战斗结束后先保留余韵，再清空目标回到全景。
         fixture.active.length = 0;
+        drainAftermathHold(fixture);
+        expect(fixture.camera.getBattleTarget()).toBe(5);
         fixture.runner.stepOnce();
         expect(fixture.camera.getBattleTarget()).toBeUndefined();
     });
@@ -389,7 +407,10 @@ describe('demo/runner — automatic battle targeting (D-12/D-15/OQ-6)', () => {
         fixture.runner.stepOnce();
         expect(fixture.camera.getBattleTarget()).toBe(7);
 
+        // 被跟拍的战斗结束后先播完余韵，之后才切到另一场仍在打的战斗。
         fixture.active.splice(1, 1);
+        drainAftermathHold(fixture);
+        expect(fixture.camera.getBattleTarget()).toBe(7);
         fixture.runner.stepOnce();
         expect(fixture.camera.getBattleTarget()).toBe(5);
     });
@@ -511,21 +532,26 @@ describe('demo/runner — battle-entry freeze (REND-05)', () => {
         drainEntryFreeze(fixture);
         fixture.runner.stepOnce();
         expect(fixture.camera.getBattleTarget()).toBe(5);
-        const ticks = fixture.probe.ticks;
 
+        // 战斗间切换同样没有入场冻结：只是先播完被跟拍那场的余韵再切过去。
         fixture.active.splice(0, 1, makeBattle([2], CENTER, 7));
+        const ticks = fixture.probe.ticks;
+        drainAftermathHold(fixture);
+        expect(fixture.camera.getBattleTarget()).toBe(5);
         fixture.runner.stepOnce();
         expect(fixture.camera.getBattleTarget()).toBe(7);
-        expect(fixture.probe.ticks).toBe(ticks + 1);
+        // 余韵 90 帧 + 切换帧全部正常推进世界：没有任何冻结帧。
+        expect(fixture.probe.ticks).toBe(ticks + POST_BATTLE_HOLD_TICKS + 1);
 
-        fixture.runner.stepOnce();
-        expect(fixture.probe.ticks).toBe(ticks + 2);
-
+        // 最后一场结束：余韵之后清空目标（开始拉远），仍然不冻结。
         fixture.active.length = 0;
+        const ticksBeforeEnd = fixture.probe.ticks;
+        drainAftermathHold(fixture);
         fixture.runner.stepOnce();
         expect(fixture.camera.getBattleTarget()).toBeUndefined();
-        fixture.runner.stepOnce();
-        expect(fixture.probe.ticks).toBe(ticks + 4);
+        expect(fixture.probe.ticks).toBe(
+            ticksBeforeEnd + POST_BATTLE_HOLD_TICKS + 1
+        );
     });
 
     it('re-arms the freeze when a target reappears after clearing', () => {
@@ -538,6 +564,7 @@ describe('demo/runner — battle-entry freeze (REND-05)', () => {
         expect(fixture.camera.getBattleTarget()).toBe(5);
 
         fixture.active.length = 0;
+        drainAftermathHold(fixture);
         fixture.runner.stepOnce();
         expect(fixture.camera.getBattleTarget()).toBeUndefined();
 
@@ -555,6 +582,79 @@ describe('demo/runner — battle-entry freeze (REND-05)', () => {
         drainEntryFreeze(fixture);
         fixture.runner.stepOnce();
         expect(fixture.camera.getBattleTarget()).toBe(7);
+    });
+});
+
+describe('demo/runner — post-battle aftermath hold (REND-04)', () => {
+    it('keeps the finished battle for exactly 90 frames, then clears the target', () => {
+        const fixture = createFixture();
+        fixture.active.push(makeBattle([1], CENTER, 5));
+        fixture.runner.stepOnce();
+        drainEntryFreeze(fixture);
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).toBe(5);
+
+        fixture.active.length = 0;
+        const ticksBefore = fixture.probe.ticks;
+
+        // 余韵第 1 帧：战斗已结束，但镜头仍留在战场上。
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).toBe(5);
+
+        for (let frame = 1; frame < POST_BATTLE_HOLD_TICKS; frame += 1) {
+            fixture.runner.stepOnce();
+            expect(fixture.camera.getBattleTarget()).toBe(5);
+        }
+        // 90 个保持帧全部推进世界：既没有冻结帧，也不读墙钟。
+        expect(fixture.probe.ticks).toBe(ticksBefore + POST_BATTLE_HOLD_TICKS);
+        expect(fixture.camera.getBattleTarget()).toBe(5);
+
+        // 第 91 帧才松手：目标清空，退出拉远由此开始。
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
+        expect(fixture.probe.ticks).toBe(
+            ticksBefore + POST_BATTLE_HOLD_TICKS + 1
+        );
+        // 拉远还没有落地：模式仍是战斗特写，单位不会在镜头缩小时消失。
+        expect(fixture.camera.getMode()).toBe(CameraMode.BattleFocus);
+    });
+
+    it('drops a pending hold on reset', () => {
+        const fixture = createFixture();
+        fixture.active.push(makeBattle([1], CENTER, 5));
+        fixture.runner.stepOnce();
+        drainEntryFreeze(fixture);
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).toBe(5);
+
+        fixture.active.length = 0;
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).toBe(5);
+
+        fixture.runner.reset();
+        expect(fixture.session.resets).toBe(1);
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
+        expect(fixture.camera.getMode()).toBe(CameraMode.Strategic);
+
+        // 复位后的第一帧是普通帧，旧目标不会被余韵重新捡起。
+        const ticks = fixture.probe.ticks;
+        fixture.runner.stepOnce();
+        expect(fixture.probe.ticks).toBe(ticks + 1);
+        expect(fixture.camera.getBattleTarget()).toBeUndefined();
+    });
+
+    it('does not hold anything while the battle is still active', () => {
+        const fixture = createFixture();
+        fixture.active.push(makeBattle([1], CENTER, 5));
+        fixture.runner.stepOnce();
+        drainEntryFreeze(fixture);
+        fixture.runner.stepOnce();
+        expect(fixture.camera.getBattleTarget()).toBe(5);
+
+        for (let frame = 0; frame < POST_BATTLE_HOLD_TICKS + 10; frame += 1) {
+            fixture.runner.stepOnce();
+            expect(fixture.camera.getBattleTarget()).toBe(5);
+        }
     });
 });
 

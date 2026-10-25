@@ -5,11 +5,14 @@
  * 战斗入场时先冻结固定帧数（只渲染、不推进）：此时镜头**没有**目标，渲染器因此停在
  * 全景层（整张地图 + 军队/城池标志），让观众看清战斗发生在哪；冻结结束后才设置目标，
  * 由 `Camera` 用 6 帧推近战斗，并在同一帧恢复模拟。
+ * 战斗结束后镜头**不**立即松手：先保留该目标 `POST_BATTLE_HOLD_TICKS` 个输出帧
+ * （1× 余韵，与世界的战后预算同步），之后才清空目标、由 `Camera` 拉回全景。
  * 它从不推进控制或物理（`KingdomWorld` 已在每个子步内推进控制，Pitfall 8），
  * 也不使用 rAF、重复计时器或固定 fps 累加器；延时就是操作面板的“速度”。
  */
 
 import type { IManualRunner, IRunnerDeps, IRunnerWorld } from '@/demo/types';
+import { POST_BATTLE_HOLD_TICKS } from '@/kingdom/constants';
 import type { IBattle } from '@/kingdom/types';
 import { MAX_FRAME_DELAY_MS, MIN_FRAME_DELAY_MS } from '@/render/constants';
 
@@ -55,6 +58,11 @@ export class ManualRunner implements IManualRunner {
     private freezeFramesRemaining: number;
     /** 冻结期间待应用的战斗 id；冻结结束时才写入镜头（缺失字面量 → `undefined`）。 */
     private pendingBattleId: number | undefined;
+    /**
+     * 战后余韵剩余的输出帧数：目标战斗已结束但仍留在镜头上（1× 余韵）。
+     * 缺失表示当前没有待结算的余韵（按帧计数，绝不读墙钟）。
+     */
+    private postBattleHoldFrames: number | undefined;
 
     /**
      * 构造帧驱动器。
@@ -71,6 +79,7 @@ export class ManualRunner implements IManualRunner {
         this.autoFollow = true;
         this.freezeFramesRemaining = 0;
         this.pendingBattleId = undefined;
+        this.postBattleHoldFrames = undefined;
         this.setFrameDelay(frameDelayMs);
     }
 
@@ -107,7 +116,8 @@ export class ManualRunner implements IManualRunner {
     }
 
     /**
-     * 复位会话：暂停 → 注入的会话重置 → 帧计数、冻结计数与待应用目标清零 → 恢复默认自动跟拍。
+     * 复位会话：暂停 → 注入的会话重置 → 帧计数、冻结计数、待应用目标与战后余韵清零
+     * → 恢复默认自动跟拍。
      */
     reset(): void {
         this.pause();
@@ -115,6 +125,7 @@ export class ManualRunner implements IManualRunner {
         this.frameCount = 0;
         this.freezeFramesRemaining = 0;
         this.pendingBattleId = undefined;
+        this.postBattleHoldFrames = undefined;
         this.autoFollow = true;
     }
 
@@ -137,7 +148,8 @@ export class ManualRunner implements IManualRunner {
     /**
      * 开关自动跟拍。关闭时本类不写镜头目标，因此操作者全景不会被覆盖；
      * 面板可在同一次操作里自行 `setBattleTarget`。
-     * 关闭还会立即丢弃冻结中的待应用目标与剩余冻结帧，使“关闭即不冻结”依然成立。
+     * 关闭还会立即丢弃冻结中的待应用目标、剩余冻结帧与未结算的战后余韵，
+     * 使“关闭即不冻结、也不保留旧目标”依然成立。
      * @param enabled 是否启用自动跟拍。
      */
     setAutoFollow(enabled: boolean): void {
@@ -145,6 +157,7 @@ export class ManualRunner implements IManualRunner {
         if (!this.autoFollow) {
             this.freezeFramesRemaining = 0;
             this.pendingBattleId = undefined;
+            this.postBattleHoldFrames = undefined;
         }
     }
 
@@ -173,7 +186,7 @@ export class ManualRunner implements IManualRunner {
     }
 
     /**
-     * 幂等释放：暂停、丢弃待完成的冻结与待应用目标并阻止后续调度。
+     * 幂等释放：暂停、丢弃待完成的冻结、待应用目标与未结算的战后余韵，并阻止后续调度。
      */
     dispose(): void {
         if (this.disposed) {
@@ -182,6 +195,7 @@ export class ManualRunner implements IManualRunner {
         this.pause();
         this.freezeFramesRemaining = 0;
         this.pendingBattleId = undefined;
+        this.postBattleHoldFrames = undefined;
         this.disposed = true;
     }
 
@@ -262,6 +276,10 @@ export class ManualRunner implements IManualRunner {
      * 只有 `undefined → 数字` 的入场切换会启动冻结，且**不**立即写镜头目标——
      * 待冻结结束才由 `releasePendingTarget` 应用，从而先播完全景节拍再推近；
      * 战斗间切换、退出全景、关闭自动跟拍都不冻结，既有语义保持不变。
+     *
+     * 当前目标消失（战斗结束）时**不**立刻松手：先保留目标
+     * `POST_BATTLE_HOLD_TICKS` 个输出帧，让观众看清战果（世界的战后余韵同样是 1×）；
+     * 余韵耗尽后才清空目标（开始拉远）或切到仍活跃的战斗——两者都不触发入场冻结。
      * @param world 当前世界。
      */
     private updateTarget(world: IRunnerWorld): void {
@@ -272,18 +290,36 @@ export class ManualRunner implements IManualRunner {
             .getBattleSystem()
             .listActiveBattles();
         const current = this.deps.camera.getBattleTarget();
-        if (
-            current !== undefined &&
-            active.some(battle => battle.getId() === current)
-        ) {
+
+        if (current !== undefined) {
+            if (active.some(battle => battle.getId() === current)) {
+                // 目标仍在打：没有待结算的余韵。
+                this.postBattleHoldFrames = undefined;
+                return;
+            }
+            if (this.postBattleHoldFrames === undefined) {
+                // 战斗刚结束的这一帧：武装余韵，本帧仍留在战场收尾画面上。
+                this.postBattleHoldFrames = POST_BATTLE_HOLD_TICKS;
+                return;
+            }
+            this.postBattleHoldFrames -= 1;
+            if (this.postBattleHoldFrames > 0) {
+                return;
+            }
+            // 本帧耗尽了最后一个余韵帧：松手，切到仍活跃的战斗或回到全景。
+            this.postBattleHoldFrames = undefined;
+            this.deps.camera.setBattleTarget(
+                active.length > 0 ? active[0].getId() : undefined
+            );
             return;
         }
+
         const next = active.length > 0 ? active[0].getId() : undefined;
-        if (current === undefined && next !== undefined) {
-            this.pendingBattleId = next;
-            this.freezeFramesRemaining = BATTLE_ENTRY_FREEZE_FRAMES;
+        if (next === undefined) {
             return;
         }
-        this.deps.camera.setBattleTarget(next);
+        this.postBattleHoldFrames = undefined;
+        this.pendingBattleId = next;
+        this.freezeFramesRemaining = BATTLE_ENTRY_FREEZE_FRAMES;
     }
 }

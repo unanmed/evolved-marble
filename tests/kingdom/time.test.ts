@@ -520,7 +520,10 @@ describe('KingdomWorld — post-battle 1× hold before the peace rate', () => {
     });
 
     it('advances 1× for 114 ticks after the last battle, then 24×', () => {
-        const created = createKingdom({ scenario: aftermathScenario(), seed: 5 });
+        const created = createKingdom({
+            scenario: aftermathScenario(),
+            seed: 5
+        });
         fixture = created;
         const { world } = created;
 
@@ -535,8 +538,7 @@ describe('KingdomWorld — post-battle 1× hold before the peace rate', () => {
         }
         expect(ended).toBe(true);
 
-        const holdTicks =
-            POST_BATTLE_HOLD_TICKS + POST_BATTLE_PULLBACK_TICKS;
+        const holdTicks = POST_BATTLE_HOLD_TICKS + POST_BATTLE_PULLBACK_TICKS;
         expect(holdTicks).toBe(114);
         const minutesAtEnd = world.getTime().getGameMinutes();
         for (let tick = 0; tick < holdTicks; tick += 1) {
@@ -544,9 +546,7 @@ describe('KingdomWorld — post-battle 1× hold before the peace rate', () => {
             expect(result.gameMinutes).toBe(BATTLE_TICK_MINUTES);
             expect(result.minutesPerTick).toBe(BATTLE_TICK_MINUTES);
         }
-        expect(world.getTime().getGameMinutes()).toBe(
-            minutesAtEnd + holdTicks
-        );
+        expect(world.getTime().getGameMinutes()).toBe(minutesAtEnd + holdTicks);
 
         const peace = world.tick();
         expect(peace.gameMinutes).toBe(PEACE_TICK_MINUTES);
@@ -621,4 +621,3 @@ describe('KingdomWorld — post-battle 1× hold before the peace rate', () => {
         expect(peace.gameMinutes).toBe(PEACE_TICK_MINUTES);
     });
 });
-

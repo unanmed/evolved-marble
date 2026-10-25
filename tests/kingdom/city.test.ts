@@ -2,7 +2,11 @@ import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import RAPIER from '@dimforge/rapier2d-compat';
 import { createKingdom, teleportUnitPhysics } from './harness';
 import type { IKingdomFixture } from './harness';
-import { BATTLE_END_DEBOUNCE_TICKS } from '@/kingdom/constants';
+import {
+    BATTLE_END_DEBOUNCE_TICKS,
+    POST_BATTLE_HOLD_TICKS,
+    POST_BATTLE_PULLBACK_TICKS
+} from '@/kingdom/constants';
 import {
     ArmyOrderKind,
     ArmyState,
@@ -824,10 +828,13 @@ describe('city battles — trigger, capture, garrison selection and regroup', ()
         }
 
         // A later arrival cannot take the city link away from the new garrison.
+        // The march runs at 1× through the post-battle aftermath (114 ticks) before
+        // the peace rate resumes, so the bound covers the hold plus the walk itself.
         orderGarrison(kingdom.world, 1, 1);
         for (
             let tick = 0;
-            tick < 40 && kingdom.world.getArmy(1)?.getOrder() !== null;
+            tick < POST_BATTLE_HOLD_TICKS + POST_BATTLE_PULLBACK_TICKS + 40 &&
+            kingdom.world.getArmy(1)?.getOrder() !== null;
             tick += 1
         ) {
             kingdom.world.tick();
