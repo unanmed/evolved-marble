@@ -19,7 +19,7 @@ affects: [05-render-system, demo, recording, 04-kingdom-system]
 actuals:
   tokens: 2036
   tasks: 1
-  commits: 2
+  commits: 4
 plan_head_before: 3ec279be434ee002efb90dfb94acc1fd53d40391
 
 tech-stack:
@@ -100,7 +100,7 @@ status: complete
 - **Completed:** 2026-10-25T13:34:19Z
 - **Tasks:** 1
 - **Files modified:** 3
-- **Commits:** 2 (measured from the plan ledger: `git rev-list --count 3ec279b..HEAD` — the task commit plus this plan's metadata commit)
+- **Commits:** 4 (measured from the plan ledger: `git rev-list --count 3ec279b..HEAD` — the task commit, the plan metadata commit, and two summary-refresh docs commits)
 
 ## Accomplishments
 
@@ -114,6 +114,8 @@ status: complete
 
 1. **Task 1: Report actual travel direction from `advanceArmyCenter`** — `915a72b` (fix)
 2. **Plan metadata: complete summary** — `b3f6b8d` (docs)
+3. **Summary refresh: measured commit count** — `ec96826` (docs)
+4. **Summary refresh: final ledger count** — this commit (docs)
 
 ## Files Created/Modified
 
@@ -184,6 +186,7 @@ None.
 - FOUND: .planning/phases/05-render-system/05-19-SUMMARY.md
 - FOUND: 915a72b (Task 1)
 - FOUND: b3f6b8d (plan metadata)
+- FOUND: ec96826 (summary refresh)
 - FOUND: src/kingdom/Army.ts
 - FOUND: tests/kingdom/time.test.ts
 - FOUND: tests/kingdom/march.test.ts
