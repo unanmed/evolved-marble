@@ -115,6 +115,58 @@ describe('advanceArmyCenter — 10 m per game hour', () => {
         expect(next.heading).toBeCloseTo(march.heading, 9);
     });
 
+    it('reports the actual travel direction as the heading on a normal march', () => {
+        // 从 (500,500) 走向 (850,300)：真实行进角 atan2(-200,350) ≈ -0.519 rad，
+        // 而输入朝向 π/4 ≈ 0.785 rad，旧实现会把这个陈旧角度原样返回。
+        const next = advanceArmyCenter(
+            500,
+            500,
+            Math.PI / 4,
+            850,
+            300,
+            60,
+            MAP_WIDTH,
+            MAP_HEIGHT
+        );
+
+        expect(next.x).toBeGreaterThan(500);
+        expect(next.y).toBeLessThan(500);
+        expect(normalizeAngle(next.heading)).toBeCloseTo(
+            Math.atan2(300 - 500, 850 - 500),
+            9
+        );
+        expect(
+            Math.abs(normalizeAngle(next.heading) - Math.PI / 4)
+        ).toBeGreaterThan(1);
+    });
+
+    it('re-derives the heading from each new target (no stale direction)', () => {
+        const eastward = advanceArmyCenter(
+            500,
+            500,
+            Math.PI / 4,
+            900,
+            500,
+            60,
+            MAP_WIDTH,
+            MAP_HEIGHT
+        );
+        expect(normalizeAngle(eastward.heading)).toBeCloseTo(0, 9);
+
+        const southward = advanceArmyCenter(
+            eastward.x,
+            eastward.y,
+            eastward.heading,
+            eastward.x,
+            900,
+            60,
+            MAP_WIDTH,
+            MAP_HEIGHT
+        );
+        expect(normalizeAngle(southward.heading)).toBeCloseTo(Math.PI / 2, 9);
+        expect(southward.y).toBeGreaterThan(500);
+    });
+
     it('does not move when the target is null (Hold)', () => {
         const march = eastwardMarch();
         const next = advanceArmyCenter(

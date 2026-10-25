@@ -19,7 +19,7 @@ import type { IArmyOrder, IMutableArmy, IVec2 } from '@/kingdom/types';
  * 同一输入永远得到同一结果（不随机、不读时钟）。
  * @param centerX 军队中心 x 坐标（米）。
  * @param centerY 军队中心 y 坐标（米）。
- * @param heading 军队朝向角（弧度；0 = +x，逆时针为正）。
+ * @param heading 军队朝向角（弧度；0 = +x，正值朝 +y 旋转，即屏幕坐标下顺时针）。
  * @param unitIds 名册单位 id（顺序决定槽位顺序）。
  * @param radius 圆盘半径（米）。
  * @returns unitId → 槽位坐标的映射；无名册单位时为空映射。
@@ -51,25 +51,29 @@ export function computeFormationSlots(
 
 /**
  * 推进军队中心一个游戏时段（D-12/KING-01）：以 10 m/h 的固定速度向目标移动，
- * 越界时钳制并在被越界的轴上反射朝向，随后沿反射后的朝向继续前进。
+ * 越界时钳制并在被越界的轴上反射行进方向，随后沿反射后的方向继续前进。
+ *
+ * 朝向约定：弧度，`0` = +x，正值朝 +y 旋转（世界 y 向下，所以在屏幕上是顺时针）。
+ * 返回值中的 `heading` **等于本时段实际的行进方向**（反射之后），
+ * 因此全景箭头总能指向军队真正走的方向；未移动时保持输入朝向。
  *
  * 规则：
  * - `targetX`/`targetY` 为 `null`（或任一侧缺失）表示 `Hold`：中心与朝向都不变。
  * - 每个轴的方向独立决定：默认取「中心 → 目标」的单位向量分量；
  *   但若目标在该轴上**位于地图外**，该轴方向改取当前朝向的对应分量
  *   （`cos(heading)` / `sin(heading)`）。这正是「反射后能沿新朝向走回地图内」的关键。
- * - 位置钳制到 `[0, width] × [0, height]`；发生钳制时在被钳制的轴上翻转朝向分量
+ * - 位置钳制到 `[0, width] × [0, height]`；发生钳制时在被钳制的轴上翻转**行进方向**分量
  *   （水平钳制取反 x 分量、垂直钳制取反 y 分量），使军队只反弹一次。
  * - 任一输入非有限时原样返回输入（不产生 NaN）；函数从不修改参数。
  * @param centerX 当前中心 x 坐标（米）。
  * @param centerY 当前中心 y 坐标（米）。
- * @param heading 当前朝向角（弧度）。
+ * @param heading 当前朝向角（弧度；0 = +x，正值朝 +y）。
  * @param targetX 目标 x 坐标（米）；`null` 表示无目标。
  * @param targetY 目标 y 坐标（米）；`null` 表示无目标。
  * @param gameMinutes 本时段推进的游戏分钟数。
  * @param width 地图宽度（米）。
  * @param height 地图高度（米）。
- * @returns 新的中心坐标与朝向（新对象，永不修改参数）。
+ * @returns 新的中心坐标与实际行进朝向（新对象，永不修改参数）。
  */
 export function advanceArmyCenter(
     centerX: number,
@@ -116,23 +120,21 @@ export function advanceArmyCenter(
 
     const clampedX = Math.min(Math.max(rawX, 0), width);
     const clampedY = Math.min(Math.max(rawY, 0), height);
-    const clampedOnX = clampedX !== rawX;
-    const clampedOnY = clampedY !== rawY;
+    const clampOnX = clampedX !== rawX;
+    const clampOnY = clampedY !== rawY;
 
-    let headingX = Math.cos(heading);
-    let headingY = Math.sin(heading);
-    if (clampedOnX) {
-        headingX = -headingX;
-    }
-    if (clampedOnY) {
-        headingY = -headingY;
+    // 实际行进方向：反射后仍是「下一步往哪走」，与尚未发生位移的单轴情况一致。
+    const travelX = clampOnX ? -dirX : dirX;
+    const travelY = clampOnY ? -dirY : dirY;
+    if (travelX === 0 && travelY === 0) {
+        // 方向退化（目标轴外且朝向分量为 0）：无从推断行进方向，保留旧朝向。
+        return { x: clampedX, y: clampedY, heading };
     }
 
     return {
         x: clampedX,
         y: clampedY,
-        heading:
-            clampedOnX || clampedOnY ? Math.atan2(headingY, headingX) : heading
+        heading: Math.atan2(travelY, travelX)
     };
 }
 
@@ -151,7 +153,7 @@ export class Army implements IMutableArmy {
     private x: number;
     /** 中心位置的 y 坐标（米）。 */
     private y: number;
-    /** 朝向角（弧度；0 = +x，逆时针为正）。 */
+    /** 朝向角（弧度；0 = +x，正值朝 +y，即屏幕坐标下顺时针；行军中等于实际行进方向）。 */
     private heading: number;
     /** 宏观状态。 */
     private state = ArmyState.Marching;
@@ -214,7 +216,8 @@ export class Army implements IMutableArmy {
     }
 
     /**
-     * 朝向角（弧度）。
+     * 朝向角（弧度）：0 = +x、正值朝 +y（屏幕顺时针）；
+     * 行军中由 `advanceArmyCenter` 写为实际行进方向。
      * @returns 朝向。
      */
     getHeading(): number {

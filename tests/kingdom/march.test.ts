@@ -246,6 +246,33 @@ describe('march — real Rapier formation control', () => {
         }
     });
 
+    it('reports the travel direction as the heading so the strategic arrow follows the march', () => {
+        const created = createRig(300, 500, Math.PI / 4, 4);
+        rig = created;
+
+        // 初始朝向 π/4 与实际目标方向无关；第一步之后必须改写成行进方向。
+        marchStep(created, 700, 700);
+
+        const center = created.army.getCenter();
+        const heading = created.army.getHeading();
+        expect(center.x).toBeGreaterThan(300);
+        expect(center.y).toBeGreaterThan(500);
+        expect(heading).toBeCloseTo(
+            Math.atan2(center.y - 500, center.x - 300),
+            9
+        );
+        expect(heading).toBeCloseTo(Math.atan2(700 - 500, 700 - 300), 9);
+
+        // 方向不变时每步重复写入同一个角度，不会漂移。
+        for (let minute = 0; minute < 30; minute += 1) {
+            marchStep(created, 700, 700);
+        }
+        expect(created.army.getHeading()).toBeCloseTo(
+            Math.atan2(700 - 500, 700 - 300),
+            9
+        );
+    });
+
     it('freezes the centre on Hold while the physics keeps stepping', () => {
         const created = createRig(300, 500, 0, 4);
         rig = created;
@@ -298,6 +325,16 @@ describe('march — real Rapier formation control', () => {
         const inward = bounced.x - after.x;
         expect(inward).toBeGreaterThan(10);
         expect(after.x).toBeLessThanOrEqual(MAP_WIDTH);
+
+        // 反射后的朝向就是实际位移方向（箭头指向真正前进的方向）。
+        const beforeStep = created.army.getCenter();
+        marchStep(created, 2000, 500);
+        const afterStep = created.army.getCenter();
+        expect(created.army.getHeading()).toBeCloseTo(
+            Math.atan2(afterStep.y - beforeStep.y, afterStep.x - beforeStep.x),
+            9
+        );
+        expect(afterStep.x).toBeLessThan(beforeStep.x);
     });
 
     it('keeps every roster id from start to finish', () => {
