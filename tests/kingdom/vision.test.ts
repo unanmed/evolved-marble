@@ -381,4 +381,55 @@ describe('vision — 100 m army union with 150 m city vision, no memory', () => 
         expect(ARMY_VISION_RADIUS).toBe(100);
         expect(CITY_VISION_RADIUS).toBe(150);
     });
+
+    it('hides an empty enemy army from its opponents briefs', () => {
+        const kingdom = createVisionKingdom({
+            ownArmyX: 500,
+            ownArmyY: 500,
+            ownArmyUnits: 2,
+            ownCityX: 50,
+            ownCityY: 50,
+            enemyArmyX: 570,
+            enemyArmyY: 500,
+            enemyArmyUnits: 1,
+            enemyCityX: 900,
+            enemyCityY: 900
+        });
+        expect(visibleArmyIds(kingdom, 1)).toEqual([1, 2]);
+
+        // 战后残留态：名册清空但军队对象与势力归属仍在（D-05）。
+        const enemy = kingdom.world.getArmy(2);
+        expect(enemy).not.toBeNull();
+        (enemy as IMutableArmy).setUnitIds([]);
+
+        expect(kingdom.world.getFaction(2)?.getArmyIds()).toContain(2);
+        expect(kingdom.world.getArmy(2)?.getUnitIds()).toEqual([]);
+        expect(visibleArmyIds(kingdom, 1)).toEqual([1]);
+    });
+
+    it('grants no vision from an empty army, including to its own faction', () => {
+        const kingdom = createVisionKingdom({
+            ownArmyX: 500,
+            ownArmyY: 500,
+            ownArmyUnits: 2,
+            ownCityX: 50,
+            ownCityY: 50,
+            enemyArmyX: 599,
+            enemyArmyY: 500,
+            enemyArmyUnits: 1,
+            enemyCityX: 900,
+            enemyCityY: 900
+        });
+        expect(visibleArmyIds(kingdom, 1)).toEqual([1, 2]);
+
+        const own = kingdom.world.getArmy(1);
+        expect(own).not.toBeNull();
+        (own as IMutableArmy).setUnitIds([]);
+
+        // 空军队自己不再出现在己方简讯里，且不再提供 100 m 视野：
+        // 敌方中心在 99 m、敌方单位在 103 m，都在失去的圆之外。
+        expect(kingdom.world.getFaction(1)?.getArmyIds()).toContain(1);
+        expect(visibleArmyIds(kingdom, 1)).toEqual([]);
+        expect(visibleCityIds(kingdom, 1)).toEqual([1]);
+    });
 });

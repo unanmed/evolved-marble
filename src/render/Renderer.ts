@@ -104,6 +104,8 @@ const EMPTY_TEXT = '';
  * 只读 `getFactions` → `getArmyIds`/`getCityIds` → `getArmy`/`getCity`，
  * 绝不使用受视野限制的查询；不解析颜色（由调用方决定），也不做任何投影以外的工作。
  * 非有限坐标被跳过，因此镜头不会被一个坏点拖走（T-05-36）。
+ * 名册为空的军队不产出标志：世界会保留这种军队的身份（D-05），
+ * 但空箭头与“0”标签只会是幽灵（见 `updateStrategic` 的释放路径）。
  * @param world 王国世界读取面（上帝视角）。
  * @param transform 本帧镜头变换。
  * @param viewport 当前画布视口（像素）。
@@ -123,6 +125,10 @@ export function buildStrategicFrame(
             if (army === null) {
                 continue;
             }
+            const unitIds = army.getUnitIds();
+            if (unitIds.length === 0) {
+                continue;
+            }
             const center = army.getCenter();
             if (!Number.isFinite(center.x) || !Number.isFinite(center.y)) {
                 continue;
@@ -132,7 +138,7 @@ export function buildStrategicFrame(
                 factionId: army.getFactionId(),
                 screen: worldToScreen(center, transform, viewport),
                 heading: army.getHeading(),
-                strength: army.getUnitIds().length
+                strength: unitIds.length
             });
         }
 

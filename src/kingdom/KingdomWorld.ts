@@ -361,7 +361,9 @@ export class KingdomWorld implements IWorld {
     /**
      * 该势力当前可见的军队简讯（D-25/A21，无记忆）：己方军队始终包含；
      * 敌方军队在中心落入己方视野圆**或**其任一单位位置落入视野圆时可见
-     * （research Pitfall 16）。每次调用都重新计算并返回全新的精简简讯。
+     * （research Pitfall 16）。名册为空的军队（战后残留）既不可见也不出现在
+     * 己方简讯中——它的身份仍保存在世界里（D-05），只是不可观测。
+     * 每次调用都重新计算并返回全新的精简简讯。
      * @param factionId 势力 id。
      * @returns 军队简讯列表。
      */
@@ -375,6 +377,9 @@ export class KingdomWorld implements IWorld {
         const briefs: IVisibleArmyBrief[] = [];
 
         for (const army of this.armies.values()) {
+            if (army.getUnitIds().length === 0) {
+                continue;
+            }
             const own = ownArmyIds.has(army.getId());
             if (!own && !this.armyInsideCircles(army, circles)) {
                 continue;
@@ -458,6 +463,8 @@ export class KingdomWorld implements IWorld {
     /**
      * 构建一个势力的视野圆并集：己方每支军队中心一个 `ARMY_VISION_RADIUS` 圆，
      * 己方每座城池点一个 `CITY_VISION_RADIUS` 圆（D-25）。
+     * 名册为空的军队不产生视野圆：没有单位就没有观察者，
+     * 直接驻留的空军队不应继续“看”地图。
      * @param faction 势力。
      * @returns 视野圆列表（每次调用新建）。
      */
@@ -467,7 +474,7 @@ export class KingdomWorld implements IWorld {
         const circles: Array<{ x: number; y: number; radius: number }> = [];
         for (const armyId of faction.getArmyIds()) {
             const army = this.armies.get(armyId);
-            if (army === undefined) {
+            if (army === undefined || army.getUnitIds().length === 0) {
                 continue;
             }
             const center = army.getCenter();

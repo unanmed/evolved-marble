@@ -395,7 +395,7 @@ export interface IWorld {
     getArmy(armyId: number): IArmy | null;
     /** 按 id 读取城池；不存在时为 `null`（缺失对象）。 */
     getCity(cityId: number): ICity | null;
-    /** 该势力当前可见的军队简讯（含己方）；无记忆（D-25/A21）。 */
+    /** 该势力当前可见的军队简讯（含己方；名册为空的军队被排除）；无记忆（D-25/A21）。 */
     getVisibleArmies(factionId: number): readonly IVisibleArmyBrief[];
     /** 该势力当前可见的城池简讯（含己方）；无记忆（D-25/A21）。 */
     getVisibleCities(factionId: number): readonly IVisibleCityBrief[];
