@@ -3,16 +3,16 @@ gsd_state_version: "1.0"
 current_phase: 05
 current_phase_name: 渲染系统
 status: executing
-stopped_at: Completed 05-18-PLAN.md
-last_updated: "2026-10-24T16:10:26.754Z"
+stopped_at: Completed 05-19-PLAN.md
+last_updated: "2026-10-25T05:35:16.226Z"
 last_activity: 2026-10-24
 last_activity_desc: Phase 05 plan 15 executed (single-phase pull-back, weight-aware in-battle follow)
-state_head: c19227c24f2d3f0d68e7c36e6b113221f36079ad
+state_head: 915a72b36c3fe6f953d1cf18a0ff4eeda5c50191
 progress:
   total_phases: 8
   completed_phases: 0
-  total_plans: 38
-  completed_plans: 37
+  total_plans: 41
+  completed_plans: 38
   percent: 0
 ---
 
@@ -99,6 +99,7 @@ Progress: [░░░░░░░░░░] 0%
 | Phase 05 P16 | 7 | 1 tasks | 2 files |
 | Phase 05 P17 | 12min | 2 tasks | 5 files |
 | Phase 05 P18 | 6min | 1 tasks | 1 files |
+| Phase 05-render-system P19 | 5min | 1 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -228,6 +229,8 @@ Recent decisions affecting current work:
 - [Phase 05]: 05-17: the battle-entry freeze renders the strategic panorama by leaving camera.getBattleTarget() undefined, then releases pendingBattleId on the frame after the 24-frame hold and resumes ticking on that same frame
 - [Phase 05]: 05-17: turning auto-follow off drops an in-flight entry freeze and its pending target, so the class never writes the camera target while auto-follow is off
 - [Phase 05]: 05-18: combat tempo raised by tuning only - gain 4->8, attack 12->16, approach 6->8, disengage 8->10 m/s; MAX_FORCE_MAGNITUDE and all physics/damage code untouched
+- [Phase 05]: advanceArmyCenter reflects the per-axis travel direction (dir) rather than the old heading, then returns atan2(travelY, travelX): out-of-bounds-target bounces stay bit-identical while normal marches no longer report a stale heading
+- [Phase 05]: Renderer marker math needed no fix: the +x-apex arrow rotated by heading is already the atan2(dy,dx) convention in a y-down canvas, so the arrow bug was purely a stale source value
 
 ### Pending Todos
 
@@ -252,6 +255,6 @@ Items acknowledged and deferred at milestone close, most recent first:
 
 ## Session Continuity
 
-Last session: 2026-10-24T16:10:26.513Z
-Stopped at: Completed 05-18-PLAN.md
+Last session: 2026-10-25T05:35:16.042Z
+Stopped at: Completed 05-19-PLAN.md
 Resume file: None
