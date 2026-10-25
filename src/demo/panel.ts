@@ -691,7 +691,8 @@ export class OperatorPanel implements IOperatorPanel {
     }
 
     /**
-     * 追加一个势力下的全部军队选项。
+     * 追加一个势力下的全部军队选项：名册为空的军队（战后残留，D-05）不列出，
+     * 否则操作员会看到一个 0 单位的幽灵条目。
      * @param select 军队下拉框。
      * @param faction 势力。
      * @param world 当前世界。
@@ -703,7 +704,7 @@ export class OperatorPanel implements IOperatorPanel {
     ): void {
         for (const armyId of faction.getArmyIds()) {
             const army = world.getArmy(armyId);
-            if (army !== null) {
+            if (army !== null && army.getUnitIds().length > 0) {
                 this.appendArmyOption(select, army, world);
             }
         }
